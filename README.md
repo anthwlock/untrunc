@@ -21,7 +21,7 @@ Download the source code from gtub at https://github.com/ponchio/untrunc
 
 Unzip the source code:
 
-    tar xvf untrunc-master.tgz
+    unzip master.zip
 
 and then go into the directory where it's been unzipped:
 
