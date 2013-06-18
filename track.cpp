@@ -63,7 +63,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         //TODO use the first byte of the nal: forbidden bit and type!
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
-        if(nal_type != 1 && nal_type != 5) return false;
+        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8) return false;
         if(start[0] == 0) return true;
         return false;
 
@@ -161,6 +161,16 @@ void Track::parse(Atom *t, Atom *mdat) {
         offset += size;
     }
 
+    //move this stuff into track!
+    Atom *hdlr = trak->atomByName("hdlr");
+    char type[5];
+    hdlr->readChar(type, 8, 4);
+
+    bool audio = (type == string("soun"));
+
+    if(type != string("soun") && type != string("vide"))
+        return;
+
     //move this to Codec
 
     codec.parse(trak, offsets, mdat);
@@ -169,14 +179,9 @@ void Track::parse(Atom *t, Atom *mdat) {
 
     if(!codec.codec) throw string("No codec found!");
     if(avcodec_open(codec.context, codec.codec)<0)
-        throw string("Could not open audio codec");
+        throw string("Could not open codec: ") + codec.context->codec_name;
 
-    //move this stuff into track!
-    Atom *hdlr = trak->atomByName("hdlr");
-    char type[5];
-    hdlr->readChar(type, 8, 4);
 
-    bool audio = (type == string("soun"));
 
 
 

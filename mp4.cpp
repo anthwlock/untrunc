@@ -169,7 +169,7 @@ void Mp4::analyze() {
             }
             //assert(matches);
             cout << "Length: " << length << " true length: " << track.sizes[i] << endl;
-            assert(length == track.sizes[i]);
+            //assert(length == track.sizes[i]);
 
         }
     }
