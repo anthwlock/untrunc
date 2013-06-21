@@ -193,11 +193,14 @@ void Mp4::parseTracks() {
 }
 
 void Mp4::repair(string filename) {
+
+
     File file;
     if(!file.open(filename))
         throw "Could not open file: " + filename;
 
     //find mdat. fails with krois
+    //TODO check for multiple mdat
     Atom *mdat = NULL;
     while(1) {
 

@@ -64,6 +64,8 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
         if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8) return false;
+        //if nal is equal 7, the other fragments (starting with nal type 7) should be part of the same packet
+        //(we cannot recover time information, remember)
         if(start[0] == 0) return true;
         return false;
 
@@ -107,10 +109,39 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         av_freep(&frame);
         return consumed;
     } else if(name == "avc1") {
+        int first_nal_type = (start[4] & 0x1f);
+        cout << "Nal type: " << first_nal_type << endl;
         int length = *(int *)start;
         reverse(length);
+
         if(length <= 0) return -1;
-        return length + 4;
+        length += 4;
+        if(length > maxlength) return -1;
+        //consume all nal units where type is != 1, 3, 5
+        unsigned char *pos = start;
+        bool found = false;
+        while(!found) {
+            assert(length + 4 < maxlength);
+            pos = start + length;
+            assert(pos - start < maxlength - 4);
+            int l = *(int *)pos;
+            reverse(l);
+            if(l <= 0) break;
+            if(pos[0] != 0) break; //not avc1
+            int nal_type = (pos[4] & 0x1f);
+            cout << "Found: " << nal_type << endl;
+            if(nal_type <= 5) found = true;
+            //if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
+            if(nal_type > 12) break; //unknown nal type
+            if(l + length + 8 >= maxlength) break; //out of boundary
+            assert(length < maxlength);
+
+
+            //ok include it
+            length += l + 4;
+            assert(length + 4 < maxlength);
+        }
+        return length;
     } else if(name == "samr") { //lenght is multiple of 32, we split packets.
         return 32;
     } else
