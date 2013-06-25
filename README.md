@@ -43,6 +43,14 @@ That's it you're done!
 
 (Thanks to Tom Sparrow for providing the guide)
 
+### Help/Support
+
+If you managed to recover the video, help me to find time to keep working on this software and make other people happy.
+
+Donations can be made at my page, http://vcg.isti.cnr.it/~ponchio
+
+Thank you.
+
 
 
 
