@@ -9,6 +9,8 @@ You need:
 * another video file which isn't broken
 * a linux installation (I used Ubuntu 12.04) and basic ability to use a command line.
 
+If you have an old Ubuntu version, you might need to manually install a recent libav version, go to the bottom of the page for instructions.
+
 What to do:
 
 Install some pre-requisite libraries with this command:
@@ -42,6 +44,26 @@ Then it should churn away and hopefully produce a playable file called broken-vi
 That's it you're done!
 
 (Thanks to Tom Sparrow for providing the guide)
+
+##Manual libav installation
+
+Download [libav, 0.8.7 version](http://libav.org/releases/libav-0.8.7.tar.xz) from [libav download page](http://libav.org/download.html) and
+unzip it into the untrunc source code library.
+
+    cd untrunc-master
+    tar -xvzf libav-0.8.7.tar.xz
+
+build the library
+
+    cd libav-0.8.7
+    ./configure
+    ./make
+
+and finally build untrunc
+    
+    g++ -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -I./libav-0.8.7 -L./libav-0.8.7/libavformat -lavformat -L./libav-0.8.7/libavcodec -lavcodec -L./libav-0.8.7/libavutil -lavutil -lpthread -lz
+
+then proceed as above.
 
 ### Help/Support
 
