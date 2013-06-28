@@ -12,15 +12,15 @@ public:
     bool open(std::string filename);
     bool create(std::string filename);
 
-    void seek(int p);
-    int pos();
+    void seek(long p);
+    long pos();
     bool atEnd();
-    int length() { return size; }
+    long length() { return size; }
 
     int readInt();
     int readInt64();
     void readChar(char *dest, int n);
-    std::vector<unsigned char> read(int n);
+    std::vector<unsigned char> read(long n);
 
     int writeInt(int n);
     int writeInt64(int n);
@@ -28,7 +28,7 @@ public:
     int write(std::vector<unsigned char> &v);
 
 protected:
-    int size;
+    long size;
     FILE *file;
 };
 

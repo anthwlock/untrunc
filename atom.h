@@ -17,7 +17,7 @@ public:
     std::vector<Atom *> children;
 
     Atom(): start(0), length(-1) {
-        name[0] = name[1] = name[3] = name[4] = name[5] = 0;
+        name[0] = name[1] = name[2] = name[3] = name[4] = 0;
         length = 0;
         start = 0;
     }

@@ -41,16 +41,16 @@ bool File::create(string filename) {
     return true;
 }
 
-void File::seek(int p) {
+void File::seek(long p) {
     fseek(file, p, SEEK_SET);
 }
 
-int File::pos() {
+long File::pos() {
     return ftell(file);
 }
 
 bool File::atEnd() {
-    int pos = ftell(file);
+    long pos = ftell(file);
     return pos == size;
 }
 
@@ -82,11 +82,11 @@ void File::readChar(char *dest, int n) {
         throw string("Could not read chars");
 }
 
-vector<unsigned char> File::read(int n) {
+vector<unsigned char> File::read(long n) {
     vector<unsigned char> dest(n);
-    int len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
+    long len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
     if(len != n)
-        throw string("Could not read chars");
+        throw string("Could not read at position");
     return dest;
 }
 

@@ -129,7 +129,6 @@ int Codec::getLength(unsigned char *start, int maxlength) {
             if(l <= 0) break;
             if(pos[0] != 0) break; //not avc1
             int nal_type = (pos[4] & 0x1f);
-            cout << "Found: " << nal_type << endl;
             if(nal_type <= 5) found = true;
             //if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
             if(nal_type > 12) break; //unknown nal type

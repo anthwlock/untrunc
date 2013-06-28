@@ -30,8 +30,8 @@ HEADERS += \
 #INCLUDEPATH += -I/usr/local/lib
 #LIBS += -L/usr/local/lib -lavformat -lavcodec -lavutil
 
-INCLUDEPATH += -I../libav-0.8.4/libavformat -I../libav-0.8.4/libavcodec -I../libav-0.8.4/libavutil
-LIBS += ../libav-0.8.4/libavformat/libavformat.a ../libav-0.8.4/libavcodec/libavcodec.a ../libav-0.8.4/libavutil/libavutil.a
+INCLUDEPATH += -I../libav-0.8.7/libavformat -I../libav-0.8.7/libavcodec -I../libav-0.8.7/libavutil
+LIBS += ../libav-0.8.7/libavformat/libavformat.a ../libav-0.8.7/libavcodec/libavcodec.a ../libav-0.8.7/libavutil/libavutil.a
 LIBS += -lz
 
 #QMAKE_LFLAGS += -static

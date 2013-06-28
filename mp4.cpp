@@ -164,7 +164,7 @@ void Mp4::analyze() {
             bool matches = track.codec.matchSample(start, maxlength);
             int length= track.codec.getLength(start, maxlength);
             if(!matches) {
-                cout << "Match failed!" << endl;
+                cout << "Match failed! Hit enter for next match." << endl;
                 getchar();
             }
             //assert(matches);
@@ -226,11 +226,11 @@ void Mp4::repair(string filename) {
     for(unsigned int i = 0; i < tracks.size(); i++)
         tracks[i].clear();
 
-    unsigned int offset = 0;
+    unsigned long offset = 0;
     while(offset < mdat->content.size()) {
         unsigned char *start = &(mdat->content[offset]);
 
-        int begin =  mdat->readInt(offset);
+        long begin =  mdat->readInt(offset);
 
         //Skip zeros to next 000
         if(begin == 0) {
@@ -238,9 +238,9 @@ void Mp4::repair(string filename) {
             offset += 0x1000;
             continue;
         }
-        int next =  mdat->readInt(offset + 4);
+        long next =  mdat->readInt(offset + 4);
 
-        int maxlength = mdat->content.size() - offset;
+        long maxlength = mdat->content.size() - offset;
         if(maxlength >1000000) maxlength = 1000000;
 
         cout << "Begin: " << hex << begin << " " << next << dec;
