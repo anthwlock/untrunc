@@ -83,6 +83,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         int t = *(int *)(start + 4);
         reverse(t);
         t &= 0xffff0000;
+
         cout << hex << t << dec << endl;
         if(s == 0 && t == 0x00130000) return true;
         if(s == 0x1000 && t == 0x001a0000) return true;
@@ -121,7 +122,6 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         unsigned char *pos = start;
         bool found = false;
         while(!found) {
-            assert(length + 4 < maxlength);
             pos = start + length;
             assert(pos - start < maxlength - 4);
             int l = *(int *)pos;

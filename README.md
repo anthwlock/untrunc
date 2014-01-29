@@ -68,6 +68,7 @@ then proceed as above.
 ### Help/Support
 
 If you managed to recover the video, help me to find time to keep working on this software and make other people happy.
+If you didn't write me, I need more corrupted samples to improve the program and I might solve the issue, who knows...
 
 Donations can be made at my page, http://vcg.isti.cnr.it/~ponchio
 
