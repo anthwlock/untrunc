@@ -8,7 +8,13 @@
 
 #define __STDC_LIMIT_MACROS 1
 #define __STDC_CONSTANT_MACROS 1
+
 extern "C" {
+#ifndef INT64_C
+#define INT64_C(c) (c ## LL)
+#define UINT64_C(c) (c ## ULL)
+#endif
+
 #include <stdint.h>
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
@@ -63,7 +69,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         //TODO use the first byte of the nal: forbidden bit and type!
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
-        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8) return false;
+        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8 && nal_type != 9) return false;
         //if nal is equal 7, the other fragments (starting with nal type 7) should be part of the same packet
         //(we cannot recover time information, remember)
         if(start[0] == 0) return true;
