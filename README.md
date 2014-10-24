@@ -25,7 +25,7 @@ Unzip the source code:
 
     unzip master.zip
 
-and then go into the directory where it's been unzipped:
+Go into the directory where it's been unzipped:
 
     cd untrunc-master
 
@@ -36,27 +36,20 @@ Compile the source code using this command (all one line):
 
 ## Installing on other operating system (Manual libav installation)
 
-Download the source code from GitHub at https://github.com/ponchio/untrunc
-
-    wget https://github.com/ponchio/untrunc/archive/master.zip
-
-Unzip the source code:
-
-    unzip master.zip
+Download the source code from GitHub at https://github.com/ponchio/untrunc and unzip the source code.
     
-Download [libav, 0.8.7 version](http://libav.org/releases/libav-0.8.7.tar.xz) from [libav download page](http://libav.org/download.html) and unzip into the untrunc source code library.
+Download [libav, 0.8.7 version](http://libav.org/releases/libav-0.8.7.tar.xz) from [libav download page](http://libav.org/download.html) and unzip into the untrunc source code library. Then:
 
     cd untrunc-master
-    tar -xvzf libav-0.8.7.tar.xz
 
-build the library
+Build the library
 
     cd libav-0.8.7
     ./configure
     make
     cd ../
 
-and finally build untrunc
+Build untrunc
 
     g++ -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -I./libav-0.8.7 -L./libav-0.8.7/libavformat -lavformat -L./libav-0.8.7/libavcodec -lavcodec -L./libav-0.8.7/libavutil -lavutil -lpthread -lz
 
