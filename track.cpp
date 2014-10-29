@@ -62,6 +62,8 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
     }
 }
 
+#define VERBOSE 1
+
 bool Codec::matchSample(unsigned char *start, int maxlength) {
     int s = *(int *)start;
 
@@ -69,19 +71,44 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         //TODO use the first byte of the nal: forbidden bit and type!
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
-        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8 && nal_type != 9) return false;
+        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8) {
+#ifdef VERBOSE
+            cout << "avc1: no match beacuse of nal type: " << nal_type << endl;
+#endif
+            return false;
+        }
         //if nal is equal 7, the other fragments (starting with nal type 7) should be part of the same packet
         //(we cannot recover time information, remember)
-        if(start[0] == 0) return true;
+        if(start[0] == 0) {
+#ifdef VERBOSE
+            cout << "avc1: Failed because of 0 header\n";
+#endif
+            return true;
+        }
+#ifdef VERBOSE
+        cout << "avc1: failed for not particular reason\n";
+#endif
         return false;
 
     } else if(name == "mp4a") {
         reverse(s);
-        if(s > 1000000) return true;
+        if(s > 1000000) {
+#ifdef VERBOSE
+            cout << "mp4a: Success because of large s value\n";
+#endif
+            return true;
+        }
         //horrible hack... these values might need to be changed depending on the file
         if((start[4] == 0xee && start[5] == 0x1b) ||
-                (start[4] == 0x3e && start[5] == 0x64)) return true;
+                (start[4] == 0x3e && start[5] == 0x64)) {
+            cout << "mp4a: Success because of horrible hack.\n";
+            return true;
+        }
+
         if(start[0] == 0) return false;
+#ifdef VERBOSE
+        cout << "Success for no particular reason....\n";
+#endif
         return true;
 
     } else if(name == "alac") {
@@ -90,7 +117,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         reverse(t);
         t &= 0xffff0000;
 
-        cout << hex << t << dec << endl;
+        //cout << hex << t << dec << endl;
         if(s == 0 && t == 0x00130000) return true;
         if(s == 0x1000 && t == 0x001a0000) return true;
         return false;
