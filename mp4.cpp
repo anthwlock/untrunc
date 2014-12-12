@@ -1,6 +1,4 @@
-#include "mp4.h"
-#include "atom.h"
-#include "file.h"
+
 
 #include <assert.h>
 #include <string>
@@ -13,6 +11,10 @@ extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 }
+
+#include "mp4.h"
+#include "atom.h"
+#include "file.h"
 
 using namespace std;
 
@@ -110,8 +112,12 @@ void Mp4::saveVideo(string filename) {
 
     root->updateLength();
 
+
     //fix offsets
-    int offset = ftyp->length + moov->length - mdat->start;
+    int offset = moov->length - mdat->start;
+    if(ftyp)
+            offset += ftyp->length; //not all mov have a ftyp.
+
     for(unsigned int t = 0; t < tracks.size(); t++) {
         Track &track = tracks[t];
         for(unsigned int i = 0; i < track.offsets.size(); i++)
@@ -125,9 +131,10 @@ void Mp4::saveVideo(string filename) {
     if(!file.create(filename))
         throw "Could not create file for writing: " + filename;
 
-    ftyp->write(file);
-    moov->write(file);
+    if(ftyp)
+        ftyp->write(file);
     mdat->write(file);
+    moov->write(file);
 }
 
 void Mp4::analyze() {
@@ -201,7 +208,7 @@ void Mp4::repair(string filename) {
 
     //find mdat. fails with krois
     //TODO check for multiple mdat
-    Atom *mdat = NULL;
+    BufferedAtom *mdat = new BufferedAtom(filename);
     while(1) {
 
         Atom *atom = new Atom;
@@ -218,8 +225,14 @@ void Mp4::repair(string filename) {
             continue;
         }
 
-        mdat = atom;
-        mdat->content = file.read(file.length() - file.pos());
+        mdat->start = atom->start;
+        memcpy(mdat->name, atom->name, 4);
+        memcpy(mdat->head, atom->head, 4);
+        memcpy(mdat->version, atom->version, 4);
+
+        mdat->file_begin = file.pos();
+        mdat->file_end = file.length() - file.pos();
+        //mdat->content = file.read(file.length() - file.pos());
         break;
     }
 
@@ -227,10 +240,14 @@ void Mp4::repair(string filename) {
         tracks[i].clear();
 
     unsigned long offset = 0;
-    while(offset < mdat->content.size()) {
-        unsigned char *start = &(mdat->content[offset]);
+    while(offset < mdat->contentSize()) {
 
-        long begin =  mdat->readInt(offset);
+        //unsigned char *start = &(mdat->content[offset]);
+        int64_t maxlength = mdat->contentSize() - offset;
+        if(maxlength > 800000) maxlength = 800000;
+        unsigned char *start = mdat->getFragment(offset, maxlength);
+
+        uint begin =  mdat->readInt(offset);
 
         //Skip zeros to next 000
         if(begin == 0) {
@@ -238,12 +255,12 @@ void Mp4::repair(string filename) {
             offset += 0x1000;
             continue;
         }
-        long next =  mdat->readInt(offset + 4);
+        uint next =  mdat->readInt(offset + 4);
 
-        long maxlength = mdat->content.size() - offset;
-        if(maxlength >1000000) maxlength = 1000000;
-
-        cout << "Begin: " << hex << begin << " " << next << dec;
+#ifdef VERBOSE1
+        cout << "Offset: " << offset << " ";
+        cout << hex << begin << " " << next << dec;
+#endif
         bool found = false;
         for(unsigned int i = 0; i < tracks.size(); i++) {
             Track &track = tracks[i];
@@ -259,7 +276,8 @@ void Mp4::repair(string filename) {
             }
             if(length >= maxlength)
                 continue;
-            cout << ": found as " << track.codec.name;
+            if(length > 8)
+                cout << ": found as " << track.codec.name;
             bool keyframe = track.codec.isKeyframe(start, maxlength);
             if(keyframe)
                 track.keyframes.push_back(track.offsets.size());
@@ -270,12 +288,17 @@ void Mp4::repair(string filename) {
             found = true;
             break;
         }
+#ifdef VERBOSE1
         cout << endl;
+#endif
+
         if(!found) {
             //this could be a problem for large files
             //assert(mdat->content.size() + 8 == mdat->length);
-            mdat->content.resize(offset);
-            mdat->length = mdat->content.size() + 8;
+            mdat->file_end = offset;
+            mdat->length = mdat->file_end - mdat->file_begin;
+            //mdat->content.resize(offset);
+            //mdat->length = mdat->content.size() + 8;
             break;
         }
 
@@ -285,6 +308,8 @@ void Mp4::repair(string filename) {
         tracks[i].fixTimes();
 
     Atom *original_mdat = root->atomByName("mdat");
-    original_mdat->content.swap(mdat->content);
-    original_mdat->start = -8;
+    mdat->start = original_mdat->start;
+    root->replace(original_mdat, mdat);
+    //original_mdat->content.swap(mdat->content);
+    //original_mdat->start = -8;
 }

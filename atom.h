@@ -1,15 +1,16 @@
 #ifndef ATOM_H
 #define ATOM_H
-
+extern "C" {
+    #include <stdint.h>
+}
 #include <vector>
 #include <string>
 
-class File;
-
+#include "file.h"
 class Atom {
 public:
-    int start;       //including 8 header bytes
-    int length;      //including 8 header bytes
+    int64_t start;       //including 8 header bytes
+    int64_t length;      //including 8 header bytes
     char name[5];
     char head[4];
     char version[4];
@@ -25,22 +26,45 @@ public:
 
     void parseHeader(File &file); //read just name and length
     void parse(File &file);
-    void write(File &file);
+    virtual void write(File &file);
     void print(int offset);
 
     std::vector<Atom *> atomsByName(std::string name);
     Atom *atomByName(std::string name);
+    void replace(Atom *original, Atom *replacement);
 
     void prune(std::string name);
-    void updateLength();
+    virtual void updateLength();
+
+    virtual int64_t contentSize() { return content.size(); }
 
     static bool isParent(char *id);
     static bool isDual(char *id);
     static bool isVersioned(char *id);
 
-    int readInt(int offset);
-    void writeInt(int value, int offset);
-    void readChar(char *str, int offset, int length);
+    virtual int readInt(int64_t offset);
+    void writeInt(int value, int64_t offset);
+    void readChar(char *str, int64_t offset, int64_t length);
+
+};
+
+class BufferedAtom: public Atom {
+public:
+    File file;
+    int64_t file_begin;
+    int64_t file_end;
+    unsigned char *buffer;
+    int64_t buffer_begin;
+    int64_t buffer_end;
+
+    BufferedAtom(std::string filename);
+    ~BufferedAtom();
+    unsigned char *getFragment(int64_t offset, int64_t size);
+    int64_t contentSize() { return file_end - file_begin; }
+    void updateLength();
+
+    int readInt(int64_t offset);
+    void write(File &file);
 
 };
 

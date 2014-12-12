@@ -106,19 +106,19 @@ void Atom::print(int offset) {
         //4 bytes reference index (see stsc)
         //additional fields
         //video:
-           //4 bytes zero
+        //4 bytes zero
         ///avcC: //see ISO 14496  5.2.4.1.1.
-          //01 -> version
-          //4d -> profile
-          //00 -> compatibility
-          //28 -> level code
-          //ff ->  6 bit reserved as 1  + 2 bit as nal length -1  so this is 4.
-          //E1 -> 3 bit as 1 + 5 for SPS (so 1)
-          //00 09 -> length of sequence parameter set
-          //27 4D 00 28 F4 02 80 2D C8  -> sequence parameter set
-          //01 -> number of picture parameter set
-          //00 04 -> length of picture parameter set
-          //28 EE 16 20 -> picture parameter set. (28 ee 04 62),  (28 ee 1e 20)
+        //01 -> version
+        //4d -> profile
+        //00 -> compatibility
+        //28 -> level code
+        //ff ->  6 bit reserved as 1  + 2 bit as nal length -1  so this is 4.
+        //E1 -> 3 bit as 1 + 5 for SPS (so 1)
+        //00 09 -> length of sequence parameter set
+        //27 4D 00 28 F4 02 80 2D C8  -> sequence parameter set
+        //01 -> number of picture parameter set
+        //00 04 -> length of picture parameter set
+        //28 EE 16 20 -> picture parameter set. (28 ee 04 62),  (28 ee 1e 20)
 
         cout << indent << " Entries: " << readInt(4) << " codec: " << type << endl;
 
@@ -177,6 +177,10 @@ AtomDefinition definition(char *id) {
         for(int i = 0; i < 174; i++)
             def[knownAtoms[i].known_atom_name] = knownAtoms[i];
     }
+    if(!def.count(id)) {
+       //return a fake definition
+        return def["<()>"];
+    }
     return def[id];
 }
 
@@ -215,6 +219,16 @@ Atom *Atom::atomByName(std::string name) {
     return NULL;
 }
 
+void Atom::replace(Atom *original, Atom *replacement) {
+    for(unsigned int i = 0; i < children.size(); i++) {
+        if(children[i] == original) {
+            children[i] = replacement;
+            return;
+        }
+    }
+    throw "Atom not found";
+}
+
 void Atom::prune(string name) {
     if(!children.size()) return;
 
@@ -245,21 +259,98 @@ void Atom::updateLength() {
     }
 }
 
-int Atom::readInt(int offset) {
+int Atom::readInt(int64_t offset) {
     int value = *(int *)&(content[offset]);
     reverse(value);
     return value;
 }
 
-void Atom::writeInt(int value, int offset) {
+void Atom::writeInt(int value, int64_t offset) {
     assert(content.size() >= offset + 4);
     reverse(value);
     *(int *)&(content[offset]) = value;
 }
 
-void Atom::readChar(char *str, int offset, int length) {
+void Atom::readChar(char *str, int64_t offset, int64_t length) {
     for(int i = 0; i < length; i++)
         str[i] = content[offset + i];
 
     str[length] = 0;
+}
+
+
+BufferedAtom::BufferedAtom(string filename): buffer(NULL) {
+    if(!file.open(filename))
+        throw "Could not open file.";
+}
+
+BufferedAtom::~BufferedAtom() {
+    if(buffer) delete []buffer;
+}
+
+unsigned char *BufferedAtom::getFragment(int64_t offset, int64_t size) {
+    if(offset < 0)
+        throw "Offset set before beginning of buffer";
+    if(offset + size > file_end - file_begin)
+        throw "Out of buffer";
+
+    if(buffer == NULL) {
+
+        buffer_begin = offset;
+        buffer_end = offset + 2*size;
+        if(buffer_end + file_begin > file_end)
+            buffer_end = file_end - file_begin;
+        buffer = new unsigned char[buffer_end - buffer_begin];
+        file.seek(file_begin + buffer_begin);
+        file.readChar((char *)buffer, buffer_end - buffer_begin);
+        return buffer;
+    }
+    if(buffer_begin >= offset && buffer_end >= offset + size)
+        return buffer + (offset - buffer_begin);
+
+    //reallocate and reread
+    delete []buffer;
+    buffer = NULL;
+    return getFragment(offset, size);
+}
+
+void BufferedAtom::updateLength() {
+    length = 8;
+    length += file_end - file_begin;
+
+    for(unsigned int i = 0; i < children.size(); i++) {
+        Atom *child = children[i];
+        child->updateLength();
+        length += child->length;
+    }
+}
+
+int BufferedAtom::readInt(int64_t offset) {
+    if(!buffer || offset < buffer_begin || offset > (buffer_end - 4)) {
+        buffer = getFragment(offset, 1<<16);
+    }
+    return *(int *)buffer;
+}
+
+void BufferedAtom::write(File &output) {
+    //1 write length
+    int start = output.pos();
+
+    output.writeInt(length);
+    output.writeChar(name, 4);
+    char buff[1<<20];
+    int offset = file_begin;
+    file.seek(file_begin);
+    while(offset < file_end) {
+        int toread = 1<<20;
+        if(toread + offset > file_end)
+            toread = file_end - offset;
+        file.readChar(buff, toread);
+        offset += toread;
+        output.writeChar(buff,toread);
+    }
+    for(unsigned int i = 0; i < children.size(); i++)
+        children[i]->write(output);
+    int end = output.pos();
+    assert(end - start == length);
 }

@@ -1,6 +1,9 @@
 #ifndef FILE_H
 #define FILE_H
 
+extern "C" {
+#include <stdint.h>
+}
 #include <stdio.h>
 #include <vector>
 #include <string>
@@ -12,23 +15,23 @@ public:
     bool open(std::string filename);
     bool create(std::string filename);
 
-    void seek(long p);
-    long pos();
+    void seek(int64_t p);
+    int64_t pos();
     bool atEnd();
-    long length() { return size; }
+    int64_t length() { return size; }
 
     int readInt();
     int readInt64();
-    void readChar(char *dest, int n);
-    std::vector<unsigned char> read(long n);
+    void readChar(char *dest, int64_t n);
+    std::vector<unsigned char> read(int64_t n);
 
     int writeInt(int n);
     int writeInt64(int n);
-    int writeChar(char *source, int n);
+    int writeChar(char *source, int64_t n);
     int write(std::vector<unsigned char> &v);
 
 protected:
-    long size;
+    int64_t size;
     FILE *file;
 };
 

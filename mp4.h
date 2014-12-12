@@ -14,6 +14,7 @@ class Mp4 {
 public:
     int timescale;
     int duration;
+    Atom *root;
 
     Mp4();
     ~Mp4();
@@ -28,8 +29,7 @@ public:
     void writeTracksToAtoms();
     void repair(std::string filename);
 
-protected:
-    Atom *root;
+protected:    
     std::vector<Track> tracks;
     AVFormatContext *context;
 

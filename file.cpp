@@ -41,8 +41,8 @@ bool File::create(string filename) {
     return true;
 }
 
-void File::seek(long p) {
-    fseek(file, p, SEEK_SET);
+void File::seek(int64_t p) {
+    fseek(file, p, SEEK_SET);    
 }
 
 long File::pos() {
@@ -76,13 +76,13 @@ int File::readInt64() {
     return low;
 }
 
-void File::readChar(char *dest, int n) {
+void File::readChar(char *dest, int64_t n) {
     int len = fread(dest, sizeof(char), n, file);
     if(len != n)
         throw string("Could not read chars");
 }
 
-vector<unsigned char> File::read(long n) {
+vector<unsigned char> File::read(int64_t n) {
     vector<unsigned char> dest(n);
     long len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
     if(len != n)
@@ -104,7 +104,7 @@ int File::writeInt64(int n) {
     return 8;
 }
 
-int File::writeChar(char *source, int n) {
+int File::writeChar(char *source, int64_t n) {
     fwrite(source, 1, n, file);
     return n;
 }

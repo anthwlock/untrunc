@@ -68,16 +68,27 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
     int s = *(int *)start;
 
     if(name == "avc1") {
+
+//this works only for a very specific kind of video
+//#define SPECIAL_VIDEO
+#ifdef SPECIAL_VIDEO
+        int s2 = ((int *)start)[1];
+        if(s !=  0x02000000  || (s2 != 0x00003009 && s2 != 0x00001009)) return false;
+        return true;
+#endif
+
+
         //TODO use the first byte of the nal: forbidden bit and type!
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
-        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8) {
+        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8 && nal_type != 9) {
 #ifdef VERBOSE
             cout << "avc1: no match beacuse of nal type: " << nal_type << endl;
 #endif
             return false;
         }
-        //if nal is equal 7, the other fragments (starting with nal type 7) should be part of the same packet
+        //if nal is equal 7, the other fragments (starting with nal type 7)
+        //should be part of the same packet
         //(we cannot recover time information, remember)
         if(start[0] == 0) {
 #ifdef VERBOSE
@@ -124,6 +135,11 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
 
     } else if(name == "samr") {
         return start[0] == 0x3c;
+    } else if(name == "twos") {
+        //weird audio codec: each packet is 2 signed 16b integers.
+        cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
+        exit(0);
+        return true;
     }
     return false;
 }
@@ -142,7 +158,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         int consumed = avcodec_decode_audio4(context, frame, &got_frame, &avp);
         av_freep(&frame);
         return consumed;
-    } else if(name == "avc1") {
+    } else if(name == "avc1") {        
         int first_nal_type = (start[4] & 0x1f);
         cout << "Nal type: " << first_nal_type << endl;
         int length = *(int *)start;
@@ -176,6 +192,8 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         return length;
     } else if(name == "samr") { //lenght is multiple of 32, we split packets.
         return 32;
+    } else if(name == "twos") { //lenght is multiple of 32, we split packets.
+        return 4;
     } else
         return -1;
 }
@@ -241,7 +259,7 @@ void Track::parse(Atom *t, Atom *mdat) {
     //if audio use next?
 
     if(!codec.codec) throw string("No codec found!");
-    if(avcodec_open(codec.context, codec.codec)<0)
+    if(avcodec_open2(codec.context, codec.codec, NULL)<0)
         throw string("Could not open codec: ") + codec.context->codec_name;
 
 
