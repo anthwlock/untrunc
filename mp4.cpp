@@ -112,9 +112,8 @@ void Mp4::saveVideo(string filename) {
 
     root->updateLength();
 
-
     //fix offsets
-    int offset = moov->length - mdat->start;
+    int offset = 8 + moov->length;
     if(ftyp)
             offset += ftyp->length; //not all mov have a ftyp.
 
@@ -133,8 +132,8 @@ void Mp4::saveVideo(string filename) {
 
     if(ftyp)
         ftyp->write(file);
-    mdat->write(file);
     moov->write(file);
+    mdat->write(file);
 }
 
 void Mp4::analyze() {
@@ -239,6 +238,7 @@ void Mp4::repair(string filename) {
     for(unsigned int i = 0; i < tracks.size(); i++)
         tracks[i].clear();
 
+    unsigned long count = 0;
     unsigned long offset = 0;
     while(offset < mdat->contentSize()) {
 
@@ -276,8 +276,10 @@ void Mp4::repair(string filename) {
             }
             if(length >= maxlength)
                 continue;
+#ifdef VERBOSE1
             if(length > 8)
-                cout << ": found as " << track.codec.name;
+                cout << ": found as " << track.codec.name << endl;
+#endif
             bool keyframe = track.codec.isKeyframe(start, maxlength);
             if(keyframe)
                 track.keyframes.push_back(track.offsets.size());
@@ -288,6 +290,7 @@ void Mp4::repair(string filename) {
             found = true;
             break;
         }
+
 #ifdef VERBOSE1
         cout << endl;
 #endif
@@ -295,14 +298,16 @@ void Mp4::repair(string filename) {
         if(!found) {
             //this could be a problem for large files
             //assert(mdat->content.size() + 8 == mdat->length);
-            mdat->file_end = offset;
+            mdat->file_end = mdat->file_begin + offset;
             mdat->length = mdat->file_end - mdat->file_begin;
             //mdat->content.resize(offset);
             //mdat->length = mdat->content.size() + 8;
             break;
         }
-
+        count++;
     }
+
+    cout << "Found " << count << " packets\n";
 
     for(unsigned int i = 0; i < tracks.size(); i++)
         tracks[i].fixTimes();

@@ -47,12 +47,19 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
     stsd->readChar(_codec, 12, 4);
     name = _codec;
 
+
+    //this was a stupid attempt at trying to detect packet type based on bitmasks
     mask1 = 0xffffffff;
     mask0 = 0xffffffff;
     //build the mask:
     for(int i = 0; i < offsets.size(); i++) {
+        int offset = offsets[i];
+        if(offset < mdat->start || offset - mdat->start > mdat->length) {
+            cout << "Invalid offset in track!\n";
+            exit(0);
+        }
 
-        int s = mdat->readInt(offsets[i] - mdat->start - 8);
+        int s = mdat->readInt(offset - mdat->start - 8);
         reverse(s);
         mask1 &= s;
         mask0 &= ~s;
@@ -92,7 +99,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         //(we cannot recover time information, remember)
         if(start[0] == 0) {
 #ifdef VERBOSE
-            cout << "avc1: Failed because of 0 header\n";
+            cout << "avc1: Match with 0 header\n";
 #endif
             return true;
         }
@@ -182,12 +189,25 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         */
         int first_nal_type = (start[4] & 0x1f);
         cout << "Nal type: " << first_nal_type << endl;
+        if(first_nal_type > 8) {
+            cout << "Unrecognized nal type: " << first_nal_type << endl;
+            return -1;
+        }
         int length = *(int *)start;
         reverse(length);
 
         if(length <= 0) return -1;
         length += 4;
+
+        cout << "Length for first packet = " << length <<  " / " << maxlength << endl;
+
         if(length > maxlength) return -1;
+
+#define SPLIT_NAL_PACKETS 1
+#ifdef SPLIT_NAL_PACKETS
+        return length;
+#endif
+
         //consume all nal units where type is != 1, 3, 5
         unsigned char *pos = start;
         bool found = false;
@@ -200,7 +220,9 @@ int Codec::getLength(unsigned char *start, int maxlength) {
             if(pos[0] != 0) break; //not avc1
 
             int nal_type = (pos[4] & 0x1f);
+            cout << "Intermediate nal type: " << nal_type << endl;
             if(nal_type <= 5) found = true;
+
             //if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
             if(nal_type > 12) break; //unknown nal type
             if(l + length + 8 >= maxlength) break; //out of boundary
@@ -248,8 +270,15 @@ void Track::parse(Atom *t, Atom *mdat) {
     vector<int> chunk_offsets = getChunkOffsets(t);
     vector<int> sample_to_chunk = getSampleToChunk(t, chunk_offsets.size());
 
-    assert(times.size() == sizes.size());
-    assert(times.size() == sample_to_chunk.size());
+    if(times.size() != sizes.size()) {
+        cout << "Mismatch between time offsets and size offsets: \n";
+        cout << "Time offsets: " << times.size() << " Size offsets: " << sizes.size() << endl;
+    }
+    //assert(times.size() == sizes.size());
+    if(times.size() != sample_to_chunk.size()) {
+        cout << "Mismatch between time offsets and sample_to_chunk offsets: \n";
+        cout << "Time offsets: " << times.size() << " Chunk offsets: " << sample_to_chunk.size() << endl;
+    }
     //compute actual offsets
     int old_chunk = -1;
     int offset = -1;
