@@ -329,7 +329,7 @@ int BufferedAtom::readInt(int64_t offset) {
     if(!buffer || offset < buffer_begin || offset > (buffer_end - 4)) {
         buffer = getFragment(offset, 1<<16);
     }
-    return *(int *)buffer;
+    return *(int *)(buffer + offset - buffer_begin);
 }
 
 void BufferedAtom::write(File &output) {

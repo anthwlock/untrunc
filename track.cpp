@@ -158,7 +158,28 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         int consumed = avcodec_decode_audio4(context, frame, &got_frame, &avp);
         av_freep(&frame);
         return consumed;
-    } else if(name == "avc1") {        
+
+    } else if(name == "avc1") {
+
+        /* NAL unit types
+        enum {
+            NAL_SLICE           = 1,
+            NAL_DPA             = 2,
+            NAL_DPB             = 3,
+            NAL_DPC             = 4,
+            NAL_IDR_SLICE       = 5,
+            NAL_SEI             = 6,
+            NAL_SPS             = 7,
+            NAL_PPS             = 8,
+            NAL_AUD             = 9,
+            NAL_END_SEQUENCE    = 10,
+            NAL_END_STREAM      = 11,
+            NAL_FILLER_DATA     = 12,
+            NAL_SPS_EXT         = 13,
+            NAL_AUXILIARY_SLICE = 19,
+            NAL_FF_IGNORE       = 0xff0f001,
+        };
+        */
         int first_nal_type = (start[4] & 0x1f);
         cout << "Nal type: " << first_nal_type << endl;
         int length = *(int *)start;
@@ -177,6 +198,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
             reverse(l);
             if(l <= 0) break;
             if(pos[0] != 0) break; //not avc1
+
             int nal_type = (pos[4] & 0x1f);
             if(nal_type <= 5) found = true;
             //if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
@@ -263,11 +285,6 @@ void Track::parse(Atom *t, Atom *mdat) {
         throw string("Could not open codec: ") + codec.context->codec_name;
 
 
-
-
-
-
-
     /*
     Atom *mdat = root->atomByName("mdat");
     if(!mdat)
@@ -300,7 +317,7 @@ void Track::writeToAtoms() {
     //I have found out in shane,banana,bruno and nawfel that pic_init_qp_minus26  is different even for consecutive videos of the same camera.
     //the only thing to do then is to test possible values, to do so remove 28 (the nal header) follow the golomb stuff
     //This test could be done automatically when decoding fails..
-#define SHANE 6
+//#define SHANE 6
 #ifdef SHANE
     int pps[15] = {
         0x28ee3880,
