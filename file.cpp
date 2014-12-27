@@ -45,7 +45,7 @@ void File::seek(int64_t p) {
     fseek(file, p, SEEK_SET);    
 }
 
-long File::pos() {
+int64_t File::pos() {
     return ftell(file);
 }
 
