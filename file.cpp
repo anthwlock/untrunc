@@ -1,19 +1,8 @@
 #include "file.h"
 #include <string>
+#include <endian.h>
 
 using namespace std;
-
-static void reverse(int &input) {
-    int output;
-    char *a = ( char* )&input;
-    char *b = ( char* )&output;
-
-    b[0] = a[3];
-    b[1] = a[2];
-    b[2] = a[1];
-    b[3] = a[0];
-    input = output;
-}
 
 File::File(): file(NULL) {
 }
@@ -59,8 +48,7 @@ int File::readInt() {
     int n = fread(&value, sizeof(int), 1, file);
     if(n != 1)
         throw string("Could not read atom length");
-    reverse(value);
-    return value;
+    return be32toh(value);
 }
 
 int File::readInt64() {
@@ -72,8 +60,7 @@ int File::readInt64() {
     if(n != 1)
         throw string("Could not read atom length");
 
-    reverse(low);
-    return low;
+    return be32toh(low);
 }
 
 void File::readChar(char *dest, int64_t n) {
@@ -91,14 +78,14 @@ vector<unsigned char> File::read(int64_t n) {
 }
 
 int File::writeInt(int n) {
-    reverse(n);
+    n = htobe32(n);
     fwrite(&n, sizeof(int), 1, file);
     return 4;
 }
 
 int File::writeInt64(int n) {
     int hi = 0;
-    reverse(n);
+    n = htobe32(n);
     fwrite(&hi, sizeof(int), 1, file);
     fwrite(&n, sizeof(int), 1, file);
     return 8;
