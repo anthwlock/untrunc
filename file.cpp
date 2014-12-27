@@ -51,16 +51,13 @@ int File::readInt() {
     return be32toh(value);
 }
 
-int File::readInt64() {
-    int hi, low;
-    int n = fread(&hi, sizeof(int), 1, file);
-    if(n != 1)
-        throw string("Could not read atom length");
-    n = fread(&low, sizeof(int), 1, file);
+int64_t File::readInt64() {
+    int64_t value;
+    int n = fread(&value, sizeof(value), 1, file);
     if(n != 1)
         throw string("Could not read atom length");
 
-    return be32toh(low);
+    return be64toh(value);
 }
 
 void File::readChar(char *dest, int64_t n) {
@@ -83,11 +80,9 @@ int File::writeInt(int n) {
     return 4;
 }
 
-int File::writeInt64(int n) {
-    int hi = 0;
-    n = htobe32(n);
-    fwrite(&hi, sizeof(int), 1, file);
-    fwrite(&n, sizeof(int), 1, file);
+int File::writeInt64(int64_t n) {
+    n = htobe64(n);
+    fwrite(&n, sizeof(n), 1, file);
     return 8;
 }
 

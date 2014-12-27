@@ -21,12 +21,12 @@ public:
     int64_t length() { return size; }
 
     int readInt();
-    int readInt64();
+    int64_t readInt64();
     void readChar(char *dest, int64_t n);
     std::vector<unsigned char> read(int64_t n);
 
     int writeInt(int n);
-    int writeInt64(int n);
+    int writeInt64(int64_t n);
     int writeChar(char *source, int64_t n);
     int write(std::vector<unsigned char> &v);
 
