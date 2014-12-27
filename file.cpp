@@ -17,9 +17,9 @@ bool File::open(string filename) {
     file = fopen(filename.c_str(), "r");
     if(file == NULL) return false;
 
-    fseek(file, 0L, SEEK_END);
-    size = ftell(file);
-    fseek(file, 0L, SEEK_SET);
+    fseeko(file, 0L, SEEK_END);
+    size = ftello(file);
+    fseeko(file, 0L, SEEK_SET);
 
     return true;
 }
@@ -30,17 +30,16 @@ bool File::create(string filename) {
     return true;
 }
 
-void File::seek(int64_t p) {
-    fseek(file, p, SEEK_SET);    
+void File::seek(off_t p) {
+    fseeko(file, p, SEEK_SET);
 }
 
-int64_t File::pos() {
-    return ftell(file);
+off_t File::pos() {
+    return ftello(file);
 }
 
 bool File::atEnd() {
-    long pos = ftell(file);
-    return pos == size;
+    return ftello(file) == size;
 }
 
 int File::readInt() {
@@ -60,15 +59,15 @@ int64_t File::readInt64() {
     return be64toh(value);
 }
 
-void File::readChar(char *dest, int64_t n) {
-    int len = fread(dest, sizeof(char), n, file);
+void File::readChar(char *dest, size_t n) {
+    size_t len = fread(dest, sizeof(char), n, file);
     if(len != n)
         throw string("Could not read chars");
 }
 
-vector<unsigned char> File::read(int64_t n) {
+vector<unsigned char> File::read(size_t n) {
     vector<unsigned char> dest(n);
-    long len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
+    size_t len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
     if(len != n)
         throw string("Could not read at position");
     return dest;
@@ -86,7 +85,7 @@ int File::writeInt64(int64_t n) {
     return 8;
 }
 
-int File::writeChar(char *source, int64_t n) {
+int File::writeChar(char *source, size_t n) {
     fwrite(source, 1, n, file);
     return n;
 }
