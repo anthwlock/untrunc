@@ -130,6 +130,13 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
         exit(0);
         return true;
+    } else if(name == "apcn") {
+        return memcmp(start, "icpf", 4) == 0;
+    } else if(name == "lpcm") {
+        // This is not trivial to detect because it is just
+        // the audio waveform encoded as signed 16-bit integers.
+        // For now, just test that it is not "apcn" video:
+        return memcmp(start, "icpf", 4) != 0;
     }
     return false;
 }
@@ -219,6 +226,14 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         return 32;
     } else if(name == "twos") { //lenght is multiple of 32, we split packets.
         return 4;
+    } else if(name == "apcn") {
+        return be32toh(*(int *)start);
+    } else if(name == "lpcm") {
+        // Use hard-coded values for now....
+        const int num_samples      = 4096; // Empirical
+        const int num_channels     =    2; // Stereo
+        const int bytes_per_sample =    2; // 16-bit
+        return num_samples * num_channels * bytes_per_sample;
     } else
         return -1;
 }
