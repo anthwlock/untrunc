@@ -88,9 +88,10 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         //TODO use the first byte of the nal: forbidden bit and type!
         int nal_type = (start[4] & 0x1f);
         //the other values are really uncommon on cameras...
-        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 && nal_type != 8 && nal_type != 9) {
+        if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 &&
+           nal_type != 8 && nal_type != 9 && nal_type != 10 && nal_type != 11 && nal_type != 12) {
 #ifdef VERBOSE
-            cout << "avc1: no match beacuse of nal type: " << nal_type << endl;
+            cout << "avc1: no match because of nal type: " << nal_type << endl;
 #endif
             return false;
         }
@@ -189,7 +190,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         */
         int first_nal_type = (start[4] & 0x1f);
         cout << "Nal type: " << first_nal_type << endl;
-        if(first_nal_type > 8) {
+        if(first_nal_type > 12) {
             cout << "Unrecognized nal type: " << first_nal_type << endl;
             return -1;
         }

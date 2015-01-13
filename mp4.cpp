@@ -249,12 +249,18 @@ void Mp4::repair(string filename) {
 
         uint begin =  mdat->readInt(offset);
 
-        //Skip zeros to next 000
+
         if(begin == 0) {
+            offset += 4;
+            continue;
+        }
+
+            //Skip zeros to next 000 AARRGH this sometimes is not very correct, unless it's all zeros.
+/*        if(begin == 0) {
             offset &= 0xfffff000;
             offset += 0x1000;
             continue;
-        }
+        } */
         uint next =  mdat->readInt(offset + 4);
 
 #ifdef VERBOSE1
