@@ -239,7 +239,7 @@ void Mp4::repair(string filename) {
         tracks[i].clear();
 
     unsigned long count = 0;
-    unsigned long offset = 0;
+    off_t offset = 0;
     while(offset < mdat->contentSize()) {
 
         //unsigned char *start = &(mdat->content[offset]);

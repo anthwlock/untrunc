@@ -5,6 +5,7 @@
 #include <vector>
 #include <string.h>
 #include <assert.h>
+#include <endian.h>
 
 #define __STDC_LIMIT_MACROS 1
 #define __STDC_CONSTANT_MACROS 1
@@ -18,20 +19,6 @@ extern "C" {
 #include <stdint.h>
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
-}
-
-using namespace std;
-
-static void reverse(int &input) {
-    int output;
-    char *a = ( char* )&input;
-    char *b = ( char* )&output;
-
-    b[0] = a[3];
-    b[1] = a[2];
-    b[2] = a[1];
-    b[3] = a[0];
-    input = output;
 }
 
 using namespace std;
@@ -60,7 +47,6 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
         }
 
         int s = mdat->readInt(offset - mdat->start - 8);
-        reverse(s);
         mask1 &= s;
         mask0 &= ~s;
 
@@ -72,15 +58,15 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 #define VERBOSE 1
 
 bool Codec::matchSample(unsigned char *start, int maxlength) {
-    int s = *(int *)start;
+    int s = be32toh(*(int *)start);
 
     if(name == "avc1") {
 
 //this works only for a very specific kind of video
 //#define SPECIAL_VIDEO
 #ifdef SPECIAL_VIDEO
-        int s2 = ((int *)start)[1];
-        if(s !=  0x02000000  || (s2 != 0x00003009 && s2 != 0x00001009)) return false;
+        int s2 = be32toh(((int *)start)[1]);
+        if(s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
         return true;
 #endif
 
@@ -110,7 +96,6 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         return false;
 
     } else if(name == "mp4a") {
-        reverse(s);
         if(s > 1000000) {
 #ifdef VERBOSE
             cout << "mp4a: Success because of large s value\n";
@@ -131,9 +116,7 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         return true;
 
     } else if(name == "alac") {
-        reverse(s);
-        int t = *(int *)(start + 4);
-        reverse(t);
+        int t = be32toh(*(int *)(start + 4));
         t &= 0xffff0000;
 
         //cout << hex << t << dec << endl;
@@ -148,6 +131,13 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
         cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
         exit(0);
         return true;
+    } else if(name == "apcn") {
+        return memcmp(start, "icpf", 4) == 0;
+    } else if(name == "lpcm") {
+        // This is not trivial to detect because it is just
+        // the audio waveform encoded as signed 16-bit integers.
+        // For now, just test that it is not "apcn" video:
+        return memcmp(start, "icpf", 4) != 0;
     }
     return false;
 }
@@ -194,8 +184,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
             cout << "Unrecognized nal type: " << first_nal_type << endl;
             return -1;
         }
-        int length = *(int *)start;
-        reverse(length);
+        int length = be32toh(*(int *)start);
 
         if(length <= 0) return -1;
         length += 4;
@@ -215,8 +204,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         while(!found) {
             pos = start + length;
             assert(pos - start < maxlength - 4);
-            int l = *(int *)pos;
-            reverse(l);
+            int l = be32toh(*(int *)pos);
             if(l <= 0) break;
             if(pos[0] != 0) break; //not avc1
 
@@ -239,6 +227,14 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         return 32;
     } else if(name == "twos") { //lenght is multiple of 32, we split packets.
         return 4;
+    } else if(name == "apcn") {
+        return be32toh(*(int *)start);
+    } else if(name == "lpcm") {
+        // Use hard-coded values for now....
+        const int num_samples      = 4096; // Empirical
+        const int num_channels     =    2; // Stereo
+        const int bytes_per_sample =    2; // 16-bit
+        return num_samples * num_channels * bytes_per_sample;
     } else
         return -1;
 }

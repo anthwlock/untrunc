@@ -7,20 +7,10 @@
 #include <iostream>
 
 #include <assert.h>
+#include <endian.h>
+
 using namespace std;
 
-
-static void reverse(int &input) {
-    int output;
-    char *a = ( char* )&input;
-    char *b = ( char* )&output;
-
-    b[0] = a[3];
-    b[1] = a[2];
-    b[2] = a[1];
-    b[3] = a[0];
-    input = output;
-}
 
 Atom::~Atom() {
     for(unsigned int i = 0; i < children.size(); i++)
@@ -260,15 +250,12 @@ void Atom::updateLength() {
 }
 
 int Atom::readInt(int64_t offset) {
-    int value = *(int *)&(content[offset]);
-    reverse(value);
-    return value;
+    return be32toh(*(int *)&(content[offset]));
 }
 
 void Atom::writeInt(int value, int64_t offset) {
     assert(content.size() >= offset + 4);
-    reverse(value);
-    *(int *)&(content[offset]) = value;
+    *(int *)&(content[offset]) = htobe32(value);
 }
 
 void Atom::readChar(char *str, int64_t offset, int64_t length) {

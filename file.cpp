@@ -1,19 +1,8 @@
 #include "file.h"
 #include <string>
+#include <endian.h>
 
 using namespace std;
-
-static void reverse(int &input) {
-    int output;
-    char *a = ( char* )&input;
-    char *b = ( char* )&output;
-
-    b[0] = a[3];
-    b[1] = a[2];
-    b[2] = a[1];
-    b[3] = a[0];
-    input = output;
-}
 
 File::File(): file(NULL) {
 }
@@ -28,9 +17,9 @@ bool File::open(string filename) {
     file = fopen(filename.c_str(), "r");
     if(file == NULL) return false;
 
-    fseek(file, 0L, SEEK_END);
-    size = ftell(file);
-    fseek(file, 0L, SEEK_SET);
+    fseeko(file, 0L, SEEK_END);
+    size = ftello(file);
+    fseeko(file, 0L, SEEK_SET);
 
     return true;
 }
@@ -41,17 +30,16 @@ bool File::create(string filename) {
     return true;
 }
 
-void File::seek(int64_t p) {
-    fseek(file, p, SEEK_SET);    
+void File::seek(off_t p) {
+    fseeko(file, p, SEEK_SET);
 }
 
-long File::pos() {
-    return ftell(file);
+off_t File::pos() {
+    return ftello(file);
 }
 
 bool File::atEnd() {
-    long pos = ftell(file);
-    return pos == size;
+    return ftello(file) == size;
 }
 
 int File::readInt() {
@@ -59,52 +47,45 @@ int File::readInt() {
     int n = fread(&value, sizeof(int), 1, file);
     if(n != 1)
         throw string("Could not read atom length");
-    reverse(value);
-    return value;
+    return be32toh(value);
 }
 
-int File::readInt64() {
-    int hi, low;
-    int n = fread(&hi, sizeof(int), 1, file);
-    if(n != 1)
-        throw string("Could not read atom length");
-    n = fread(&low, sizeof(int), 1, file);
+int64_t File::readInt64() {
+    int64_t value;
+    int n = fread(&value, sizeof(value), 1, file);
     if(n != 1)
         throw string("Could not read atom length");
 
-    reverse(low);
-    return low;
+    return be64toh(value);
 }
 
-void File::readChar(char *dest, int64_t n) {
-    int len = fread(dest, sizeof(char), n, file);
+void File::readChar(char *dest, size_t n) {
+    size_t len = fread(dest, sizeof(char), n, file);
     if(len != n)
         throw string("Could not read chars");
 }
 
-vector<unsigned char> File::read(int64_t n) {
+vector<unsigned char> File::read(size_t n) {
     vector<unsigned char> dest(n);
-    long len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
+    size_t len = fread(&*dest.begin(), sizeof(unsigned char), n, file);
     if(len != n)
         throw string("Could not read at position");
     return dest;
 }
 
 int File::writeInt(int n) {
-    reverse(n);
+    n = htobe32(n);
     fwrite(&n, sizeof(int), 1, file);
     return 4;
 }
 
-int File::writeInt64(int n) {
-    int hi = 0;
-    reverse(n);
-    fwrite(&hi, sizeof(int), 1, file);
-    fwrite(&n, sizeof(int), 1, file);
+int File::writeInt64(int64_t n) {
+    n = htobe64(n);
+    fwrite(&n, sizeof(n), 1, file);
     return 8;
 }
 
-int File::writeChar(char *source, int64_t n) {
+int File::writeChar(char *source, size_t n) {
     fwrite(source, 1, n, file);
     return n;
 }
