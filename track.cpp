@@ -115,6 +115,34 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
 #endif
         return true;
 
+   /* THIS is true for mp3...
+        //from http://www.mp3-tech.org/ programmers corner
+        //first 11 bits as 1,
+        //       2 bits as version (mpeg 1, 2 etc)
+        //       2 bits layer (I, II, III)
+        //       1 bit crc protection
+        //       4 bits bitrate (could be variable if VBR)
+        //       2 bits sample rate
+        //       1 bit padding (might be variable)
+        //       1 bit privete (???)
+        //       2 bit channel mode (constant)
+        //       2 bit mode extension
+        //       1 bit copyright
+        //       1 bit original
+        //       2 bit enfasys.
+        //in practice we have
+        // 11111111111 11 11 1 0000 11 0 0 11 11 1 1 11 mask
+        // 1111 1111 1111 1111 0000 1100 1111 1111 or 0xFFFF0CFF
+        reverse(s);
+        if(s & 0xFFE00000 != 0xFFE0000)
+            return false;
+        return true; */
+
+    } else if(name == "mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
+        if(s == 0x1b3 || s == 0x1b6)
+            return true;
+        return false;
+
     } else if(name == "alac") {
         int t = be32toh(*(int *)(start + 4));
         t &= 0xffff0000;
@@ -156,6 +184,11 @@ int Codec::getLength(unsigned char *start, int maxlength) {
         int consumed = avcodec_decode_audio4(context, frame, &got_frame, &avp);
         av_freep(&frame);
         return consumed;
+
+    } else if(name == "mp4v") {
+        //found no way to guess size, probably the only way is to use some functions in ffmpeg
+        //to decode the stream
+        return -1;
 
     } else if(name == "avc1") {
 
