@@ -53,6 +53,10 @@ Build untrunc
 
     g++ -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -I./libav-0.8.7 -L./libav-0.8.7/libavformat -lavformat -L./libav-0.8.7/libavcodec -lavcodec -L./libav-0.8.7/libavutil -lavutil -lpthread -lz
 
+## Arch package
+
+Jose1711 kindly provides an arch package here: https://aur.archlinux.org/packages/untrunc-git/
+
 ## Using
 
 You need both the broken video and an example working video (ideally from the same camera, if not the chances to fix it are slim).
