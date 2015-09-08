@@ -44,6 +44,8 @@ public:
     void printMediaInfo();
     void printAtoms();
     void saveVideo(std::string filename);
+	void makeStreamable(std::string filename, std::string output);
+
 
     void analyze();
     void writeTracksToAtoms();
