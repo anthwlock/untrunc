@@ -26,7 +26,7 @@
 using namespace std;
 
 void usage() {
-    cerr << "Usage: untrunc [options] <ok.mp4> [<corrupt.mp4>]\n\n";
+	cerr << "Usage: untrunc [-a -i] <ok.mp4> [<corrupt.mp4>]\n\n";
 }
 
 int main(int argc, char *argv[]) {

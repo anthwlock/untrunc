@@ -239,11 +239,11 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 
 		/* NAL unit types
 		enum {
-			NAL_SLICE           = 1,
+			NAL_SLICE           = 1, //non keyframe
 			NAL_DPA             = 2,
 			NAL_DPB             = 3,
 			NAL_DPC             = 4,
-			NAL_IDR_SLICE       = 5,
+			NAL_IDR_SLICE       = 5, //keyframe
 			NAL_SEI             = 6,
 			NAL_SPS             = 7,
 			NAL_PPS             = 8,
@@ -256,8 +256,14 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 			NAL_FF_IGNORE       = 0xff0f001,
 		};
 		*/
+		//first 4 bytes are the length, then the nal starts.
+		//ref_idc !=0 per unit_type = 5
+		//ref_idc == 0 per unit_type = 6, 9, 10, 11, 12
+
+		int first_nal_ref_idc = (start[4] >> 5) & 0x3;
+//		cout << "Nal ref: " << first_nal_ref_idc << endl;
 		int first_nal_type = (start[4] & 0x1f);
-		cout << "Nal type: " << first_nal_type << endl;
+		cout << "First nal type: " << first_nal_type << endl;
 		if(first_nal_type > 21) {
 			cout << "Unrecognized nal type: " << first_nal_type << endl;
 			return -1;
@@ -271,7 +277,10 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 
 		if(length > maxlength) return -1;
 
-#define SPLIT_NAL_PACKETS 1
+
+		//packets should be split only after a picture  (1, or 5 is encountered), actually it's more complicated  (7.4.1.2.3 Order of NAL units)
+
+//#define SPLIT_NAL_PACKETS 1
 #ifdef SPLIT_NAL_PACKETS
 		return length;
 #endif
@@ -286,8 +295,10 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 			if(l <= 0) break;
 			if(pos[0] != 0) break; //not avc1
 
+			int ref_idc = (pos[4] >> 5) & 0x3;
+//			cout << "Ref idc: " << ref_idc << endl;
 			int nal_type = (pos[4] & 0x1f);
-			cout << "Intermediate nal type: " << nal_type << endl;
+			cout << "Nalal type: " << nal_type << endl;
 			if(nal_type <= 5) found = true;
 
 			//if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
@@ -299,6 +310,7 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 			//ok include it
 			length += l + 4;
 			assert(length + 4 < maxlength);
+			if(nal_type == 1 || nal_type == 5) return length;
 		}
 		return length;
 	} else if(name == "samr") { //lenght is multiple of 32, we split packets.

@@ -223,7 +223,7 @@ void Mp4::analyze() {
 
 
 	Atom *mdat = root->atomByName("mdat");
-	for(unsigned int i = 1; i < tracks.size(); i++) {
+	for(unsigned int i = 0; i < tracks.size(); i++) {
 		cout << "\n\n Track " << i << endl;
 		Track &track = tracks[i];
 

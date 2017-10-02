@@ -22,7 +22,7 @@ public:
         length = 0;
         start = 0;
     }
-    ~Atom();
+	virtual ~Atom();
 
     void parseHeader(File &file); //read just name and length
     void parse(File &file);
