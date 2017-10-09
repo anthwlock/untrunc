@@ -116,7 +116,7 @@ void Atom::print(int offset) {
         //lets just read the first entry
         int entries = readInt(4);
         cout << indent << " Entries: " << entries << endl;
-        for(int i = 0; i < entries && i < 10; i++)
+		for(int i = 0; i < entries && i < 30; i++)
             cout << indent << " samples: " << readInt(8 + 8*i) << " for: " << readInt(12 + 8*i) << endl;
 
     } else if(name == string("stss")) { //sync sample: (keyframes)

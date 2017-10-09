@@ -33,7 +33,7 @@ public:
     std::string name;
     void parse(Atom *trak, std::vector<int> &offsets, Atom *mdat);
     bool matchSample(unsigned char *start, int maxlength);
-    int getLength(unsigned char *start, int maxlength);
+	int getLength(unsigned char *start, int maxlength, int &duration);
     bool isKeyframe(unsigned char *start, int maxlength);
     //used by: mp4a
     int mask1;

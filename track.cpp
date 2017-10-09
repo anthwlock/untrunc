@@ -37,8 +37,15 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
+
+//Horrible hack: there is a variabled named 'new' inside!
+#define new extern_new
+#include <libavcodec/h264.h>
+#undef new
+
 }
 
 using namespace std;
@@ -194,12 +201,199 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
 		return memcmp(start, "icpf", 4) != 0;
 	} else if(name == "in24") { //it's a codec id, in a case I found a pcm_s24le (little endian 24 bit) No way to know it's length.
 		return true;
+	} else if(name == "sowt") {
+		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
+		return false;
 	}
 
 	return false;
 }
 
-int Codec::getLength(unsigned char *start, int maxlength) {
+//AVC1
+
+int golomb(uint8_t *&buffer, int &offset) {
+	//count the zeroes;
+	int count = 0;
+	//count the leading zeroes
+	while((*buffer & (0x1<<(7 - offset))) == 0) {
+		count++;
+		offset++;
+		if(offset == 8) {
+			buffer++;
+			offset = 0;
+		}
+		if(count > 20) {
+			cout << "Failed reading golomb: too large!\n";
+			return -1;
+		}
+	}
+	//skip the single 1 delimiter
+	offset++;
+	if(offset == 8) {
+		buffer++;
+		offset = 0;
+	}
+	uint32_t res = 1;
+	//read count bits
+	while(count-- > 0) {
+		res <<= 1;
+		res |= (*buffer  & (0x1<<(7 - offset))) >> (7 - offset);
+		offset++;
+		if(offset == 8) {
+			buffer++;
+			offset = 0;
+		}
+	}
+	return res-1;
+}
+
+
+int readBits(int n, uint8_t *&buffer, int &offset) {
+	int res = 0;
+	while(n + offset > 8) { //can't read in a single reading
+		int d = 8 - offset;
+		res <<= d;
+		res |= *buffer & ((1<<d) - 1);
+		offset = 0;
+		buffer++;
+		n -= d;
+	}
+	//read the remaining bits
+	int d = (8 - offset - n);
+	res <<= n;
+	res |= (*buffer >> d) & ((1 << n) - 1);
+	return res;
+}
+
+class NalInfo {
+public:
+	int length;
+
+	int ref_idc;
+	int nal_type;
+	int first_mb; //unused
+	int slice_type;   //should match the nal type (1, 5)
+	int pps_id;       //which parameter set to use
+	int frame_num;
+	int field_pic_flag;
+	int bottom_pic_flag;
+	int idr_pic_flag; //actually 1 for nal_type 5, 0 for nal_type 0
+	int idr_pic_id;   //read only for nal_type 5
+	int poc_type; //if zero check the lsb
+	int poc_lsb;
+	NalInfo(): length(0), ref_idc(0), nal_type(0), first_mb(0), slice_type(0), pps_id(0),
+		frame_num(0), field_pic_flag(0), bottom_pic_flag(0), idr_pic_flag(0), idr_pic_id(0),
+		poc_type(0), poc_lsb(0) {}
+};
+
+
+//return false means this probably is not a nal.
+bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &info) {
+
+	if(buffer[0] != 0) {
+		cout << "First byte expected 0\n";
+		return false;
+	}
+	//this is supposed to be the length of the NAL unit.
+	uint32_t len = be32toh(*(uint32_t *)buffer);
+
+	int MAX_AVC1_LENGTH = 8*(1<<20);
+	if(len > MAX_AVC1_LENGTH) {
+		cout << "Max length exceeded\n";
+		return false;
+	}
+
+	if(len + 4 > maxlength) {
+		cout << "Buffer size exceeded\n";
+		return false;
+	}
+	info.length = len + 4;
+	cout << "Length: " << info.length << "\n";
+
+	buffer += 4;
+	if(*buffer & (1 << 7)) {
+		cout << "Forbidden first bit 1\n";
+		return false; //forbidden first bit;
+	}
+	info.ref_idc = *buffer >> 5;
+	cout << "Ref idc: " << info.ref_idc << "\n";
+
+	info.nal_type = *buffer & 0x1f;
+	cout << "Nal type: " << info.nal_type << "\n";
+	if(info.nal_type != 1 && info.nal_type != 5)
+		return true;
+
+	//check size is reasonable:
+	if(len < 8) {
+		cout << "Too short!\n";
+		return false;
+	}
+
+	buffer++; //skip nal header
+
+	//remove the emulation prevention 3 byte.
+	//could be done in place to speed up things.
+	vector<uint8_t> data;
+	data.reserve(len);
+	for(int i =0; i < len; i++) {
+		if(i+2 < len && buffer[i] == 0 && buffer[i+1] == 0 && buffer[i+2] == 3) {
+			data.push_back(buffer[i]);
+			data.push_back(buffer[i+1]);
+			assert(buffer[i+2] == 0x3);
+			i += 2; //skipping 0x3 byte!
+		} else
+			data.push_back(buffer[i]);
+	}
+
+	uint8_t *start = data.data();
+	int offset = 0;
+	info.first_mb = golomb(start, offset);
+	//TODO is there a max number (so we could validate?)
+	cout << "First mb: " << info.first_mb << endl; "\n";
+
+	info.slice_type = golomb(start, offset);
+	if(info.slice_type > 9) {
+		cout << "Invalid slice type, probably this is not an avc1 sample\n";
+		return false;
+	}
+	info.pps_id = golomb(start, offset);
+	cout << "pic paramter set id: " << info.pps_id << "\n";
+	//pps id: should be taked from master context (h264_slice.c:1257
+
+	//assume separate coloud plane flag is 0
+	//otherwise we would have to read colour_plane_id which is 2 bits
+
+	info.frame_num = readBits(h->sps.log2_max_frame_num, start, offset);
+	cout << "Frame num: " << info.frame_num << "\n";
+
+	//read 2 flags
+	info.field_pic_flag = 0;
+	info.bottom_pic_flag = 0;
+	if(h->sps.frame_mbs_only_flag) {
+		info.field_pic_flag = readBits(1, start, offset);
+		cout << "field: " << info.field_pic_flag << "\n";
+		if(info.field_pic_flag) {
+			info.bottom_pic_flag = readBits(1, start, offset);
+			cout << "bottom: " << info.bottom_pic_flag << "\n";
+		}
+	}
+	info.idr_pic_flag = (info.nal_type == 5)? 1 : 0;
+	if (info.nal_type == 5 ) {
+		info.idr_pic_id = golomb(start, offset);
+		cout << "Idr pic: " << info.idr_pic_id << "\n";
+	}
+
+	//if pic order cnt type == 0
+	if(h->sps.poc_type == 0) {
+		info.poc_lsb = readBits(h->sps.log2_max_poc_lsb, start, offset);
+		cout << "Poc lsb: " << info.poc_lsb << "\n";
+	}
+	//ignoring the delta_poc for the moment.
+	return true;
+}
+
+
+int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 	if(name == "mp4a") {
 		AVFrame *frame = avcodec_alloc_frame();
 		if(!frame)
@@ -211,6 +405,9 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 		avp.data=(uint8_t *)(start);
 		avp.size = maxlength;
 		int consumed = avcodec_decode_audio4(context, frame, &got_frame, &avp);
+
+		duration = frame->nb_samples;
+		cout << "Duration: " << frame->nb_samples << endl;
 		av_freep(&frame);
 		return consumed;
 
@@ -237,6 +434,31 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 
 	} else if(name == "avc1") {
 
+/*		AVFrame *frame = avcodec_alloc_frame();
+		if(!frame)
+			throw string("Could not create AVFrame");
+		AVPacket avp;
+		av_init_packet(&avp);
+
+		int got_frame;
+		avp.data=(uint8_t *)(start);
+		avp.size = maxlength;
+		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp); */
+//		cout << "Consumed: " << consumed << endl; */
+
+		H264Context *h = (H264Context *)context->priv_data;//context->codec->
+		//int this_frame_num = h->frame_num;
+		cout << "log2 max frame: " << h->sps.log2_max_frame_num << endl;
+		cout << "frame mbs only flag: " << h->sps.frame_mbs_only_flag << endl;
+		cout << "Pic order present flag: " << h->pps.pic_order_present << endl;
+		cout << "Delta pic order zero flag: " << h->sps.delta_pic_order_always_zero_flag << endl;
+		cout << "Pic order log2: " << h->sps.log2_max_poc_lsb << endl;
+
+		//av_freep(&frame);
+		//cout << "Consumed: " << consumed << endl;
+
+		//return consumed;
+
 		/* NAL unit types
 		enum {
 			NAL_SLICE           = 1, //non keyframe
@@ -260,10 +482,199 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 		//ref_idc !=0 per unit_type = 5
 		//ref_idc == 0 per unit_type = 6, 9, 10, 11, 12
 
+		//See 7.4.1.2.4 Detection of the first VCL NAL unit of a primary coded picture
+		//for rules on how to group nals into a picture.
+
+
+		uint32_t length = 0;
+		unsigned char *pos = start;
+
+		NalInfo previous;
+		bool seen_slice = false;
+
+		while(1) {
+			cout << "\n";
+			NalInfo info;
+			bool ok = getNalInfo(h, maxlength, pos, info);
+			if(!ok) return length;
+
+			switch(info.nal_type) {
+			case 1:
+			case 5:
+				if(!seen_slice) {
+					previous = info;
+					seen_slice = true;
+				} else {
+					//check for changes
+					if(previous.frame_num != info.frame_num) {
+						cout << "Different frame number\n";
+						return length;
+					}
+					if(previous.pps_id != info.pps_id) {
+						cout << "Different pps_id\n";
+						return length;
+					}
+					//All these conditions are listed in the docs, but it looks like
+					//it creates invalid packets if respected. Puzzling.
+
+					//if(previous.field_pic_flag != info.field_pic_flag) {
+					//	cout << "Different field pic flag\n";
+					//	return length;
+					//}
+
+					//if(previous.bottom_pic_flag != info.bottom_pic_flag) {
+					//	cout << "Different bottom pic flag\n";
+					//	return length;
+					//}
+					if(previous.ref_idc != info.ref_idc) {
+						cout << "Different ref idc\n";
+						return length;
+					}
+					//if((previous.poc_type == 0  && info.poc_type == 0 && previous.poc_lsb != info.poc_lsb)) {
+					//	cout << "Different poc lsb\n";
+					//	return length;
+					//}
+					if(previous.idr_pic_flag != info.idr_pic_flag) {
+						cout << "Different nal type (5, 1)\n";
+					}
+					//if(previous.idr_pic_flag == 1 && info.idr_pic_flag == 1 && previous.idr_pic_id != info.idr_pic_id) {
+					//	cout << "Different idr pic id for keyframe\n";
+					//	return length;
+					//}
+				}
+				break;
+			default:
+				if(seen_slice) {
+					cerr << "New access unit since seen picture\n";
+					return length;
+				}
+				break;
+			}
+			pos += info.length;
+			length += info.length;
+			maxlength -= info.length;
+			cout << "Partial length: " << length << "\n";
+		}
+		return length;
+
+
+
+
+
+/*
+
+
+
+
+
+		int IdrPicFlag = -1;
+		int previous_idr_pic_id = -1;
+		int previous_ref_idc = -1;
+		int frame_num = -1;
+		uint32_t length = 0;
+		unsigned char *pos = start;
+		uint32_t MAX_AVC1_LENGTH = 1<<23; //8 mb TODO is this reasonable?
+		bool first_picture_seen = false;
+		while(1) {
+			//this is supposed to be the length of the NAL unit.
+			uint32_t l = be32toh(*(uint32_t *)pos);
+
+			if(l > MAX_AVC1_LENGTH) break;
+			if(l + length + 4 > maxlength) {
+				cout << "Buffer size exceeded\n";
+				break;
+			}
+			pos += 4;
+
+			if(*pos & (1 << 7)) break; //forbidden first bit;
+			int ref_idc = *pos >> 5;
+			cout << "\nRef idc: " << ref_idc << endl;
+
+			uint32_t nal_type = *pos & 0x1f;
+
+//			if(nal_type == 1 && first_picture_seen == true)
+//				return length;
+
+			if(nal_type == 1 || nal_type == 5) { //TODO might be other nal type to be included
+				first_picture_seen = true;
+				if(previous_ref_idc != -1 && previous_ref_idc != ref_idc) {
+					cout << "Changing ref idc.\n";
+					break;
+				}
+				previous_ref_idc = ref_idc;
+			}
+
+			int num = -2;
+			switch(nal_type) {
+				case 1: {
+					if(IdrPicFlag == 1)
+						return length;
+					IdrPicFlag = 0;
+					cout << "Nal unit type: " << nal_type << "(Picture)\n";
+					int idr_pic_id = 0; //not filled below
+					num = getFrameNum(h, nal_type, l, pos+1, idr_pic_id);
+					cout << "Frame num: " << num << endl;
+			}
+				break;
+			case 5: {false
+					if(IdrPicFlag == 0)
+						return length;
+
+					cout << "Nal unit type: " << nal_type << "(Keyframe)\n";
+					int idr_pic_id = 0;
+					num = getFrameNum(h, nal_type, l, pos+1, idr_pic_id);
+					cout << "Frame num: " << num << endl;
+					//another keyframe change the idr_pic_id.
+					if(IdrPicFlag == 1 && previous_idr_pic_id != idr_pic_id)
+						return length;
+					IdrPicFlag = 1;
+			}
+				break;
+				case 6:
+					cout << "Nal unit type: " << nal_type << "(SEI)\n";
+					if(first_picture_seen == true) {
+						cerr << "New access unit since seen picture\n";
+						return length;
+					}
+				break;
+				default:
+					cout << "Nal unit type: " << nal_type << endl;
+					if(first_picture_seen == true) {
+						cerr << "New access unit since seen picture\n";
+						return length;
+					}
+				break;
+			}
+
+			switch(num) {
+				case -2: //non picture
+					break;
+				case -1:
+					cout << "Could not read frame_num\n";
+					return length;
+				default:
+					if(frame_num == -1) {
+						frame_num = num;
+						break;
+					} else if(frame_num != num){
+//						cout << "New sample detected (frame_num changed)\n";
+						return length;
+					}
+			}
+
+
+			length += l + 4;
+			cout << "Partial length: " << length << endl;
+			pos += l;
+		}
+		cout << "Total length: " << length << endl;
+		return length;
+*/
+/*
 		int first_nal_ref_idc = (start[4] >> 5) & 0x3;
-//		cout << "Nal ref: " << first_nal_ref_idc << endl;
 		int first_nal_type = (start[4] & 0x1f);
-		cout << "First nal type: " << first_nal_type << endl;
+		cout << "First nal type: " << first_nal_type << " ref: " << first_nal_ref_idc << endl;
+
 		if(first_nal_type > 21) {
 			cout << "Unrecognized nal type: " << first_nal_type << endl;
 			return -1;
@@ -273,9 +684,16 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 		if(length <= 0) return -1;
 		length += 4;
 
-		cout << "Length for first packet = " << length <<  " / " << maxlength << endl;
+		cout << "First length: " << length << endl;
 
 		if(length > maxlength) return -1;
+
+
+		if(first_nal_type == 1 || first_nal_type == 5) {
+			int num = getFrameNum(length - 4, start+5);
+
+//			return length;
+		}
 
 
 		//packets should be split only after a picture  (1, or 5 is encountered), actually it's more complicated  (7.4.1.2.3 Order of NAL units)
@@ -287,32 +705,37 @@ int Codec::getLength(unsigned char *start, int maxlength) {
 
 		//consume all nal units where type is != 1, 3, 5
 		unsigned char *pos = start;
-		bool found = false;
-		while(!found) {
+		while(1) {
 			pos = start + length;
 			assert(pos - start < maxlength - 4);
 			int l = be32toh(*(int *)pos);
 			if(l <= 0) break;
+			//TODO: improve this euristic
 			if(pos[0] != 0) break; //not avc1
 
-			int ref_idc = (pos[4] >> 5) & 0x3;
-//			cout << "Ref idc: " << ref_idc << endl;
-			int nal_type = (pos[4] & 0x1f);
-			cout << "Nalal type: " << nal_type << endl;
-			if(nal_type <= 5) found = true;
 
-			//if(nal_type <= 5 || nal_type >= 18) break;//wrong nal or not video
+			int ref_idc = (pos[4] >> 5) & 0x3;
+			int nal_type = (pos[4] & 0x1f);
+
 			if(nal_type > 21) break; //unknown nal type
 			if(l + length + 8 >= maxlength) break; //out of boundary
 			assert(length < maxlength);
 
+			cout << "Following nal type: " << nal_type << " ref: " << ref_idc << endl;
+			cout << "Length: " << l + 4 << endl;
 
-			//ok include it
 			length += l + 4;
 			assert(length + 4 < maxlength);
-			if(nal_type == 1 || nal_type == 5) return length;
+
+
+			//picture found bailing
+			if(nal_type == 1 || nal_type == 5) {
+				getFrameNum(length - 4, pos+5);
+//				break;
+			}
 		}
-		return length;
+		*/
+
 	} else if(name == "samr") { //lenght is multiple of 32, we split packets.
 		return 32;
 	} else if(name == "twos") { //lenght is multiple of 32, we split packets.
@@ -470,10 +893,7 @@ void Track::clear() {
 }
 
 void Track::fixTimes() {
-	if(codec.name == "samr") { //just return smallest of packets
-		unsigned int min = 0xffffffff;
-		for(int i = 0; i < times.size(); i++)
-			if(times[i] < min) min = i;
+	if(codec.name == "samr") {
 		times.clear();
 		times.resize(offsets.size(), 160);
 		return;
