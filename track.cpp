@@ -365,13 +365,15 @@ bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &in
 	//assume separate coloud plane flag is 0
 	//otherwise we would have to read colour_plane_id which is 2 bits
 
-	info.frame_num = readBits(h->ps.sps->log2_max_frame_num, start, offset);
+	//assuming same sps for all frames:
+	SPS *sps = (SPS *)(h->ps.sps_list[0]->data);
+	info.frame_num = readBits(sps->log2_max_frame_num, start, offset);
 	cout << "Frame num: " << info.frame_num << "\n";
 
 	//read 2 flags
 	info.field_pic_flag = 0;
 	info.bottom_pic_flag = 0;
-	if(h->ps.sps->frame_mbs_only_flag) {
+	if(sps->frame_mbs_only_flag) {
 		info.field_pic_flag = readBits(1, start, offset);
 		cout << "field: " << info.field_pic_flag << "\n";
 		if(info.field_pic_flag) {
@@ -386,8 +388,8 @@ bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &in
 	}
 
 	//if pic order cnt type == 0
-	if(h->ps.sps->poc_type == 0) {
-		info.poc_lsb = readBits(h->ps.sps->log2_max_poc_lsb, start, offset);
+	if(sps->poc_type == 0) {
+		info.poc_lsb = readBits(sps->log2_max_poc_lsb, start, offset);
 		cout << "Poc lsb: " << info.poc_lsb << "\n";
 	}
 	//ignoring the delta_poc for the moment.
@@ -449,12 +451,17 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 //		cout << "Consumed: " << consumed << endl; */
 
 		H264Context *h = (H264Context *)context->priv_data;//context->codec->
+		//assuming same sps for all frames:
+		SPS *sps = (SPS *)(h->ps.sps_list[0]->data);
+		if(sps == NULL) {
+			cerr << "No SPS ready for decoding!" << endl;
+			exit(0);
+		}
 		//int this_frame_num = h->frame_num;
-		cout << "log2 max frame: " << h->ps.sps->log2_max_frame_num << endl;
-		cout << "frame mbs only flag: " << h->ps.sps->frame_mbs_only_flag << endl;
-		cout << "Pic order present flag: " << h->ps.pps->pic_order_present << endl;
-		cout << "Delta pic order zero flag: " << h->ps.sps->delta_pic_order_always_zero_flag << endl;
-		cout << "Pic order log2: " << h->ps.sps->log2_max_poc_lsb << endl;
+		cout << "log2 max frame: " << sps->log2_max_frame_num << endl;
+		cout << "frame mbs only flag: " << sps->frame_mbs_only_flag << endl;
+		cout << "Delta pic order zero flag: " << sps->delta_pic_order_always_zero_flag << endl;
+		cout << "Pic order log2: " << sps->log2_max_poc_lsb << endl;
 
 		//av_freep(&frame);
 		//cout << "Consumed: " << consumed << endl;
