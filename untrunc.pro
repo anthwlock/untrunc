@@ -27,17 +27,17 @@ HEADERS += \
     file.h \
     track.h
 
-#INCLUDEPATH += ../libav-11.2/
-#LIBS += ../libav-11.2/libavformat/libavformat.a ../libav-11.2/libavcodec/libavcodec.a ../libav-11.2/libavutil/libavutil.a ../libav-11.2/libavresample/libavresample.a
+INCLUDEPATH += ../FFmpeg/
+LIBS += ../FFmpeg/libavformat/libavformat.a ../FFmpeg/libavcodec/libavcodec.a ../FFmpeg/libavutil/libavutil.a ../FFmpeg/libswresample/libswresample.a
 
 
-INCLUDEPATH += -I/usr/local/lib
-LIBS += -L/usr/local/lib -lavformat -lavcodec -lavutil
+#INCLUDEPATH += -I/usr/local/lib
+#LIBS += -L/usr/local/lib -lavformat -lavcodec -lavutil
 DEFINES += _FILE_OFFSET_BITS=64 VERBOSE VERBOSE1
 
 #INCLUDEPATH += -I../libav-0.8.7/libavformat -I../libav-0.8.7/libavcodec -I../libav-0.8.7/libavutil
 #LIBS += ../libav-0.8.7/libavformat/libavformat.a ../libav-0.8.7/libavcodec/libavcodec.a ../libav-0.8.7/libavutil/libavutil.a
-LIBS += -lz -lbz2
+LIBS += -lz -lbz2 -ldl
 
 #QMAKE_LFLAGS += -static
 #LIBS += /usr/lib/x86_64-linux-gnu/libavcodec.a \
