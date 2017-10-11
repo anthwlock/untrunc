@@ -41,12 +41,16 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 
-//Horrible hack: there is a variabled named 'new' inside!
+//Horrible hack: there is a variabled named 'new' and 'class' inside!
+#include <config.h>
+#undef restrict
+#define restrict __restrict__
 #define new extern_new
 #define class extern_class
 #include <libavcodec/h264dec.h>
 #undef new
 #undef class
+#undef restrict
 
 }
 
