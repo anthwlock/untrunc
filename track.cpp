@@ -42,6 +42,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 
 //Horrible hack: there is a variabled named 'new' and 'class' inside!
+#if LIBAVCODEC_VERSION_MAJOR != 56 //ubuntu 16.04 version
 #include <config.h>
 #undef restrict
 #define restrict __restrict__
@@ -51,6 +52,14 @@ extern "C" {
 #undef new
 #undef class
 #undef restrict
+
+#else
+define new extern_new
+#define class extern_class
+#include <libavcodec/h264dec.h>
+#undef new
+#undef class
+#endif
 
 }
 
@@ -292,9 +301,58 @@ public:
 		poc_type(0), poc_lsb(0) {}
 };
 
+class H264sps {
+public:
+	int log2_max_frame_num;
+	bool frame_mbs_only_flag;
+	int poc_type;
+	int log2_max_poc_lsb;
+};
+
+H264sps parseSPS(uint8_t *data, int size) {
+	if (data[0] != 1)  {
+		cerr << "Uncharted territory..." << endl;
+	}
+	H264sps sps;
+	int i, cnt, nalsize;
+	const uint8_t *p = data;
+
+	if (size < 7) {
+		cerr << "Could not parse SPS!" << endl;
+		exit(0);
+	}
+
+	// Decode sps from avcC
+	cnt = *(p + 5) & 0x1f; // Number of sps
+	p  += 6;
+	if(cnt != 1) {
+		cerr << "Not supporting more than 1 SPS unit for the moment, might fail horribly." << endl;
+	}
+	for (i = 0; i < cnt; i++) {
+		//nalsize = AV_RB16(p) + 2;
+		uint16_t n = *(uint16_t *)p;
+		nalsize = (n>>8) | (n<<8);
+		if (p - data + nalsize > size) {
+			cerr << "Could not parse SPS!" << endl;
+			exit(0);
+		}
+/*		ret = decode_extradata_ps_mp4(p, nalsize, ps, err_recognition, logctx);
+		if (ret < 0) {
+			av_log(logctx, AV_LOG_ERROR,
+				   "Decoding sps %d from avcC failed\n", i);
+			return ret;
+		}
+		p += nalsize; */
+		break;
+	}
+	//Skip pps
+
+	return sps;
+}
+
 
 //return false means this probably is not a nal.
-bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &info) {
+bool getNalInfo(H264sps &sps, uint32_t maxlength, uint8_t *buffer, NalInfo &info) {
 
 	if(buffer[0] != 0) {
 		cout << "First byte expected 0\n";
@@ -370,14 +428,14 @@ bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &in
 	//otherwise we would have to read colour_plane_id which is 2 bits
 
 	//assuming same sps for all frames:
-	SPS *sps = (SPS *)(h->ps.sps_list[0]->data);
-	info.frame_num = readBits(sps->log2_max_frame_num, start, offset);
+	//SPS *sps = (SPS *)(h->ps.sps_list[0]->data);
+	info.frame_num = readBits(sps.log2_max_frame_num, start, offset);
 	cout << "Frame num: " << info.frame_num << "\n";
 
 	//read 2 flags
 	info.field_pic_flag = 0;
 	info.bottom_pic_flag = 0;
-	if(sps->frame_mbs_only_flag) {
+	if(sps.frame_mbs_only_flag) {
 		info.field_pic_flag = readBits(1, start, offset);
 		cout << "field: " << info.field_pic_flag << "\n";
 		if(info.field_pic_flag) {
@@ -392,8 +450,8 @@ bool getNalInfo(H264Context *h, uint32_t maxlength, uint8_t *buffer, NalInfo &in
 	}
 
 	//if pic order cnt type == 0
-	if(sps->poc_type == 0) {
-		info.poc_lsb = readBits(sps->log2_max_poc_lsb, start, offset);
+	if(sps.poc_type == 0) {
+		info.poc_lsb = readBits(sps.log2_max_poc_lsb, start, offset);
 		cout << "Poc lsb: " << info.poc_lsb << "\n";
 	}
 	//ignoring the delta_poc for the moment.
@@ -442,7 +500,22 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 
 	} else if(name == "avc1") {
 
-/*		AVFrame *frame = avcodec_alloc_frame();
+		static bool contextinited = false;
+		static H264sps sps;
+		if(!contextinited) {
+			H264Context *h = (H264Context *)context->priv_data;//context->codec->
+			SPS *hsps = (SPS *)(h->ps.sps_list[0]->data);
+			sps.frame_mbs_only_flag = hsps->frame_mbs_only_flag;
+			sps.log2_max_frame_num = hsps->log2_max_frame_num;
+			sps.log2_max_poc_lsb = hsps->log2_max_poc_lsb;
+			sps.poc_type = hsps->poc_type;
+
+			cout << "Log2 max frame: " << sps.log2_max_frame_num << endl;
+			cout << "Frame mbs only flag: " << sps.frame_mbs_only_flag << endl;
+			cout << "Pic order log2: " << sps.log2_max_poc_lsb << endl;
+		}
+
+		/*		AVFrame *frame = avcodec_alloc_frame();
 		if(!frame)
 			throw string("Could not create AVFrame");
 		AVPacket avp;
@@ -451,26 +524,13 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 		int got_frame;
 		avp.data=(uint8_t *)(start);
 		avp.size = maxlength;
-		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp); */
-//		cout << "Consumed: " << consumed << endl; */
+		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp);
+		cout << "Consumed: " << consumed << endl;
+		av_freep(&frame);
+		cout << "Consumed: " << consumed << endl;
 
-		H264Context *h = (H264Context *)context->priv_data;//context->codec->
-		//assuming same sps for all frames:
-		SPS *sps = (SPS *)(h->ps.sps_list[0]->data);
-		if(sps == NULL) {
-			cerr << "No SPS ready for decoding!" << endl;
-			exit(0);
-		}
-		//int this_frame_num = h->frame_num;
-		cout << "log2 max frame: " << sps->log2_max_frame_num << endl;
-		cout << "frame mbs only flag: " << sps->frame_mbs_only_flag << endl;
-		cout << "Delta pic order zero flag: " << sps->delta_pic_order_always_zero_flag << endl;
-		cout << "Pic order log2: " << sps->log2_max_poc_lsb << endl;
-
-		//av_freep(&frame);
-		//cout << "Consumed: " << consumed << endl;
-
-		//return consumed;
+		return consumed;
+		*/
 
 		/* NAL unit types
 		enum {
@@ -498,7 +558,6 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 		//See 7.4.1.2.4 Detection of the first VCL NAL unit of a primary coded picture
 		//for rules on how to group nals into a picture.
 
-
 		uint32_t length = 0;
 		unsigned char *pos = start;
 
@@ -508,7 +567,7 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 		while(1) {
 			cout << "\n";
 			NalInfo info;
-			bool ok = getNalInfo(h, maxlength, pos, info);
+			bool ok = getNalInfo(sps, maxlength, pos, info);
 			if(!ok) return length;
 
 			switch(info.nal_type) {
@@ -574,7 +633,7 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 
 
 
-/*
+		/*
 
 
 
@@ -683,7 +742,7 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 		cout << "Total length: " << length << endl;
 		return length;
 */
-/*
+		/*
 		int first_nal_ref_idc = (start[4] >> 5) & 0x3;
 		int first_nal_type = (start[4] & 0x1f);
 		cout << "First nal type: " << first_nal_type << " ref: " << first_nal_ref_idc << endl;
