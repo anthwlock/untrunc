@@ -24,6 +24,28 @@
 
 using namespace std;
 
+
+uint16_t swap16(uint16_t us) {
+	return (us >> 8) | (us << 8);
+}
+
+uint32_t swap32(uint32_t ui) {
+	return (ui >> 24) | ((ui<<8) & 0x00FF0000) | ((ui>>8) & 0x0000FF00) | (ui << 24);
+}
+
+uint64_t swap64(uint64_t ull) {
+	return (ull >> 56) |
+			((ull<<40) & 0x00FF000000000000) |
+			((ull<<24) & 0x0000FF0000000000) |
+			((ull<<8)  & 0x000000FF00000000) |
+			((ull>>8)  & 0x00000000FF000000) |
+			((ull>>24) & 0x0000000000FF0000) |
+			((ull>>40) & 0x000000000000FF00) |
+			(ull << 56);
+}
+
+
+
 File::File(): file(NULL) {
 }
 
@@ -67,7 +89,7 @@ int File::readInt() {
     int n = fread(&value, sizeof(int), 1, file);
     if(n != 1)
         throw string("Could not read atom length");
-    return be32toh(value);
+	return swap32(value);
 }
 
 int64_t File::readInt64() {
@@ -76,7 +98,7 @@ int64_t File::readInt64() {
     if(n != 1)
         throw string("Could not read atom length");
 
-    return be64toh(value);
+	return swap64(value);
 }
 
 void File::readChar(char *dest, size_t n) {
@@ -94,13 +116,13 @@ vector<unsigned char> File::read(size_t n) {
 }
 
 int File::writeInt(int n) {
-    n = htobe32(n);
+	n = swap32(n);
     fwrite(&n, sizeof(int), 1, file);
     return 4;
 }
 
 int File::writeInt64(int64_t n) {
-    n = htobe64(n);
+	n = swap64(n);
     fwrite(&n, sizeof(n), 1, file);
     return 8;
 }

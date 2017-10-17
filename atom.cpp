@@ -250,12 +250,12 @@ void Atom::updateLength() {
 }
 
 int Atom::readInt(int64_t offset) {
-    return be32toh(*(int *)&(content[offset]));
+	return swap32(*(int *)&(content[offset]));
 }
 
 void Atom::writeInt(int value, int64_t offset) {
     assert(content.size() >= offset + 4);
-    *(int *)&(content[offset]) = htobe32(value);
+	*(int *)&(content[offset]) = swap32(value);
 }
 
 void Atom::readChar(char *str, int64_t offset, int64_t length) {

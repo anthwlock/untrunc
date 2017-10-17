@@ -100,14 +100,14 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 #define VERBOSE 1
 
 bool Codec::matchSample(unsigned char *start, int maxlength) {
-	int s = be32toh(*(int *)start);
+	int s = swap32(*(int *)start);
 
 	if(name == "avc1") {
 
 		//this works only for a very specific kind of video
 		//#define SPECIAL_VIDEO
 #ifdef SPECIAL_VIDEO
-		int s2 = be32toh(((int *)start)[1]);
+		int s2 = swap32(((int *)start)[1]);
 		if(s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
 		return true;
 #endif
@@ -192,10 +192,9 @@ bool Codec::matchSample(unsigned char *start, int maxlength) {
 		return false;
 
 	} else if(name == "alac") {
-		int t = be32toh(*(int *)(start + 4));
+		int t = swap32(*(int *)(start + 4));
 		t &= 0xffff0000;
 
-		//cout << hex << t << dec << endl;
 		if(s == 0 && t == 0x00130000) return true;
 		if(s == 0x1000 && t == 0x001a0000) return true;
 		return false;
@@ -359,7 +358,7 @@ bool getNalInfo(H264sps &sps, uint32_t maxlength, uint8_t *buffer, NalInfo &info
 		return false;
 	}
 	//this is supposed to be the length of the NAL unit.
-	uint32_t len = be32toh(*(uint32_t *)buffer);
+	uint32_t len = swap32(*(uint32_t *)buffer);
 
 	int MAX_AVC1_LENGTH = 8*(1<<20);
 	if(len > MAX_AVC1_LENGTH) {
@@ -629,191 +628,12 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 		}
 		return length;
 
-
-
-
-
-		/*
-
-
-
-
-
-		int IdrPicFlag = -1;
-		int previous_idr_pic_id = -1;
-		int previous_ref_idc = -1;
-		int frame_num = -1;
-		uint32_t length = 0;
-		unsigned char *pos = start;
-		uint32_t MAX_AVC1_LENGTH = 1<<23; //8 mb TODO is this reasonable?
-		bool first_picture_seen = false;
-		while(1) {
-			//this is supposed to be the length of the NAL unit.
-			uint32_t l = be32toh(*(uint32_t *)pos);
-
-			if(l > MAX_AVC1_LENGTH) break;
-			if(l + length + 4 > maxlength) {
-				cout << "Buffer size exceeded\n";
-				break;
-			}
-			pos += 4;
-
-			if(*pos & (1 << 7)) break; //forbidden first bit;
-			int ref_idc = *pos >> 5;
-			cout << "\nRef idc: " << ref_idc << endl;
-
-			uint32_t nal_type = *pos & 0x1f;
-
-//			if(nal_type == 1 && first_picture_seen == true)
-//				return length;
-
-			if(nal_type == 1 || nal_type == 5) { //TODO might be other nal type to be included
-				first_picture_seen = true;
-				if(previous_ref_idc != -1 && previous_ref_idc != ref_idc) {
-					cout << "Changing ref idc.\n";
-					break;
-				}
-				previous_ref_idc = ref_idc;
-			}
-
-			int num = -2;
-			switch(nal_type) {
-				case 1: {
-					if(IdrPicFlag == 1)
-						return length;
-					IdrPicFlag = 0;
-					cout << "Nal unit type: " << nal_type << "(Picture)\n";
-					int idr_pic_id = 0; //not filled below
-					num = getFrameNum(h, nal_type, l, pos+1, idr_pic_id);
-					cout << "Frame num: " << num << endl;
-			}
-				break;
-			case 5: {false
-					if(IdrPicFlag == 0)
-						return length;
-
-					cout << "Nal unit type: " << nal_type << "(Keyframe)\n";
-					int idr_pic_id = 0;
-					num = getFrameNum(h, nal_type, l, pos+1, idr_pic_id);
-					cout << "Frame num: " << num << endl;
-					//another keyframe change the idr_pic_id.
-					if(IdrPicFlag == 1 && previous_idr_pic_id != idr_pic_id)
-						return length;
-					IdrPicFlag = 1;
-			}
-				break;
-				case 6:
-					cout << "Nal unit type: " << nal_type << "(SEI)\n";
-					if(first_picture_seen == true) {
-						cerr << "New access unit since seen picture\n";
-						return length;
-					}
-				break;
-				default:
-					cout << "Nal unit type: " << nal_type << endl;
-					if(first_picture_seen == true) {
-						cerr << "New access unit since seen picture\n";
-						return length;
-					}
-				break;
-			}
-
-			switch(num) {
-				case -2: //non picture
-					break;
-				case -1:
-					cout << "Could not read frame_num\n";
-					return length;
-				default:
-					if(frame_num == -1) {
-						frame_num = num;
-						break;
-					} else if(frame_num != num){
-//						cout << "New sample detected (frame_num changed)\n";
-						return length;
-					}
-			}
-
-
-			length += l + 4;
-			cout << "Partial length: " << length << endl;
-			pos += l;
-		}
-		cout << "Total length: " << length << endl;
-		return length;
-*/
-		/*
-		int first_nal_ref_idc = (start[4] >> 5) & 0x3;
-		int first_nal_type = (start[4] & 0x1f);
-		cout << "First nal type: " << first_nal_type << " ref: " << first_nal_ref_idc << endl;
-
-		if(first_nal_type > 21) {
-			cout << "Unrecognized nal type: " << first_nal_type << endl;
-			return -1;
-		}
-		int length = be32toh(*(int *)start);
-
-		if(length <= 0) return -1;
-		length += 4;
-
-		cout << "First length: " << length << endl;
-
-		if(length > maxlength) return -1;
-
-
-		if(first_nal_type == 1 || first_nal_type == 5) {
-			int num = getFrameNum(length - 4, start+5);
-
-//			return length;
-		}
-
-
-		//packets should be split only after a picture  (1, or 5 is encountered), actually it's more complicated  (7.4.1.2.3 Order of NAL units)
-
-//#define SPLIT_NAL_PACKETS 1
-#ifdef SPLIT_NAL_PACKETS
-		return length;
-#endif
-
-		//consume all nal units where type is != 1, 3, 5
-		unsigned char *pos = start;
-		while(1) {
-			pos = start + length;
-			assert(pos - start < maxlength - 4);
-			int l = be32toh(*(int *)pos);
-			if(l <= 0) break;
-			//TODO: improve this euristic
-			if(pos[0] != 0) break; //not avc1
-
-
-			int ref_idc = (pos[4] >> 5) & 0x3;
-			int nal_type = (pos[4] & 0x1f);
-
-			if(nal_type > 21) break; //unknown nal type
-			if(l + length + 8 >= maxlength) break; //out of boundary
-			assert(length < maxlength);
-
-			cout << "Following nal type: " << nal_type << " ref: " << ref_idc << endl;
-			cout << "Length: " << l + 4 << endl;
-
-			length += l + 4;
-			assert(length + 4 < maxlength);
-
-
-			//picture found bailing
-			if(nal_type == 1 || nal_type == 5) {
-				getFrameNum(length - 4, pos+5);
-//				break;
-			}
-		}
-		*/
-
 	} else if(name == "samr") { //lenght is multiple of 32, we split packets.
 		return 32;
 	} else if(name == "twos") { //lenght is multiple of 32, we split packets.
 		return 4;
 	} else if(name == "apcn") {
-		return be32toh(*(int *)start);
+		return swap32(*(int *)start);
 	} else if(name == "lpcm") {
 		// Use hard-coded values for now....
 		const int num_samples      = 4096; // Empirical
