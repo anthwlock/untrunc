@@ -37,7 +37,7 @@ LIBS += ../libav-12.2/libavformat/libavformat.a \
 #LIBS += -L/usr/local/lib -lavformat -lavcodec -lavutil
 DEFINES += _FILE_OFFSET_BITS=64 VERBOSE VERBOSE1
 
-LIBS += -lz -lbz2
+LIBS += -lz
 
 #QMAKE_LFLAGS += -static
 #LIBS += /usr/lib/x86_64-linux-gnu/libavcodec.a \

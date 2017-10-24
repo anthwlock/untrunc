@@ -508,10 +508,6 @@ int Codec::getLength(unsigned char *start, int maxlength, int &duration) {
 			sps.log2_max_frame_num = hsps->log2_max_frame_num;
 			sps.log2_max_poc_lsb = hsps->log2_max_poc_lsb;
 			sps.poc_type = hsps->poc_type;
-
-			cout << "Log2 max frame: " << sps.log2_max_frame_num << endl;
-			cout << "Frame mbs only flag: " << sps.frame_mbs_only_flag << endl;
-			cout << "Pic order log2: " << sps.log2_max_poc_lsb << endl;
 		}
 
 		/*		AVFrame *frame = avcodec_alloc_frame();

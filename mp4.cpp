@@ -329,6 +329,12 @@ void Mp4::repair(string filename) {
 	for(unsigned int i = 0; i < tracks.size(); i++)
 		tracks[i].clear();
 
+	//mp4a is more reliable than avc1.
+	if(tracks.size() > 1 && tracks[1].codec.name == "mp4a") {
+		Track tmp = tracks[0];
+		tracks[0] = tracks[1];
+		tracks[1] = tmp;
+	}
 
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
@@ -339,7 +345,7 @@ void Mp4::repair(string filename) {
 
 		//unsigned char *start = &(mdat->content[offset]);
 		int64_t maxlength = mdat->contentSize() - offset;
-		if(maxlength > 800000) maxlength = 800000;
+		if(maxlength > 1600000) maxlength = 1600000;
 		unsigned char *start = mdat->getFragment(offset, maxlength);
 
 		uint begin =  mdat->readInt(offset);
@@ -360,16 +366,25 @@ void Mp4::repair(string filename) {
 
 #ifdef VERBOSE1
 		cout << "Offset: " << offset << " ";
-		cout << hex << begin << " " << next << dec;
+		cout << hex << begin << " " << next << dec << endl;
 #endif
+
+		//skip fake moov
+		if(start[4] == 'm' && start[5] == 'o' && start[6] == 'o' && start[7] == 'v') {
+			cout << "Skipping moov atom: " << swap32(begin) << endl;
+			offset += swap32(begin);
+			continue;
+		}
+
 		bool found = false;
 		for(unsigned int i = 0; i < tracks.size(); i++) {
 			Track &track = tracks[i];
+			cout << "Track codec: " << track.codec.name << endl;
 			//sometime audio packets are difficult to match, but if they are the only ones....
 			int duration =0;
 			if(tracks.size() > 1 && !track.codec.matchSample(start, maxlength)) continue;
 			int length = track.codec.getLength(start, maxlength, duration);
-			if(length < -1 || length > 800000) {
+			if(length < -1 || length > 1600000) {
 				cout << endl << "Invalid length. " << length << ". Wrong match in track: " << i << endl;
 				continue;
 			}
