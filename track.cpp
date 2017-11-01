@@ -45,7 +45,8 @@ extern "C" {
 #if LIBAVCODEC_VERSION_MAJOR != 56 //ubuntu 16.04 version
 #include <config.h>
 #undef restrict
-#define restrict __restrict__
+//#define restrict __restrict__
+#define restrict ()
 #define new extern_new
 #define class extern_class
 #include <libavcodec/h264dec.h>
