@@ -53,6 +53,8 @@ Build untrunc
 
     g++ -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -I./libav-12.2 -L./libav-12.2/libavformat -lavformat -L./libav-12.2/libavcodec -lavcodec -L./libav-12.2/libavresample -lavresample -L./libav-12.2/libavutil -lavutil -lpthread -lz
 
+Depending on your system and libav configure options you might need to add the flags `-lbz2 -lX11 -lvdpau` to he command line to fix errors like: `undefined reference to 'BZ2_bzDecompressInit'` or `#undefined reference to 'XOpenDisplay'`.
+
 ## Arch package
 
 Jose1711 kindly provides an arch package here: https://aur.archlinux.org/packages/untrunc-git/
