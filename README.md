@@ -77,8 +77,8 @@ That's it you're done!
 ### Help/Support
 
 If you managed to recover the video, help me to find time to keep working on this software and make other people happy.
-If you didn't write me, I need more corrupted samples to improve the program and I might solve the issue, who knows...
+If you didn't, I need more corrupted samples to improve the program and I might solve the issue, who knows... so write me.
 
-Donations can be made at my page, http://vcg.isti.cnr.it/~ponchio
+Donations can be made at my page, http://vcg.isti.cnr.it/~ponchio/untrunc.php, and promptly converted into beer.
 
 Thank you.
