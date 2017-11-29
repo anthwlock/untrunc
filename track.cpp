@@ -46,7 +46,7 @@ extern "C" {
 #include <config.h>
 #undef restrict
 //#define restrict __restrict__
-#define restrict ()
+#define restrict
 #define new extern_new
 #define class extern_class
 #include <libavcodec/h264dec.h>
