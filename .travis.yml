@@ -1,13 +1,22 @@
 addons:
   apt:
     packages:
+    - yasm
     - libavformat-dev
     - libavcodec-dev
     - libavutil-dev
-    - g++
+    - libx11-dev
+    - libvdpau-dev
+    - libbz2-dev
+env:
+ - libav=apt
+ - libav=download
 language:
  - c++
 compiler:
  - g++
+before_script:
+ - if [[ $libav == download ]]; then wget http://libav.org/releases/libav-12.2.tar.xz && tar -xJf libav-12.2.tar.xz && pushd libav-12.2 && ./configure && make && popd; fi
 script:
- - $CXX -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L/usr/lib -lavformat -lavcodec -lavutil
+ - if [[ $libav == apt ]]; then $CXX -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L/usr/lib -lavformat -lavcodec -lavutil; fi
+ - if [[ $libav == download ]]; then $CXX -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -I./libav-12.2 -L./libav-12.2/libavformat -lavformat -L./libav-12.2/libavcodec -lavcodec -L./libav-12.2/libavresample -lavresample -L./libav-12.2/libavutil -lavutil -lpthread -lz -lX11 -lbz2 -lvdpau; fi
