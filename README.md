@@ -70,7 +70,6 @@ Build the Libav library:
 
 Depending on your system you may need to install additional packages if configure complains about them.
 If `configure` complains about `nasm/yasm not found`, you can either install Nasm or Yasm or tell `configure` not to use a stand-alone assembler with `--disable-yasm`.
-If you're using Libav version 12.2 or older, you can tell `configure` not to use a stand-alone assembler with `--disable-x86asm` and then you must replace the `avresample` library with the `swresample` library below.
 
 Build the untrunc executable:
 
@@ -85,8 +84,6 @@ Depending on your system and Libav configure options you might need to add extra
 
 On macOS add the following (tested on OSX 10.12.6):
 - add `-framework CoreFoundation -framework CoreVideo -framework VideoDecodeAcceleration`.
-
-If you configured Libav version 12.2 or older not to use a stand-alone assembler with `--disable-x86asm`, you must substitute `avresample` with `swresample` in the command above.
 
 
 ## Arch package
