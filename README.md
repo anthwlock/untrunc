@@ -43,17 +43,19 @@ Download the [Untrunc](https://github.com/ponchio/untrunc) source code from GitH
 
     wget https://github.com/ponchio/untrunc/archive/master.zip
 
-Download [Libav, 12.2 version](http://libav.org/releases/libav-12.2.tar.xz) from [Libav download page](http://libav.org/download.html):
+Download the Libav sources from either [the download page](https://libav.org/download/) or its [GitHub mirror](https://github.com/libav/libav/releases):
 
-    wget http://libav.org/releases/libav-12.2.tar.xz
+    wget https://libav.org/releases/libav-12.3.tar.xz
+    [or:  wget https://github.com/libav/libav/archive/v12.3.zip ]
 
 Unzip the Untrunc source code:
 
     unzip master.zip
 
-Unzip the Libav source code into the Untrunc source directory:
+Unzip the Libav source code into the Untrunc source directory with either:
 
-    tar -xJf libav-12.2.tar.xz -C untrunc-master
+    tar -xJf libav-12.3.tar.xz -C untrunc-master
+    [or:  unzip v12.3.zip -d untrunc-master ]
 
 Go into the directory where it's been unzipped:
 
@@ -61,17 +63,18 @@ Go into the directory where it's been unzipped:
 
 Build the Libav library:
 
-    cd libav-12.2/
+    cd libav-12.3/
     ./configure
     make
     cd ..
 
 Depending on your system you may need to install additional packages if configure complains about them.
-If configure complains about `nasm/yasm not found`, you can either install nasm or yasm or tell configure not to use a stand-alone assembler (`--disable-x86asm`). If you choose the latter, you must replace the `avresample` library with the `swresample` library below.
+If `configure` complains about `nasm/yasm not found`, you can either install Nasm or Yasm or tell `configure` not to use a stand-alone assembler with `--disable-yasm`.
+If you're using Libav version 12.2 or older, you can tell `configure` not to use a stand-alone assembler with `--disable-x86asm` and then you must replace the `avresample` library with the `swresample` library below.
 
 Build the untrunc executable:
 
-    g++ -o untrunc -I./libav-12.2 file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L./libav-12.2/libavformat -lavformat -L./libav-12.2/libavcodec -lavcodec -L./libav-12.2/libavresample -lavresample -L./libav-12.2/libavutil -lavutil -lpthread -lz
+    g++ -o untrunc -I./libav-12.3 file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L./libav-12.3/libavformat -lavformat -L./libav-12.3/libavcodec -lavcodec -L./libav-12.3/libavresample -lavresample -L./libav-12.3/libavutil -lavutil -lpthread -lz
 
 Depending on your system and Libav configure options you might need to add extra flags to the command line:
 - add `-lbz2`   for errors like `undefined reference to 'BZ2_bzDecompressInit'`,
@@ -83,7 +86,7 @@ Depending on your system and Libav configure options you might need to add extra
 On macOS add the following (tested on OSX 10.12.6):
 - add `-framework CoreFoundation -framework CoreVideo -framework VideoDecodeAcceleration`.
 
-If you configured Libav without using a stand-alone assembler (`--disable-x86asm`), you must substitute `avresample` with `swresample` in the command above.
+If you configured Libav version 12.2 or older not to use a stand-alone assembler with `--disable-x86asm`, you must substitute `avresample` with `swresample` in the command above.
 
 
 ## Arch package
@@ -95,11 +98,11 @@ Jose1711 kindly provides an arch package here: https://aur.archlinux.org/package
 
 You need both the broken video and an example working video (ideally from the same camera, if not the chances to fix it are slim).
 
-Run this command in the folder where you have unzipped and compiled Untrunc but replace the /path/to/... bits with your 2 video files:
+Run this command in the folder where you have unzipped and compiled Untrunc but replace the `/path/to/...` bits with your 2 video files:
 
     ./untrunc /path/to/working-video.m4v /path/to/broken-video.m4v
 
-Then it should churn away and hopefully produce a playable file called broken-video_fixed.m4v
+Then it should churn away and hopefully produce a playable file called `broken-video_fixed.m4v`.
 
 That's it you're done!
 
