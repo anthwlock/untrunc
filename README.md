@@ -90,7 +90,12 @@ On macOS add the following (tested on OSX 10.12.6):
 
 Jose1711 kindly provides an arch package here: https://aur.archlinux.org/packages/untrunc-git/
 
+## Docker container
 
+You can use the included Dockerfile to build and execute the package as a container
+    docker build -t untrunc
+    docker run -v ~/Desktop/:/files untrunc /files/filea /files/fileb
+    
 ## Using
 
 You need both the broken video and an example working video (ideally from the same camera, if not the chances to fix it are slim).
