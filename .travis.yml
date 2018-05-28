@@ -2,4 +2,4 @@ sudo: required
 services:
   - docker
 script:
-  - docker build -t untrunc 
+  - docker build -t untrunc .  
