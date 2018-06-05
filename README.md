@@ -10,7 +10,7 @@ You need:
 * Basic ability to use a command line
 
 
-## Installing on Ubuntu
+## Building
 
 If you have an old Ubuntu version or other operational system, you might need to manually install a recent Libav version, go to the bottom of the page for instructions.
 
@@ -32,12 +32,10 @@ Go into the directory where it's been unzipped:
 
 Compile the source code using this command (all one line):
 
-    g++ -o untrunc file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L/usr/local/lib -lavformat -lavcodec -lavutil
+    g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil
 
 
-## Installing on other operating systems (Manual Libav installation)
-
-Because Untrunc uses Libav internal headers and internal headers are not included in application development packages, you must build Libav from source.
+## Building (Manual Libav installation)
 
 Download the [Untrunc](https://github.com/ponchio/untrunc) source code from GitHub:
 
@@ -73,7 +71,7 @@ If `configure` complains about `nasm/yasm not found`, you can either install Nas
 
 Build the untrunc executable:
 
-    g++ -o untrunc -I./libav-12.3 file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L./libav-12.3/libavformat -lavformat -L./libav-12.3/libavcodec -lavcodec -L./libav-12.3/libavresample -lavresample -L./libav-12.3/libavutil -lavutil -lpthread -lz
+    g++ -o untrunc -O3 -I./libav-12.3 *.cpp -L./libav-12.3/libavformat -lavformat -L./libav-12.3/libavcodec -lavcodec -L./libav-12.3/libavresample -lavresample -L./libav-12.3/libavutil -lavutil -lpthread -lz
 
 Depending on your system and Libav configure options you might need to add extra flags to the command line:
 - add `-lbz2`   for errors like `undefined reference to 'BZ2_bzDecompressInit'`,
@@ -90,13 +88,7 @@ On macOS add the following (tested on OSX 10.12.6):
 
 Jose1711 kindly provides an arch package here: https://aur.archlinux.org/packages/untrunc-git/
 
-## Docker container
 
-You can use the included Dockerfile to build and execute the package as a container
-```
-docker build -t untrunc
-docker run -v ~/Desktop/:/files untrunc /files/filea /files/fileb
-```    
 ## Using
 
 You need both the broken video and an example working video (ideally from the same camera, if not the chances to fix it are slim).
