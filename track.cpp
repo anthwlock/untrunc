@@ -24,7 +24,6 @@
 #include <vector>
 #include <string.h>
 #include <assert.h>
-#include <endian.h>
 
 
 extern "C" {

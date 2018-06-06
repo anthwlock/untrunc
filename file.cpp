@@ -20,7 +20,6 @@
 
 #include "file.h"
 #include <string>
-#include <endian.h>
 #include <cstring>
 #include <iostream>
 
