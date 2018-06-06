@@ -31,11 +31,11 @@ public:
 	virtual void write(FileWrite &file);
 	void print(int offset);
 
-	std::vector<Atom *> atomsByName(std::string name_);
-	Atom *atomByName(std::string name_);
+	std::vector<Atom *> atomsByName(std::string name);
+	Atom *atomByName(std::string name);
 	void replace(Atom *original, Atom *replacement);
 
-	void prune(std::string name_);
+	void prune(std::string name);
 	virtual void updateLength();
 
 	virtual int64_t contentSize() { return content_.size(); }
@@ -46,7 +46,7 @@ public:
 
 	virtual int readInt(int64_t offset);
 	void writeInt(int value, int64_t offset);
-	void readChar(char *str, int64_t offset, int64_t length_);
+	void readChar(char *str, int64_t offset, int64_t length);
 
 };
 
