@@ -1,5 +1,19 @@
-sudo: required
-services:
-  - docker
+# sadly the packages on travis are too old
+#addons:
+# apt:
+#  packages:
+#   - libavformat-dev
+#   - libavcodec-dev
+#   - libavutil-dev
+#   - g++
+env:
+ - av_ver='12.3'
+language:
+ - c++
+compiler:
+ - g++
 script:
-  - docker build -t untrunc .  
+#- echo -e "commit: '$TRAVIS_COMMIT'\npr: '$TRAVIS_PULL_REQUEST'\npr-branch: '$TRAVIS_PULL_REQUEST_BRANCH'"
+- wget http://libav.org/releases/libav-${av_ver}.tar.xz && tar -xJf libav-${av_ver}.tar.xz && pushd libav-${av_ver} && ./configure --disable-yasm && make && popd
+- $CXX -o untrunc -std=c++11 *.cpp -I./libav-${av_ver} -L./libav-${av_ver}/libavcodec/ -L./libav-${av_ver}/libavutil/ -L./libav-${av_ver}/libavresample/ -L./libav-${av_ver}/libavformat/ -lavformat -lavcodec -lavresample -lavutil -lpthread -lz -lX11 -lbz2 #-lvdpau
+#- $CXX -o untrunc -std=c++11 *.cpp -lavformat -lavcodec -lavutil
