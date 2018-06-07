@@ -3,26 +3,25 @@ FROM ubuntu
 
 # install packaged dependencies
 RUN apt-get update
-RUN apt-get -y install libavformat-dev libavcodec-dev libavutil-dev unzip g++ wget make nasm zlib1g-dev
+RUN apt-get -y install libavformat-dev libavcodec-dev libavutil-dev g++
 
-# download and extract
-RUN wget https://github.com/ponchio/untrunc/archive/master.zip
-RUN unzip master.zip 
-WORKDIR /untrunc-master
-#RUN wget https://fossies.org/linux/misc/libav-12.3.tar.gz && tar -zxvf libav-12.3.tar.gz -C .
+# in case we alredy have the src (travis)
+ADD . /untrunc-src
 
-# build libav
-#WORKDIR /untrunc-master/libav-12.3/
-#RUN ./configure && make
+# otherwise download and extract master
+RUN [ -f /untrunc-src/mp4.cpp ] || apt-get -y install wget unzip
+RUN [ -f /untrunc-src/mp4.cpp ] || wget https://github.com/ponchio/untrunc/archive/master.zip
+RUN [ -f /untrunc-src/mp4.cpp ] || unzip master.zip 
+RUN [ -f /untrunc-src/mp4.cpp ] || mv /untrunc-src /abc
+RUN [ -f /untrunc-src/mp4.cpp ] || ln -s untrunc-master /untrunc-src
+
+WORKDIR /untrunc-src
 
 # build untrunc
-WORKDIR /untrunc-master
-RUN /usr/bin/g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil
-#RUN /usr/bin/g++ -o untrunc -I./libav-12.3 file.cpp main.cpp track.cpp atom.cpp mp4.cpp -L./libav-12.3/libavformat -lavformat -L./libav-12.3/libavcodec -lavcodec -L./libav-12.3/libavresample -lavresample -L./libav-12.3/libavutil -lavutil -lpthread -lz
+RUN /usr/bin/g++ -o untrunc *.cpp -lavformat -lavcodec -lavutil
 
 # package / push the build artifact somewhere (dockerhub, .deb, .rpm, tell me what you want)
 # ... 
 
 # execution
-WORKDIR /untrunc-master
 ENTRYPOINT ["./untrunc"]
