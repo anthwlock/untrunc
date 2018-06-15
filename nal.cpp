@@ -7,13 +7,15 @@
 #include <vector>
 
 #include <cassert>
+#include <string.h> // memcpy
 
 #include "common.h"
 
 using namespace std;
 
+NalInfo::NalInfo() : length(0), ref_idc(0), nal_type(0), payload_(NULL) {}
 
-NalInfo::NalInfo(const uchar* start, int max_size) {
+NalInfo::NalInfo(const uchar* start, int max_size) : payload_(NULL){
 	is_ok = parseNal(start, max_size);
 }
 
@@ -28,6 +30,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		return false;
 	}
 	//this is supposed to be the length of the NAL unit.
+	// FIXIT: only true if 'avcc' bytestream standard used, not 'Annex B'!
 	uint32_t len = swap32(*(uint32_t *)buffer);
 	length = len + 4;
 	logg(V, "Length: ", length, "\n");
@@ -40,9 +43,10 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	}
 
 	if(length > maxlength) {
-		cout << "maxlength = " << maxlength << '\n';
-		cout << "len - maxlength = " << len - maxlength << '\n';
-		cout << "Buffer size exceeded\n";
+//		cout << "maxlength = " << maxlength << '\n';
+//		cout << "len - maxlength = " << len - maxlength << '\n';
+//		cout << "Buffer size exceeded\n";
+		logg(W, "buffer exceeded by: ", len-maxlength, '\n');
 		return false;
 	}
 	buffer += 4;
@@ -70,19 +74,36 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 	buffer++; //skip nal header
 
-	//remove the emulation prevention 3 byte.
-	//could be done in place to speed up things.
-	data_.reserve(len);
-	for(int i =0; i < len; i++) {
-		if(i+2 < len && buffer[i] == 0 && buffer[i+1] == 0 && buffer[i+2] == 3) {
-			data_.push_back(buffer[i]);
-			data_.push_back(buffer[i+1]);
-			assert(buffer[i+2] == 0x3);
-			i += 2; //skipping 0x3 byte!
-		} else
-			data_.push_back(buffer[i]);
-	}
+	// remove the emulation prevention 3 byte.
+	// could be done in place to speed up things.
+	// EDIT: only needed for 'annex b' bytestream standard, which
+	//       is currently not support supported anyways. See nal-decoder.
+	// FIXIT: citation needed
 
-	payload_ = data_.data();
+//	data_.reserve(len);
+//	for(int i =0; i < len; i++) {
+//		if(i+2 < len && buffer[i] == 0 && buffer[i+1] == 0 && buffer[i+2] == 3) {
+//			data_.push_back(buffer[i]);
+//			data_.push_back(buffer[i+1]);
+//			assert(buffer[i+2] == 0x3);
+//			i += 2; //skipping 0x3 byte!
+//		} else
+//			data_.push_back(buffer[i]);
+//	}
+//	payload_ = data_.data();
+
+	payload_ = (uchar*) malloc(len);
+	memcpy(payload_, buffer, len);
 	return true;
+}
+
+NalInfo& NalInfo::operator= ( NalInfo&& other) {
+	swap(payload_, other.payload_);
+	return *this;
+}
+
+
+NalInfo::~NalInfo() {
+	if (payload_ != NULL)
+		free(payload_);
 }
