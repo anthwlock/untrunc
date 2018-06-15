@@ -171,12 +171,11 @@ void Mp4::saveVideo(const string& filename) {
 	  assumes offsets in stco are absolute and so to find the relative just subtrack mdat->start + 8
 */
 
-	logg(I, "saving ", filename, '\n');
 	context = 0;
 	for(Track& track : tracks_) {
 		track.writeToAtoms();
 		//convert to movie timescale
-		cout << "Track duration: " << track.duration_ << " movie timescale: " << timescale_ << " track timescale: " << track.timescale_ << endl;
+//		cout << "Track duration: " << track.duration_ << " movie timescale: " << timescale_ << " track timescale: " << track.timescale_ << endl;
 		int track_duration = (int)(double)track.duration_ * ((double)timescale_ / (double)track.timescale_);
 		if(track_duration > context) context = track_duration;
 		logg(I, "Duration of ", track.codec_.name_, " = ", (double)track_duration/1000, "s\n");
@@ -184,6 +183,7 @@ void Mp4::saveVideo(const string& filename) {
 		Atom *tkhd = track.trak_->atomByName("tkhd");
 		tkhd->writeInt(track_duration, 20); //in movie timescale, not track timescale
 	}
+	logg(I, "saving ", filename, '\n');
 	Atom *mvhd = root_atom_->atomByName("mvhd");
 	mvhd->writeInt(context, 16);
 
@@ -387,7 +387,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			Track &track = tracks_[i];
 			logg(V, "Track codec: ", track.codec_.name_, '\n');
 			//sometime audio packets are difficult to match, but if they are the only ones....
-			int duration =0;
+			int duration = 0;
 			if (tracks_.size() > 1 && !track.codec_.matchSample(start))
 				continue;
 			int length = track.codec_.getLength(start, maxlength, duration);
