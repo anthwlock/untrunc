@@ -7,7 +7,7 @@ class NalInfo;
 
 class SpsInfo {
 public:
-	SpsInfo() : is_ok(false) {};
+	SpsInfo();
 	SpsInfo(const NalInfo&, int max_size);
 	int log2_max_frame_num;
 	bool frame_mbs_only_flag;
