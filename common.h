@@ -7,7 +7,7 @@
 typedef unsigned int uint;
 typedef unsigned char uchar;
 
-enum LogMode { E, I, V, VV };
+enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
 
 extern size_t g_max_partsize;
@@ -25,8 +25,10 @@ void logg(LogMode m, Args&&... x){
 		return;
 	if(m == I)
 		std::cout << "Info: ";
+	else if(m == W)
+		std::cout << "Warning: ";
 	else if(m == E)
-		std::cout << "error: ";
+		std::cout << "Error: ";
 	logg(std::forward<Args>(x)...);
 }
 
