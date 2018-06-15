@@ -191,8 +191,8 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 
-		//        cout << "buffer:\n";
-		//        printBuffer(start, 30);
+//		cout << "buffer:\n";
+//		printBuffer(start, 30);
 
 		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
 		duration = frame->nb_samples;
@@ -247,12 +247,15 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 		uint32_t length = 0;
 		const uchar *pos = start;
 
+		// FIXIT: should decode SPS seperatly, if possible from 'avcc' extradata
 		static SpsInfo sps_info;
+
 		SliceInfo previous_slice;
 		NalInfo previous_nal;
 		last_frame_was_idr_ = false;
 
 		while(1) {
+			logg(V, "---\n");
 			NalInfo nal_info(pos, maxlength);
 			if(!nal_info.is_ok){
 				logg(V, "failed parsing nal-header\n");
@@ -279,16 +282,16 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 				SliceInfo slice_info(nal_info, sps_info);
 				if(!previous_slice.is_ok){
 					previous_slice = slice_info;
-					previous_nal = nal_info;
+					previous_nal = move(nal_info);
 				}
 				else {
-					if(previous_nal.ref_idc != nal_info.ref_idc &&
-					   (previous_nal.ref_idc == 0 || nal_info.ref_idc == 0)) {
-						cout << "Different ref idc\n";
-						return length;
-					}
 					if (slice_info.isInNewFrame(previous_slice))
 						return length;
+					if(previous_nal.ref_idc != nal_info.ref_idc &&
+					   (previous_nal.ref_idc == 0 || nal_info.ref_idc == 0)) {
+						logg(W, "Different ref idc\n");
+						return length;
+					}
 				}
 				break;
 			}
