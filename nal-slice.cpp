@@ -20,43 +20,44 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 
 	//check for changes
 	if(previous_slice.frame_num != frame_num) {
-		cout << "Different frame number\n";
+		logg(V, "Different frame number\n");
 		return true;
 	}
 	if(previous_slice.pps_id != pps_id) {
-		cout << "Different pps_id\n";
+		logg(W, "Different pps_id\n");
 		return true;
 	}
-	// this is not documented?
-//	if(previous_slice.idr_pic_flag != idr_pic_flag) {
-//		cout << "Different nal type (5, 1)\n";
-//		return true;
-//	}
+
+	// different nal type
+	if(previous_slice.idr_pic_flag != idr_pic_flag) {
+		logg(W, "Different nal type (5, 1)\n");
+		return true;
+	}
 
 	//All these conditions are listed in the docs, but it looks like
 	//it creates invalid packets if respected. Puzzling.
 
 	if(previous_slice.field_pic_flag != field_pic_flag) {
-		cout << "Different field pic flag\n";
+		logg(W, "Different field pic flag\n");
 		return true;
 	}
 
 	if(previous_slice.bottom_pic_flag != bottom_pic_flag &&
 	   previous_slice.bottom_pic_flag != -1 && previous_slice.bottom_pic_flag != -1) {
-		cout << "Different bottom pic flag\n";
+		logg(W, "Different bottom pic flag\n");
 		return true;
 	}
 
 	// TODO: 'poc_lsb' differs OR 'delta_poc_bottom' differs
 	if(previous_slice.poc_type == 0  && poc_type == 0 && previous_slice.poc_lsb != poc_lsb) {
-		cout << "Different poc lsb\n";
+		logg(W, "Different poc lsb\n");
 		return true;
 	}
 	// TODO: both 'poc_type' == 1 AND either 'delta_pic_order_cnt[0]' or 'delta_pic_order_cnt[1]' differs
 //	if(previous_slice.poc_type == 1  && poc_type == 1 && ... )
 
 	if(previous_slice.idr_pic_flag == 1 && idr_pic_flag == 1 && previous_slice.idr_pic_id != idr_pic_id) {
-		cout << "Different idr pic id for keyframe\n";
+		logg(W, "Different idr pic id for keyframe\n");
 		return true;
 	}
 	return false;
@@ -71,7 +72,7 @@ bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
 
 	slice_type = readGolomb(start, offset);
 	if(slice_type > 9) {
-		cout << "Invalid slice type, probably this is not an avc1 sample\n";
+		logg(W, "Invalid slice type, probably this is not an avc1 sample\n");
 		return false;
 	}
 	pps_id = readGolomb(start, offset);
