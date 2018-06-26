@@ -21,6 +21,8 @@ void Atom::parseHeader(FileRead &file) {
 	logg(V, "start_ = ", start_, '\n');
 	length_ = file.readInt();
 	logg(V, "length_ = ", length_, '\n');
+	if (length_ < 0)
+		throw length_error("length of atom < 0");
 	file.readChar(name_, 4);
 	logg(V, "name_ = ", name_, '\n');
 
