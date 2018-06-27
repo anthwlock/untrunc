@@ -26,7 +26,7 @@ uint64_t swap64(uint64_t ull) {
 			(ull << 56);
 }
 
-int readGolomb(uchar *&buffer, int &offset) {
+int readGolomb(const uchar *&buffer, int &offset) {
 	//count the zeroes;
 	int count = 0;
 	//count the leading zeroes
@@ -73,7 +73,7 @@ void printBuffer(const uchar* pos, int n){
 	cout << dec << '\n';
 }
 
-uint readBits(int n, uchar *&buffer, int &offset) {
+uint readBits(int n, const uchar *&buffer, int &offset) {
 	uint res = 0;
 	int d = 8 - offset;
 	uint mask = ((1 << d)-1);

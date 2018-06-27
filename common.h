@@ -56,8 +56,8 @@ uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);
 uint64_t swap64(uint64_t ull);
 
-int readGolomb(uchar *&buffer, int &offset);
-uint readBits(int n, uchar *&buffer, int &offset);
+int readGolomb(const uchar *&buffer, int &offset);
+uint readBits(int n, const uchar *&buffer, int &offset);
 
 void printBuffer(const uchar* pos, int n);
 

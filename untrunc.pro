@@ -23,8 +23,9 @@ SOURCES += main.cpp \
     codec.cpp \
     common.cpp \
     nal.cpp \
-    nal-sps.cpp \
-    nal-slice.cpp
+    sps-info.cpp \
+    nal-slice.cpp \
+    avc-config.cpp
 
 HEADERS += \
     atom.h \
@@ -34,7 +35,8 @@ HEADERS += \
     codec.h \
     common.h \
     nal.h \
-    nal-sps.h \
-    nal-slice.h
+    sps-info.h \
+    nal-slice.h \
+    avc-config.h
 
 LIBS += -lavformat -lavcodec -lavutil

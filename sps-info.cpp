@@ -1,4 +1,4 @@
-#include "nal-sps.h"
+#include "sps-info.h"
 
 #include <iostream>
 
@@ -16,12 +16,12 @@ using namespace std;
 // default values in case SPS is not decoded yet...
 SpsInfo::SpsInfo() : is_ok(false), log2_max_frame_num(4), frame_mbs_only_flag(1), log2_max_poc_lsb(5), poc_type(0) {};
 
-SpsInfo::SpsInfo(const NalInfo& nal_info, int max_size) {
-	is_ok = decode(nal_info);
+SpsInfo::SpsInfo(const uchar* pos) {
+	is_ok = decode(pos);
 }
 
-bool SpsInfo::decode(const NalInfo& nal_info) {
-	uchar* pos = nal_info.payload_;
+bool SpsInfo::decode(const uchar* pos) {
+//	const uchar* pos = nal_info.payload_;
 //	cout << "nal_info.type = " << nal_info.nal_type << '\n';
 //	cout << "I am here:\n";
 //	printBuffer(pos, 20);
@@ -32,7 +32,7 @@ bool SpsInfo::decode(const NalInfo& nal_info) {
 
 	int log2_max_frame_num_minus4 = readGolomb(pos, offset);
 	log2_max_frame_num = log2_max_frame_num_minus4 + 4;
-	logg(V, "log2_max_frame_num: ", log2_max_frame_num);
+	logg(V, "log2_max_frame_num: ", log2_max_frame_num, '\n');
 
 	poc_type = readGolomb(pos, offset);
 	if (poc_type == 0) {

@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "common.h"
-#include "nal-sps.h"
+#include "sps-info.h"
 #include "nal.h"
 
 using namespace std;
@@ -64,7 +64,7 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 }
 
 bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
-	uchar* start = nal_info.payload_;
+	const uchar* start = nal_info.payload_;
 	int offset = 0;
 	first_mb = readGolomb(start, offset);
 	//TODO is there a max number (so we could validate?)

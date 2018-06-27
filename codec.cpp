@@ -14,20 +14,22 @@ extern "C" {
 #include "common.h"
 #include "atom.h"
 #include "nal.h"
-#include "nal-sps.h"
+#include "sps-info.h"
 #include "nal-slice.h"
+#include "avc-config.h"
 
 using namespace std;
 
-Codec::Codec(AVCodecContext* c) {
+Codec::Codec(AVCodecContext* c) : avc_config_(NULL) {
 	context_ = c;
 
 	//    codec_.parse(trak, offsets, mdat);
 	codec_ = avcodec_find_decoder(context_->codec_id);
 	//if audio use next?
 
-	if(!codec_) throw string("No codec found!");
-	if(avcodec_open2(context_, codec_, NULL)<0)
+	if (!codec_)
+		throw string("No codec found!");
+	if (avcodec_open2(context_, codec_, NULL)<0)
 		throw string("Could not open codec: ?"); //+ context_->codec_name;
 
 }
@@ -38,10 +40,18 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 	if(entries != 1)
 		throw string("Multiplexed stream! Not supported");
 
-	char _codec[5];
-	stsd->readChar(_codec, 12, 4);
-	name_ = _codec;
+	char codec[5];
+	stsd->readChar(codec, 12, 4);
+	name_ = codec;
+//	cout << "codec: " <<  codec << '\n';
 
+	if (codec == string("avc1")) {
+		avc_config_ = new AvcConfig(*stsd);
+		if (!avc_config_->is_ok)
+			logg(W, "avcC was not decoded correctly\n");
+		else
+			logg(I, "avcC got decoded\n");
+	}
 
 	//this was a stupid attempt at trying to detect packet type based on bitmasks
 	mask1_ = 0xffffffff;
@@ -247,8 +257,24 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 		uint32_t length = 0;
 		const uchar *pos = start;
 
-		// FIXIT: should decode SPS seperatly, if possible from 'avcc' extradata
+		static bool sps_info_initialized = false;
 		static SpsInfo sps_info;
+		if (!sps_info_initialized){
+			logg(V, "sps_info (before): ",
+			     sps_info.frame_mbs_only_flag,
+			     ' ', sps_info.log2_max_frame_num,
+			     ' ', sps_info.log2_max_poc_lsb,
+			     ' ', sps_info.poc_type, '\n');
+			if (avc_config_->sps_info_->is_ok){
+				sps_info = *avc_config_->sps_info_;
+			}
+			sps_info_initialized = true;
+			logg(V, "sps_info (after):  ",
+			     sps_info.frame_mbs_only_flag,
+			     ' ', sps_info.log2_max_frame_num,
+			     ' ', sps_info.log2_max_poc_lsb,
+			     ' ', sps_info.poc_type, '\n');
+		}
 
 		SliceInfo previous_slice;
 		NalInfo previous_nal;
@@ -269,7 +295,7 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 					return length;
 				}
 				if (!sps_info.is_ok)
-					sps_info.decode(nal_info);
+					sps_info.decode(nal_info.payload_);
 				break;
 			case NAL_AUD: // Access unit delimiter
 				if (!previous_slice.is_ok)

@@ -10,6 +10,8 @@ class Atom;
 class AVCodecContext;
 class AVCodec;
 
+class AvcConfig;
+
 class Codec {
 public:
 	Codec(AVCodecContext* c);
@@ -22,6 +24,8 @@ public:
 	int mask0_;
 	AVCodecContext *context_;
 	AVCodec *codec_;
+
+	AvcConfig* avc_config_;
 
 	bool last_frame_was_idr_;
 };
