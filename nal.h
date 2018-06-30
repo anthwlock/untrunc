@@ -8,7 +8,7 @@
 
 class NalInfo {
 public:
-	NalInfo();
+	NalInfo() = default;
 	NalInfo(const uchar* start, int max_size);
 	NalInfo(NalInfo const& other);
 	~NalInfo();
@@ -17,13 +17,13 @@ public:
 //	Foo (const Foo& other);
 
 
-	int length;
-	int ref_idc;
-	int nal_type;
+	int length_ = 0;
+	int ref_idc_ = 0;
+	int nal_type_ = 0;
 
 	bool is_ok;  // did parsing work
 	bool is_forbidden_set_;
-	uchar* payload_;
+	uchar* payload_ = NULL;
 	bool parseNal(const uchar* start, uint32_t max_size);
 //private:
 //	std::vector<uchar> data_;

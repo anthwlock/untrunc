@@ -265,7 +265,7 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 			     ' ', sps_info.log2_max_frame_num,
 			     ' ', sps_info.log2_max_poc_lsb,
 			     ' ', sps_info.poc_type, '\n');
-			if (avc_config_->sps_info_->is_ok){
+			if (avc_config_->is_ok){
 				sps_info = *avc_config_->sps_info_;
 			}
 			sps_info_initialized = true;
@@ -288,7 +288,7 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 				return length;
 			}
 
-			switch(nal_info.nal_type) {
+			switch(nal_info.nal_type_) {
 			case NAL_SPS:
 				if(previous_slice.is_ok){
 					logg(E, "searching end, found new 'SPS'\n");
@@ -313,8 +313,8 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 				else {
 					if (slice_info.isInNewFrame(previous_slice))
 						return length;
-					if(previous_nal.ref_idc != nal_info.ref_idc &&
-					   (previous_nal.ref_idc == 0 || nal_info.ref_idc == 0)) {
+					if(previous_nal.ref_idc_ != nal_info.ref_idc_ &&
+					   (previous_nal.ref_idc_ == 0 || nal_info.ref_idc_ == 0)) {
 						logg(W, "Different ref idc\n");
 						return length;
 					}
@@ -324,15 +324,15 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 			default:
 				if(previous_slice.is_ok) {
 					if(!nal_info.is_forbidden_set_) {
-						logg(E, "New access unit since seen picture (type: ", nal_info.nal_type, ")\n");
+						logg(E, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
 						return length;
 					} // else is malformed, no stand-alone frame
 				}
 				break;
 			}
-			pos += nal_info.length;
-			length += nal_info.length;
-			maxlength -= nal_info.length;
+			pos += nal_info.length_;
+			length += nal_info.length_;
+			maxlength -= nal_info.length_;
 			if (maxlength == 0) // we made it
 				return length;
 			logg(V, "Partial avc1-length: ", length, "\n");

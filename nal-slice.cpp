@@ -95,8 +95,8 @@ bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
 			bottom_pic_flag = readBits(1, start, offset);
 		}
 	}
-	idr_pic_flag = (nal_info.nal_type == NAL_IDR_SLICE)? 1 : 0;
-	if (nal_info.nal_type == NAL_IDR_SLICE) {
+	idr_pic_flag = (nal_info.nal_type_ == NAL_IDR_SLICE)? 1 : 0;
+	if (nal_info.nal_type_ == NAL_IDR_SLICE) {
 		idr_pic_id = readGolomb(start, offset);
 	}
 

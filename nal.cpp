@@ -13,8 +13,6 @@
 
 using namespace std;
 
-NalInfo::NalInfo() : length(0), ref_idc(0), nal_type(0), payload_(NULL) {}
-
 NalInfo::NalInfo(const uchar* start, int max_size) : payload_(NULL){
 	is_ok = parseNal(start, max_size);
 }
@@ -32,8 +30,8 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	//this is supposed to be the length of the NAL unit.
 	// FIXIT: only true if 'avcc' bytestream standard used, not 'Annex B'!
 	uint32_t len = swap32(*(uint32_t *)buffer);
-	length = len + 4;
-	logg(V, "Length: ", length, "\n");
+	length_ = len + 4;
+	logg(V, "Length: ", length_, "\n");
 
 
 	int MAX_AVC1_LENGTH = 8*(1<<20); // 8MB
@@ -42,7 +40,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		return false;
 	}
 
-	if(length > maxlength) {
+	if(length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "len - maxlength = " << len - maxlength << '\n';
 //		cout << "Buffer size exceeded\n";
@@ -56,14 +54,14 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		// means payload is garbage, header is ok though
 		// dont return false
 	}
-	ref_idc = *buffer >> 5;
-	logg(V, "Ref idc: ", ref_idc, "\n");
+	ref_idc_ = *buffer >> 5;
+	logg(V, "Ref idc: ", ref_idc_, "\n");
 
-	nal_type = *buffer & 0x1f;
-	logg(V, "Nal type: ", nal_type, "\n");
-	if(nal_type != NAL_SLICE
-	   && nal_type != NAL_IDR_SLICE
-	   && nal_type != NAL_SPS)
+	nal_type_ = *buffer & 0x1f;
+	logg(V, "Nal type: ", nal_type_, "\n");
+	if(nal_type_ != NAL_SLICE
+	   && nal_type_ != NAL_IDR_SLICE
+	   && nal_type_ != NAL_SPS)
 		return true;
 
 	//check size is reasonable:
@@ -104,6 +102,5 @@ NalInfo& NalInfo::operator= ( NalInfo&& other) {
 
 
 NalInfo::~NalInfo() {
-	if (payload_ != NULL)
-		free(payload_);
+	free(payload_);
 }
