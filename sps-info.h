@@ -1,23 +1,23 @@
-#ifndef H264SPS_H
-#define H264SPS_H
+#ifndef SPSINFO_H
+#define SPSINFO_H
 
 #include "common.h"
-
-#include <cstdint>
 
 class NalInfo;
 
 class SpsInfo {
 public:
-	SpsInfo();
+	SpsInfo() = default;
 	SpsInfo(const uchar* pos);
-	int log2_max_frame_num;
-	bool frame_mbs_only_flag;
-	int poc_type;
-	int log2_max_poc_lsb;
+
+	// default values in case SPS is not decoded yet...
+	int log2_max_frame_num = 4;
+	bool frame_mbs_only_flag = true;
+	int poc_type = 0;
+	int log2_max_poc_lsb = 5;
 
 	bool is_ok;
 	bool decode(const uchar* pos);
 };
 
-#endif // H264SPS_H
+#endif // SPSINFO_H

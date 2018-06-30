@@ -13,9 +13,6 @@
 
 using namespace std;
 
-// default values in case SPS is not decoded yet...
-SpsInfo::SpsInfo() : is_ok(false), log2_max_frame_num(4), frame_mbs_only_flag(1), log2_max_poc_lsb(5), poc_type(0) {};
-
 SpsInfo::SpsInfo(const uchar* pos) {
 	is_ok = decode(pos);
 }

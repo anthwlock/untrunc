@@ -9,13 +9,14 @@ class SpsInfo;
 class AvcConfig
 {
 public:
-	AvcConfig();
+	AvcConfig() = default;
 	AvcConfig(const Atom& stsd);
 	~AvcConfig();
-	bool decode(const uchar* start);
-	bool is_ok;
+	bool is_ok = false;
+	SpsInfo* sps_info_ = NULL;
 
-	SpsInfo* sps_info_;
+private:
+	bool decode(const uchar* start);
 };
 
 #endif // AVCCONFIG_H

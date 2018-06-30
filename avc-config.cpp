@@ -8,8 +8,6 @@
 
 using namespace std;
 
-AvcConfig::AvcConfig() : is_ok(false), sps_info_(NULL) {};
-
 AvcConfig::AvcConfig(const Atom& stsd) {
 	// find avcC payload
 	const uchar* start = stsd.content_.data()+12;
@@ -38,8 +36,7 @@ AvcConfig::AvcConfig(const Atom& stsd) {
 }
 
 AvcConfig::~AvcConfig() {
-	if (sps_info_ != NULL)
-		delete sps_info_;
+	delete sps_info_;
 }
 
 
