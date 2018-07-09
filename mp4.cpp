@@ -393,7 +393,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			int length = track.codec_.getLength(start, maxlength, duration);
 			logg(V, "frame-length: ", length, '\n');
 			if(length < -1 || length > g_max_partsize) {
-				logg(E, "Invalid length. ", length, ". Wrong match in track: ", i, '\n');
+				logg(E, "Invalid length: ", length, ". Wrong match in track: ", i, '\n');
 				continue;
 			}
 			if(length == -1 || length == 0) {
