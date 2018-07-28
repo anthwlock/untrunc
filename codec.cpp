@@ -321,12 +321,18 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 				}
 				break;
 			}
+			case NAL_FILLER_DATA:
+				if (g_log_mode >= V) {
+					logg(V, "found filler data: ");
+					printBuffer(pos, 30);
+				}
+				break;
 			default:
 				if(previous_slice.is_ok) {
 					if(!nal_info.is_forbidden_set_) {
-						logg(E, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
+						logg(W, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
 						return length;
-					} // else is malformed, no stand-alone frame
+					} // otherwise it's malformed, don't produce an isolated malformed unit
 				}
 				break;
 			}

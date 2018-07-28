@@ -377,7 +377,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 
 		//skip fake moov
 		if(start[4] == 'm' && start[5] == 'o' && start[6] == 'o' && start[7] == 'v') {
-			cout << "Skipping moov atom: " << swap32(begin) << endl;
+			logg(V, "Skipping moov atom: ", swap32(begin), '\n');
 			offset += swap32(begin);
 			continue;
 		}

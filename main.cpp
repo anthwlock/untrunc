@@ -27,7 +27,8 @@
 using namespace std;
 
 void usage() {
-	cerr << "Usage: untrunc [-a -i -v] <ok.mp4> [<corrupt.mp4>]\n"
+	cerr << "Usage: untrunc [options] <ok.mp4> [corrupt.mp4]\n"
+	     << "\noptions:\n"
 		 << "-a  - analyze\n"
 		 << "-i  - info\n"
 		 << "-v  - verbose\n"
@@ -40,14 +41,18 @@ int main(int argc, char *argv[]) {
 	bool info = false;
 	bool analyze = false;
 	int i = 1;
-	for(; i < argc; i++) {
+	for (; i < argc; i++) {
 		string arg(argv[i]);
-		if(arg[0] == '-') {
+		if (arg[0] == '-') {
 			if(arg[1] == 'i') info = true;
 			else if(arg[1] == 'a') analyze = true;
 			else if(arg[1] == 'v' && arg[2] == 'v') g_log_mode = LogMode::VV;
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;
 			else if(arg[1] == 'q') g_log_mode = LogMode::E;
+			else {usage(); return -1;}
+		} else if (argc > i + 2) {
+			usage();
+			return -1;
 		} else
 			break;
 	}
