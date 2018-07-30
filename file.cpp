@@ -104,7 +104,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 	size_t avail = buf_size_ - buf_off_;
 	size_t nread = 0;
 	if (avail < total) {
-		logg(V, "reallocating the file buffer\n");
+		logg(VV, "reallocating the file buffer\n");
 		memcpy(dest, buffer_+buf_off_, avail);
 		nread = avail;
 		total -= avail;

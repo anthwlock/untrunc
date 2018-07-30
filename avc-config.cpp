@@ -39,9 +39,8 @@ AvcConfig::~AvcConfig() {
 	delete sps_info_;
 }
 
-
 bool AvcConfig::decode(const uchar* start) {
-	logg(V, "decoding avcC ...\n");
+	logg(V, "parsing avcC ...\n");
 	int off = 0;
 	int ver = readBits(8, start, off); // config_version
 	if (ver != 1){

@@ -161,7 +161,7 @@ void Track::writeToAtoms() {
 }
 
 void Track::clear() {
-	//times.clear();
+//	times_.clear();
 	offsets_.clear();
 	sizes_.clear();
 	keyframes_.clear();
@@ -173,6 +173,8 @@ void Track::fixTimes() {
 		times_.resize(offsets_.size(), 160);
 		return;
 	}
+//	for(int i=0; i != 100; i++)
+//		cout << "times_[" << i << "] = " << times_[i] << '\n';
 	while(times_.size() < offsets_.size())
 		times_.insert(times_.end(), times_.begin(), times_.end());
 	times_.resize(offsets_.size());
@@ -284,13 +286,22 @@ vector<int> Track::getSampleToChunk(Atom *t, int nchunks){
 void Track::saveSampleTimes() {
 	Atom *stts = trak_->atomByName("stts");
 	assert(stts);
+	vector<pair<int,int>> vp;
+	for (uint i = 0; i < times_.size(); i++){
+		if (vp.empty() || times_[i] != vp.back().second)
+			vp.emplace_back(1, times_[i]);
+		else
+			vp.back().first++;
+	}
 	stts->content_.resize(4 + //version
-						  4 + //entries
-						  8*times_.size()); //time table
-	stts->writeInt(times_.size(), 4);
-	for(unsigned int i = 0; i < times_.size(); i++) {
-		stts->writeInt(1, 8 + 8*i);
-		stts->writeInt(times_[i], 12 + 8*i);
+	                      4 + //entries
+	                      8*vp.size()); //time table
+	stts->writeInt(vp.size(), 4);
+	int cnt = 0;
+	for(auto p : vp) {
+		stts->writeInt(p.first, 8 + 8*cnt); // sample_count
+		stts->writeInt(p.second, 12 + 8*cnt); // sample_time_delta
+		cnt++;
 	}
 }
 
