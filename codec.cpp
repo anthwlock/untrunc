@@ -17,6 +17,7 @@ extern "C" {
 #include "sps-info.h"
 #include "nal-slice.h"
 #include "avc-config.h"
+#include "audio-config.h"
 
 using namespace std;
 
@@ -51,6 +52,14 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 			logg(W, "avcC was not decoded correctly\n");
 		else
 			logg(I, "avcC got decoded\n");
+	}
+	else if (codec == string("mp4a")) {
+		audio_config_ = new AudioConfig(*stsd);
+		if (!audio_config_->is_ok)
+			logg(W, "audio-config (esds) was not decoded correctly\n");
+		else
+			logg(I, "audio-config (esds) got decoded\n");
+//		exit(1);
 	}
 
 	//this was a stupid attempt at trying to detect packet type based on bitmasks
@@ -189,7 +198,7 @@ bool Codec::matchSample(const uchar *start) {
 	return false;
 }
 
-int Codec::getLength(const uchar *start, int maxlength, int &duration) {
+int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
 	if(name_ == "mp4a") {
 		AVFrame *frame = av_frame_alloc();
 		if(!frame)
@@ -201,12 +210,10 @@ int Codec::getLength(const uchar *start, int maxlength, int &duration) {
 		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 
-//		cout << "buffer:\n";
-//		printBuffer(start, 30);
-
 		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
 		duration = frame->nb_samples;
-		logg(V, "N(Samples): ", frame->nb_samples, '\n');
+//		logg(V, "nb_samples: ", duration);
+
 		av_freep(&frame);
 		return consumed;
 
