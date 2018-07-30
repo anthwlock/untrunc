@@ -193,13 +193,15 @@ bool Codec::matchSample(const uchar *start) {
 	} else if(name_ == "sowt") {
 		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
 		return false;
+	} else if(name_ == "sawb") {
+		return start[0] == 0x44;
 	}
 
 	return false;
 }
 
 int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
-	if(name_ == "mp4a") {
+	if(name_ == "mp4a" || name_ == "sawb") {
 		AVFrame *frame = av_frame_alloc();
 		if(!frame)
 			throw string("Could not create AVFrame");
@@ -212,7 +214,7 @@ int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
 
 		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
 		duration = frame->nb_samples;
-//		logg(V, "nb_samples: ", duration);
+		logg(V, "nb_samples: ", duration, '\n');
 
 		av_freep(&frame);
 		return consumed;
