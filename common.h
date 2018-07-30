@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <map>
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -51,6 +52,21 @@ enum {
 	NAL_FF_IGNORE       = 0xff0f001,
 };
 
+
+
+const std::map<std::string, std::string> g_atom_names = {
+    {"esds", "ES Descriptor"},
+    {"stsd", "sample description"},
+    {"minf", "media information"},
+    {"stss", "sync samples"},
+    {"udta", "user data"},
+    {"stsz", "sample to size"},
+    {"ctts", "sample to composition time"},
+    {"stsc", "sample to chunk"},
+    {"stts", "sample to decode time"},
+    {"co64", "chunk to offset 64"},
+    {"stco", "chunk to offset"}
+};
 
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);

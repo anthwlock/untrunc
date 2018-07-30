@@ -72,7 +72,10 @@ void Atom::write(FileWrite &file) {
 void Atom::print(int offset) {
 	string indent(offset, ' ');
 
-	cout << string(offset, '-') << name_ << " [" << start_ << ", " << length_ << "]\n";
+	cout << string(offset, '-') << name_;
+	if (g_atom_names.count(name_))
+		cout << " \"" << g_atom_names.at(name_) << "\"";
+	cout << " [" << start_ << ", " << length_ << "]\n";
 	if(name_ == string("mvhd") || name_ == string("mdhd")) {
 		for(int i = 0; i < offset; i++)
 			cout << " ";
