@@ -302,7 +302,7 @@ int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
 					return length;
 				}
 				if (!sps_info.is_ok)
-					sps_info.decode(nal_info.payload_);
+					sps_info.decode(nal_info.payload_.data());
 				break;
 			case NAL_AUD: // Access unit delimiter
 				if (!previous_slice.is_ok)

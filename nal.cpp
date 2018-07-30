@@ -41,9 +41,6 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	}
 
 	if(length_ > maxlength) {
-//		cout << "maxlength = " << maxlength << '\n';
-//		cout << "len - maxlength = " << len - maxlength << '\n';
-//		cout << "Buffer size exceeded\n";
 		logg(W, "buffer exceeded by: ", len-maxlength, '\n');
 		return false;
 	}
@@ -51,8 +48,8 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	if(*buffer & (1 << 7)) {
 		logg(V, "Warning: Forbidden first bit 1\n");
 		is_forbidden_set_ = true;
-		// means payload is garbage, header is ok though
-		// dont return false
+		// means payload is garbage, header might be ok though
+		// so dont return false
 	}
 	ref_idc_ = *buffer >> 5;
 	logg(V, "Ref idc: ", ref_idc_, "\n");
@@ -88,19 +85,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 //		} else
 //			data_.push_back(buffer[i]);
 //	}
-//	payload_ = data_.data();
-
-	payload_ = (uchar*) malloc(len);
-	memcpy(payload_, buffer, len);
+	payload_.reserve(len);
+	memcpy(payload_.data(), buffer, len);
 	return true;
-}
-
-NalInfo& NalInfo::operator= ( NalInfo&& other) {
-	swap(payload_, other.payload_);
-	return *this;
-}
-
-
-NalInfo::~NalInfo() {
-	free(payload_);
 }

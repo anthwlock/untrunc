@@ -44,13 +44,13 @@ bool AvcConfig::decode(const uchar* start) {
 	int off = 0;
 	int ver = readBits(8, start, off); // config_version
 	if (ver != 1){
-		logg(E, "avcC config version != 1\n");
+		logg(V, "avcC config version != 1\n");
 		return false;
 	}
 	start += 4;
 	uint reserved = readBits(3, start, off); // 111
 	if (reserved != 7){
-		logg(E, "avcC - unexpected value: ", reserved, '\n');
+		logg(V, "avcC - reserved is not reserved: ", reserved, '\n');
 		return false;
 	}
 	uint num_sps = readBits(5, start, off);
