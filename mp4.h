@@ -33,7 +33,7 @@ class AVFormatContext;
 class Mp4 {
 public:
 	int timescale_;
-	int context;
+	int duration_;
 	Atom *root_atom_;
 
 	Mp4();

@@ -37,7 +37,6 @@ using namespace std;
 Mp4::Mp4(): root_atom_(NULL) { }
 
 Mp4::~Mp4() {
-
 	delete root_atom_;
 }
 
@@ -67,7 +66,7 @@ void Mp4::parseOk(string& filename) {
 	if(!mvhd)
 		throw string("Missing movie header atom");
 	timescale_ = mvhd->readInt(12);
-	context = mvhd->readInt(16);
+	duration_ = mvhd->readInt(16);
 
 	av_register_all();
 	if(g_log_mode < V)
@@ -171,21 +170,31 @@ void Mp4::saveVideo(const string& filename) {
 	  assumes offsets in stco are absolute and so to find the relative just subtrack mdat->start + 8
 */
 
-	context = 0;
+	duration_ = 0;
 	for(Track& track : tracks_) {
 		track.writeToAtoms();
 		//convert to movie timescale
 //		cout << "Track duration: " << track.duration_ << " movie timescale: " << timescale_ << " track timescale: " << track.timescale_ << endl;
 		int track_duration = (int)(double)track.duration_ * ((double)timescale_ / (double)track.timescale_);
-		if(track_duration > context) context = track_duration;
-		logg(I, "Duration of ", track.codec_.name_, " = ", (double)track_duration/1000, "s\n");
+		if(track_duration > duration_) duration_ = track_duration;
+
+		int hour, min, sec, msec;
+		int bmsec = track.duration_ / (track.timescale_ / 1000);
+		auto x = div(bmsec, 1000); msec = x.rem; sec = x.quot;
+		x = div(sec, 60); sec = x.rem; min = x.quot;
+		x = div(min, 60); min = x.rem; hour = x.quot;
+		string s_msec = (msec?to_string(msec)+"ms ":"");
+		string s_sec = (sec?to_string(sec)+"s ":"");
+		string s_min = (min?to_string(min)+"min ":"");
+		string s_hour = (hour?to_string(hour)+"h ":"");
+		logg(I, "Duration of ", track.codec_.name_, ": ", s_hour, s_min, s_sec, s_msec, " (", bmsec, " ms)\n");
 
 		Atom *tkhd = track.trak_->atomByName("tkhd");
 		tkhd->writeInt(track_duration, 20); //in movie timescale, not track timescale
 	}
 	logg(I, "saving ", filename, '\n');
 	Atom *mvhd = root_atom_->atomByName("mvhd");
-	mvhd->writeInt(context, 16);
+	mvhd->writeInt(duration_, 16);
 
 
 	Atom *ftyp = root_atom_->atomByName("ftyp");
@@ -244,7 +253,7 @@ void Mp4::analyze() {
 		for(unsigned int i = 0; i < track.offsets_.size(); i++) {
 			int offset = track.offsets_[i] - (mdat->start_ + 8);
 			uchar *start = &(mdat->content_[offset]);
-			int maxlength = mdat->content_.size() - offset;
+			uint maxlength = mdat->content_.size() - offset;
 
 			int begin =  mdat->readInt(offset);
 			int next =  mdat->readInt(offset + 4);
@@ -329,23 +338,20 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		tracks_[i].clear();
 
 	//mp4a is more reliable than avc1.
-	if(tracks_.size() > 1 && tracks_[1].codec_.name_ == "mp4a") {
-		Track tmp = tracks_[0];
-		tracks_[0] = tracks_[1];
-		tracks_[1] = tmp;
-	}
+	if(tracks_.size() > 1 && tracks_[1].codec_.name_ == "mp4a")
+		swap(tracks_[0], tracks_[1]);
 
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	vector<int> audiotimes;
-	unsigned long count = 0;
+	unsigned long cnt_packets = 0;
 	off_t offset = 0;
 
 	logg(V, "mdat->contentSize = ", mdat->contentSize(), '\n');
 	int loop_cnt = 0;
-	while(offset < mdat->contentSize()) {
+	while (offset < mdat->contentSize()) {
 		logg(V, "\n(reading element from mdat)\n");
-		if (g_log_mode == I){
+		if (g_log_mode == I) { // output progress
 			if (loop_cnt >= 2000) {
 				double p = round(1000*((double)offset/(double)mdat->file_end_));
 				cout << p/10 << "%  \r" << flush;
@@ -354,8 +360,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			loop_cnt++;
 		}
 
-		int64_t maxlength = mdat->contentSize() - offset;
-		if(maxlength > g_max_partsize) maxlength = g_max_partsize; // 1.6MB
+		uint maxlength = min((int64_t) g_max_partsize, mdat->contentSize() - offset); // maximal 1.6MB
 		const uchar *start = mdat->getFragment(offset, maxlength);
 
 		uint begin = mdat->readInt(offset);
@@ -406,13 +411,13 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			}
 			if(length > 8)
 				logg(V, "- found as ", track.codec_.name_, '\n');
+
 			bool keyframe = track.codec_.last_frame_was_idr_;
 			if(keyframe)
 				track.keyframes_.push_back(track.offsets_.size());
 			track.offsets_.push_back(offset);
 			track.sizes_.push_back(length);
 			offset += length;
-
 			if(duration)
 				audiotimes.push_back(duration);
 
@@ -434,11 +439,11 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			//mdat->length = mdat->content.size() + 8;
 			break;
 		}
-		count++;
+		cnt_packets++;
 	}
 
 	if(g_log_mode >= I){
-		cout << "Info: Found " << count << " packets ( ";
+		cout << "Info: Found " << cnt_packets << " packets ( ";
 		for(const Track& t : tracks_){
 			cout << t.codec_.name_ << ": " << t.n_matched << ' ';
 			if (t.codec_.name_ == "avc1")
@@ -447,11 +452,11 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		cout << ")\n";
 	}
 
-	for(unsigned int i = 0; i < tracks_.size(); i++) {
-		if(audiotimes.size() == tracks_[i].offsets_.size())
-			swap(audiotimes, tracks_[i].times_);
+	for(auto& track : tracks_) {
+		if(audiotimes.size() == track.offsets_.size())
+			swap(audiotimes, track.times_);
 
-		tracks_[i].fixTimes();
+		track.fixTimes();
 	}
 
 	Atom *original_mdat = root_atom_->atomByName("mdat");
