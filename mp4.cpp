@@ -69,8 +69,7 @@ void Mp4::parseOk(string& filename) {
 	duration_ = mvhd->readInt(16);
 
 	av_register_all();
-	if(g_log_mode < V)
-		av_log_set_level(AV_LOG_QUIET);
+	if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
 	context_ = avformat_alloc_context();
 	// Open video file
 	int error = avformat_open_input(&context_, filename.c_str(), NULL, NULL);
