@@ -96,16 +96,16 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
 	const uchar* start = nal_info.payload_.data();
 	int offset = 0;
-	first_mb = readGolomb(start, offset);
+	first_mb = readGolomb(&start, &offset);
 	// TODO(ponchio): Is there a max number, so we could validate?
 	logg(VV, "First mb: ", first_mb, '\n');
 
-	slice_type = readGolomb(start, offset);
+	slice_type = readGolomb(&start, &offset);
 	if (slice_type > 9) {
 		logg(W, "Invalid slice type, probably this is not an avc1 sample\n");
 		return false;
 	}
-	pps_id = readGolomb(start, offset);
+	pps_id = readGolomb(&start, &offset);
 	logg(VV, "pic paramter set id: ", pps_id, '\n');
 	// Pps id: Should be taked from master context (h264_slice.c:1257).
 
@@ -113,26 +113,26 @@ bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
 	// otherwise we would have to read colour_plane_id which is 2 bits.
 
 	// Assuming same SPS for all frames.
-	frame_num = readBits(sps.log2_max_frame_num, start, offset);
+	frame_num = readBits(sps.log2_max_frame_num, &start, &offset);
 	logg(VV, "Frame num: ", frame_num, '\n');
 
 	// Read 2 flags.
 	field_pic_flag = 0;
 	bottom_pic_flag = 0;
 	if (!sps.frame_mbs_only_flag) {
-		field_pic_flag = readBits(1, start, offset);
+		field_pic_flag = readBits(1, &start, &offset);
 		if (field_pic_flag) {
-			bottom_pic_flag = readBits(1, start, offset);
+			bottom_pic_flag = readBits(1, &start, &offset);
 		}
 	}
 	idr_pic_flag = (nal_info.nal_type_ == NAL_IDR_SLICE) ? 1 : 0;
 	if (nal_info.nal_type_ == NAL_IDR_SLICE) {
-		idr_pic_id = readGolomb(start, offset);
+		idr_pic_id = readGolomb(&start, &offset);
 	}
 
 	// If pic order cnt type == 0.
 	if (sps.poc_type == 0) {
-		poc_lsb = readBits(sps.log2_max_poc_lsb, start, offset);
+		poc_lsb = readBits(sps.log2_max_poc_lsb, &start, &offset);
 		logg(VV, "Poc lsb: ", poc_lsb, '\n');
 	}
 	// TODO(ponchio): Ignoring the delta_poc for the moment.

@@ -23,6 +23,7 @@
 #include "common.h"
 
 
+using std::cerr;
 using std::cout;
 using std::dec;
 using std::hex;
@@ -55,71 +56,87 @@ uint64_t swap64(uint64_t ull) {
 }
 
 
-int readGolomb(const uchar*& buffer, int& offset) {
+int readGolomb(const uchar** buffer, int* offset) {
+	if (!buffer || !*buffer || !offset)
+		return -1;
+	const uchar* buf = *buffer;
+	int          ofs = *offset;
+
 	// Count the zeroes.
 	int count = 0;
 	// Count the leading zeroes.
-	while ((*buffer & (0x1 << (7 - offset))) == 0) {
+	while ((*buf & (0x01 << (7 - ofs))) == 0) {
 		count++;
-		offset++;
-		if (offset == 8) {
-			buffer++;
-			offset = 0;
+		ofs++;
+		if (ofs == 8) {
+			buf++;
+			ofs = 0;
 		}
 		if (count > 20) {
-			cout << "Failed reading golomb: too large!\n";
+			cerr << "Failed reading golomb: too large!\n";
+			*buffer = buf;
+			*offset = ofs;
 			return -1;
 		}
 	}
 	// Skip the single 1 delimiter.
-	offset++;
-	if (offset == 8) {
-		buffer++;
-		offset = 0;
+	ofs++;
+	if (ofs == 8) {
+		buf++;
+		ofs = 0;
 	}
-	uint32_t res = 1;
 	// Read count bits.
+	uint32_t res = 1;
 	while (count-- > 0) {
 		res <<= 1;
-		res |= (*buffer & (0x1 << (7 - offset))) >> (7 - offset);
-		offset++;
-		if (offset == 8) {
-			buffer++;
-			offset = 0;
+		res |= (*buf & (0x01 << (7 - ofs))) >> (7 - ofs);
+		ofs++;
+		if (ofs == 8) {
+			buf++;
+			ofs = 0;
 		}
 	}
+	*buffer = buf;
+	*offset = ofs;
 	return res - 1;
 }
 
-uint readBits(int n, const uchar*& buffer, int& offset) {
+uint readBits(int n, const uchar** buffer, int* offset) {
+	if (!buffer || !*buffer || !offset)
+		return -1;
+	const uchar* buf = *buffer;
+	int          ofs = *offset;
+
 	uint res = 0;
-	int d = 8 - offset;
+	int d = 8 - ofs;
 	uint mask = ((1 << d) - 1);
 	int to_rshift = d - n;
 	if (to_rshift > 0) {
-		res = (*buffer & mask) >> to_rshift;
-		offset += n;
+		res = (*buf & mask) >> to_rshift;
+		ofs += n;
 	} else if (to_rshift == 0) {
-		res = (*buffer & mask);
-		buffer++;
-		offset = 0;
+		res = (*buf & mask);
+		buf++;
+		ofs = 0;
 	} else {
-		res = (*buffer & mask);
+		res = (*buf & mask);
 		n -= d;
-		buffer++;
-		offset = 0;
+		buf++;
+		ofs = 0;
 		while (n >= 8) {
 			res <<= 8;
-			res |= *buffer;
+			res |= *buf;
 			n -= 8;
-			buffer++;
+			buf++;
 		}
 		if (n > 0) {
-			offset = n;
+			ofs = n;
 			res <<= n;
-			res |= *buffer >> (8 - n);
+			res |= *buf >> (8 - n);
 		}
 	}
+	*buffer = buf;
+	*offset = ofs;
 	return res;
 }
 
