@@ -1,4 +1,5 @@
-/*
+//==================================================================//
+/*                                                                  *
 	Untrunc - mp4.h
 
 	Untrunc is GPL software; you can freely distribute,
@@ -15,47 +16,49 @@
 	Suite 330, Boston, MA 02111-1307, USA.  Or www.fsf.org
 
 	Copyright 2010 Federico Ponchio
+ *                                                                  */
+//==================================================================//
 
-							*/
+#ifndef MP4_H_
+#define MP4_H_
 
-#ifndef MP4_H
-#define MP4_H
-
-#include <vector>
 #include <string>
-#include <stdio.h>
+#include <vector>
 
 #include "track.h"
+
+
+struct AVFormatContext;
 class Atom;
-class FileRead;
-class AVFormatContext;
+
 
 class Mp4 {
 public:
 	int timescale_;
 	int duration_;
-	Atom *root_atom_;
+	Atom* root_atom_;
 
 	Mp4();
 	~Mp4();
 
-	void parseOk(std::string& filename); // parse the healthy one
+	void parseOk(const std::string& filename);  // Parse the healthy one.
 
 	void printMediaInfo();
 	void printAtoms();
-	void makeStreamable(std::string& filename, std::string& output);
+	void makeStreamable(const std::string& filename, const std::string& output);
 
 	void analyze();
 	void writeTracksToAtoms();
-	void repair(std::string& filename, const std::string& filname_fixed);
+	void repair(const std::string& filename, const std::string& filname_fixed);
 
-protected:    
+protected:
 	std::vector<Track> tracks_;
-	AVFormatContext *context_;
+	AVFormatContext* context_;
 
 	void saveVideo(const std::string& filename);
 	void parseTracks();
 };
 
 
-#endif // MP4_H
+// vim:set ts=4 sw=4 sts=4 noet:
+#endif  // MP4_H_

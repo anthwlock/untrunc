@@ -1,4 +1,5 @@
-/*
+//==================================================================//
+/*                                                                  *
 	Untrunc - track.h
 
 	Untrunc is GPL software; you can freely distribute,
@@ -15,21 +16,24 @@
 	Suite 330, Boston, MA 02111-1307, USA.  Or www.fsf.org
 
 	Copyright 2010 Federico Ponchio
+ *                                                                  */
+//==================================================================//
 
-														*/
-
-#ifndef TRACK_H
-#define TRACK_H
+#ifndef TRACK_H_
+#define TRACK_H_
 
 #include <vector>
-#include <iosfwd>
 
 #include "codec.h"
-class Codec;
+
+
+struct AVCodecContext;
+class Atom;
+
 
 class Track {
 public:
-	Atom *trak_;
+	Atom* trak_;
 	int timescale_;
 	int duration_;
 	int n_matched;
@@ -38,27 +42,29 @@ public:
 	std::vector<int> times_;
 	std::vector<int> offsets_;
 	std::vector<int> sizes_;
-	std::vector<int> keyframes_; //used for 'avc1', 0 based!
+	std::vector<int> keyframes_;  // Used for 'avc1', 0 based!
 
-	//    Track(): trak_(0) {}
+	//Track(): trak_(0) { }
 	Track(Atom* t, AVCodecContext* c);
-	void parse(Atom *mdat);
+
+	void parse(Atom* mdat);
 	void writeToAtoms();
 	void clear();
 	void fixTimes();
 
-	std::vector<int> getSampleTimes(Atom *t);
-	std::vector<int> getKeyframes(Atom *t);
-	std::vector<int> getSampleSizes(Atom *t);
-	std::vector<int> getChunkOffsets(Atom *t);
-	std::vector<int> getSampleToChunk(Atom *t, int nchunks);
+	std::vector<int> getSampleTimes(Atom* t);
+	std::vector<int> getKeyframes(Atom* t);
+	std::vector<int> getSampleSizes(Atom* t);
+	std::vector<int> getChunkOffsets(Atom* t);
+	std::vector<int> getSampleToChunk(Atom* t, int nchunks);
 
 	void saveSampleTimes();
 	void saveKeyframes();
 	void saveSampleToChunk();
 	void saveSampleSizes();
 	void saveChunkOffsets();
-
 };
 
-#endif // TRACK_H
+
+// vim:set ts=4 sw=4 sts=4 noet:
+#endif  // TRACK_H_

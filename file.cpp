@@ -1,4 +1,5 @@
-/*
+//==================================================================//
+/*                                                                  *
 	Untrunc - file.cpp
 
 	Untrunc is GPL software; you can freely distribute,
@@ -15,46 +16,48 @@
 	Suite 330, Boston, MA 02111-1307, USA.  Or www.fsf.org
 
 	Copyright 2010 Federico Ponchio
-
-							*/
+ *                                                                  */
+//==================================================================//
 
 #include "file.h"
-#include <string>
+
 #include <cstring>
+#include <algorithm>
 #include <iostream>
 
-#include "common.h"
 
-using namespace std;
+using std::cout;
+using std::min;
+using std::string;
+using std::vector;
 
-FileRead::FileRead(): file_(NULL), buf_begin_(0), buf_off_(0) {
-}
+
+FileRead::FileRead() : file_(NULL), buf_begin_(0), buf_off_(0) { }
 
 FileRead::~FileRead() {
-	if(file_){
+	if (file_) {
 		fclose(file_);
 		free(buffer_);
 	}
 }
 
-FileWrite::FileWrite(): file_(NULL) {
-}
+FileWrite::FileWrite() : file_(NULL) { }
 
 FileWrite::~FileWrite() {
-	if(file_){
+	if (file_) {
 		fclose(file_);
 	}
 }
 
 bool FileRead::open(string filename) {
 	file_ = fopen(filename.c_str(), "r");
-	if(file_ == NULL) return false;
+	if (file_ == NULL) return false;
 
 	fseeko(file_, 0L, SEEK_END);
 	size_ = ftello(file_);
 	fseeko(file_, 0L, SEEK_SET);
 
-	buffer_ = (uchar*) malloc(buf_size_);
+	buffer_ = static_cast<uchar*>(malloc(buf_size_));
 	fread(buffer_, 1, buf_size_, file_);
 
 	return true;
@@ -62,15 +65,16 @@ bool FileRead::open(string filename) {
 
 bool FileWrite::create(string filename) {
 	file_ = fopen(filename.c_str(), "wb");
-	if(file_ == NULL) return false;
+	if (file_ == NULL) return false;
 	return true;
 }
 
 void FileRead::seek(off_t p) {
-	if (p < buf_begin_ || p >= buf_begin_ + buf_size_){
+	if (p < buf_begin_ || p >= buf_begin_ + buf_size_) {
 		fillBuffer(p);
-	} else
+	} else {
 		buf_off_ = p - buf_begin_;
+	}
 }
 
 off_t FileRead::pos() {
@@ -82,7 +86,7 @@ bool FileRead::atEnd() {
 }
 
 size_t FileRead::fillBuffer(off_t location) {
-	off_t avail = (buf_begin_+buf_size_) - location;
+	off_t avail = (buf_begin_ + buf_size_) - location;
 	off_t buf_loc = location - buf_begin_;
 
 	buf_begin_ = location;
@@ -91,63 +95,63 @@ size_t FileRead::fillBuffer(off_t location) {
 		fseeko(file_, location, SEEK_SET);
 		int n = fread(buffer_, 1, buf_size_, file_);
 		return n;
-	}else if (avail > 0) {
-		memcpy(buffer_, buffer_+buf_loc, buf_size_-buf_loc);
+	} else if (avail > 0) {
+		memcpy(buffer_, buffer_ + buf_loc, buf_size_ - buf_loc);
 	}
-	int n = fread(buffer_+avail, 1, buf_size_-avail, file_);
+	int n = fread(buffer_ + avail, 1, buf_size_ - avail, file_);
 	return n;
 }
 
 size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
-	logg(VV, "requests: ", size*n, " at offset : ", buf_off_, '\n');
-	size_t total = size*n;
+	logg(VV, "requests: ", size * n, " at offset : ", buf_off_, '\n');
+	size_t total = size * n;
 	size_t avail = buf_size_ - buf_off_;
 	size_t nread = 0;
 	if (avail < total) {
 		logg(VV, "reallocating the file buffer\n");
-		memcpy(dest, buffer_+buf_off_, avail);
+		memcpy(dest, buffer_ + buf_off_, avail);
 		nread = avail;
 		total -= avail;
 		buf_off_ = buf_size_;
-		if (total >= buf_size_){
-			size_t x = fread(dest+nread, 1, total, file_);
+		if (total >= buf_size_) {
+			size_t x = fread(dest + nread, 1, total, file_);
 			nread += x;
 			fillBuffer(ftello(file_));
 		} else {
-			size_t x = min(fillBuffer(buf_begin_+buf_off_), total);
-			memcpy(dest+nread, buffer_, x);
+			size_t x = min(fillBuffer(buf_begin_ + buf_off_), total);
+			memcpy(dest + nread, buffer_, x);
 			buf_off_ += x;
 			nread += x;
 		}
 	} else {
-		memcpy(dest, buffer_+buf_off_, total);
+		memcpy(dest, buffer_ + buf_off_, total);
 		buf_off_ += total;
 		nread = total;
 	}
-	return nread/size;
+	return nread / size;
 }
 
 int FileRead::readInt() {
 	int value;
-	int n = readBuffer((uchar*)&value, sizeof(int), 1);
-//    cout << "n = " << n << '\n';
-	if(n != 1)
+	int n = readBuffer(reinterpret_cast<uchar*>(&value), sizeof(int), 1);
+	//cout << "n = " << n << '\n';
+	if (n != 1)
 		throw string("Could not read atom length");
 	return swap32(value);
 }
 
 int64_t FileRead::readInt64() {
 	int64_t value;
-	int n = readBuffer((uchar*)&value, sizeof(value), 1);
-	if(n != 1)
+	int n = readBuffer(reinterpret_cast<uchar*>(&value), sizeof(value), 1);
+	if (n != 1)
 		throw string("Could not read atom length");
 
 	return swap64(value);
 }
 
-void FileRead::readChar(char *dest, size_t n) {
-	size_t len = readBuffer((uchar*)dest, sizeof(char), n);
-	if(len != n){
+void FileRead::readChar(char* dest, size_t n) {
+	size_t len = readBuffer(reinterpret_cast<uchar*>(dest), sizeof(char), n);
+	if (len != n) {
 		cout << "expected " << n << " but got " << len << '\n';
 		throw string("Could not read chars");
 	}
@@ -156,28 +160,23 @@ void FileRead::readChar(char *dest, size_t n) {
 vector<uchar> FileRead::read(size_t n) {
 	vector<uchar> dest(n);
 	size_t len = readBuffer(&*dest.begin(), 1, n);
-	if(len != n)
+	if (len != n)
 		throw string("Could not read at position");
 	return dest;
 }
 
 const uchar* FileRead::getPtr(int size_requested) {
-	// check if requested size exceeds buffer
-	if (buf_off_ + size_requested > buf_size_){
+	// Check if requested size exceeds buffer.
+	if (buf_off_ + size_requested > buf_size_) {
 		logg(VV, "size_requested: ", size_requested, '\n');
-//		cout << "buffer_:\n";
-//		printBuffer(buffer_, 30);
-		fillBuffer(buf_begin_+buf_off_);
-//		cout << "buffer_:\n";
-//		printBuffer(buffer_, 30);
-//		return buffer_tmp_;
+		//cout << "buffer_:\n"; printBuffer(buffer_, 30);
+		fillBuffer(buf_begin_ + buf_off_);
+		//cout << "buffer_:\n"; printBuffer(buffer_, 30);
 	}
-	return buffer_+buf_off_;
+	return buffer_ + buf_off_;
 }
 
-off_t FileWrite::pos() {
-	return ftell(file_);
-}
+off_t FileWrite::pos() { return ftell(file_); }
 
 int FileWrite::writeInt(int n) {
 	n = swap32(n);
@@ -191,12 +190,15 @@ int FileWrite::writeInt64(int64_t n) {
 	return 8;
 }
 
-int FileWrite::writeChar(char *source, size_t n) {
+int FileWrite::writeChar(char* source, size_t n) {
 	fwrite(source, 1, n, file_);
 	return n;
 }
 
-int FileWrite::write(vector<uchar> &v) {
+int FileWrite::write(vector<uchar> const& v) {
 	fwrite(&*v.begin(), 1, v.size(), file_);
 	return v.size();
 }
+
+
+// vim:set ts=4 sw=4 sts=4 noet:
