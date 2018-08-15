@@ -42,7 +42,8 @@ Atom::~Atom() {
 		delete children_[i];
 }
 
-void Atom::parseHeader(FileRead& file) {
+void Atom::parseHeader(const FileRead& file_rd) {
+	FileRead& file = const_cast<FileRead&>(file_rd);
 	start_ = file.pos();
 	logg(V, "start_ = ", start_, '\n');
 	length_ = file.readInt();
@@ -60,7 +61,8 @@ void Atom::parseHeader(FileRead& file) {
 	}
 }
 
-void Atom::parse(FileRead& file) {
+void Atom::parse(const FileRead& file_rd) {
+	FileRead& file = const_cast<FileRead&>(file_rd);
 	logg(V, '\n');
 	parseHeader(file);
 
@@ -81,17 +83,18 @@ void Atom::parse(FileRead& file) {
 	}
 }
 
-void Atom::write(FileWrite& file) {
+void Atom::write(FileWrite* file) {
+	if (!file) return;
 	// 1 write length.
-	int start = file.pos();
+	int start = file->pos();
 
-	file.writeInt(length_);
-	file.writeChar(name_, 4);
+	file->writeInt(length_);
+	file->writeChar(name_, 4);
 	if (content_.size())
-		file.write(content_);
+		file->write(content_);
 	for (unsigned int i = 0; i < children_.size(); i++)
 		children_[i]->write(file);
-	int end = file.pos();
+	int end = file->pos();
 	//cout << "end = " << end << '\n';
 	//cout << "length_ = " << length_ << '\n';
 	assert(end - start == length_);
@@ -314,7 +317,7 @@ void Atom::readChar(char* str, int64_t offset, int64_t length) {
 }
 
 
-WriteAtom::WriteAtom(FileRead& file) : file_read_(file) {}
+WriteAtom::WriteAtom(const FileRead& file) : file_read_(const_cast<FileRead&>(file)) {}
 
 WriteAtom::~WriteAtom() {}
 
@@ -343,12 +346,13 @@ int WriteAtom::readInt(int64_t offset) {
 	return *reinterpret_cast<const int*>(file_read_.getPtr(sizeof(int)));
 }
 
-void WriteAtom::write(FileWrite& output) {
+void WriteAtom::write(FileWrite* file) {
+	if (!file) return;
 	// 1 write length.
-	int start = output.pos();
+	int start = file->pos();
 
-	output.writeInt(length_);
-	output.writeChar(name_, 4);
+	file->writeInt(length_);
+	file->writeChar(name_, 4);
 	char buff[1 << 20];
 	int offset = file_begin_;
 	file_read_.seek(file_begin_);
@@ -358,11 +362,11 @@ void WriteAtom::write(FileWrite& output) {
 			toread = file_end_ - offset;
 		file_read_.readChar(buff, toread);
 		offset += toread;
-		output.writeChar(buff, toread);
+		file->writeChar(buff, toread);
 	}
 	for (unsigned int i = 0; i < children_.size(); i++)
-		children_[i]->write(output);
-	int end = output.pos();
+		children_[i]->write(file);
+	int end = file->pos();
 	assert(end - start == length_);
 }
 

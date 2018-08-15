@@ -48,9 +48,9 @@ public:
 	}
 	virtual ~Atom();
 
-	void parseHeader(FileRead& file);  // Read just name and length.
-	void parse(FileRead& file);
-	virtual void write(FileWrite& file);
+	void parseHeader(const FileRead& file);  // Read just name and length.
+	void parse(const FileRead& file);
+	virtual void write(FileWrite* file);
 	void print(int indentation);
 
 	std::vector<Atom*> atomsByName(const std::string& name) const;
@@ -78,7 +78,7 @@ public:
 	int64_t file_begin_;
 	int64_t file_end_;
 
-	explicit WriteAtom(FileRead& file);
+	explicit WriteAtom(const FileRead& file);
 	~WriteAtom();
 
 	const uchar* getFragment(int64_t offset, int64_t size);
@@ -87,7 +87,7 @@ public:
 	virtual int64_t contentSize() const { return file_end_ - file_begin_; }
 
 	virtual int readInt(int64_t offset);
-	void write(FileWrite& file);
+	void write(FileWrite* file);
 
 private:
 	FileRead& file_read_;

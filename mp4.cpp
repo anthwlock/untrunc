@@ -176,9 +176,9 @@ void Mp4::makeStreamable(const string& filename, const string& output) {
 			throw "Could not create file for writing: " + output;
 
 		if (ftyp)
-			ftyp->write(file);
-		moov->write(file);
-		mdat->write(file);
+			ftyp->write(&file);
+		moov->write(&file);
+		mdat->write(&file);
 	}
 }
 
@@ -264,9 +264,9 @@ void Mp4::saveVideo(const string& filename) {
 		throw "Could not create file for writing: " + filename;
 
 	if (ftyp)
-		ftyp->write(file);
-	moov->write(file);
-	mdat->write(file);
+		ftyp->write(&file);
+	moov->write(&file);
+	mdat->write(&file);
 }
 
 void Mp4::analyze() {
