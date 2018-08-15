@@ -21,9 +21,11 @@
 
 #include "file.h"
 
+#include <cassert>
 #include <cstring>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 
 using std::cout;
@@ -32,172 +34,426 @@ using std::string;
 using std::vector;
 
 
-FileRead::FileRead() : file_(NULL), buf_begin_(0), buf_off_(0) { }
+// Seek from end-of-file when seeking to a negative offset.
+//#define FILE_SEEK_FROM_END  1
 
-FileRead::~FileRead() {
-	if (file_) {
-		fclose(file_);
-		free(buffer_);
-	}
+
+// Code requires 8-bit bytes.
+static_assert(sizeof(uint8_t) == sizeof(char) && sizeof(uint8_t) == 1 &&
+			  std::numeric_limits<unsigned char>::digits == 8,
+			  "Unsupported machine byte size");
+
+
+// RAII wrapper for FILE, to make sure it gets closed if an error occurs.
+void File::FileCloser::operator()(std::FILE *fp) const {
+	fclose(fp);
 }
 
-FileWrite::FileWrite() : file_(NULL) { }
 
-FileWrite::~FileWrite() {
-	if (file_) {
-		fclose(file_);
-	}
+// Reading from a file.
+FileRead::FileRead(const string& filename) {
+	if (!filename.empty() && !open(filename))
+		throw string("Could not open file: ") + filename;
 }
 
-bool FileRead::open(string filename) {
-	file_ = fopen(filename.c_str(), "r");
-	if (file_ == NULL) return false;
+bool FileRead::open(const string& filename, bool buffered) {
+	logg(VV, ((buffered) ? "open buffered file: ": "open unbuffered file: "),
+		 filename, ".\n");
+	close();
 
-	fseeko(file_, 0L, SEEK_END);
-	size_ = ftello(file_);
-	fseeko(file_, 0L, SEEK_SET);
+	if (filename.empty())
+		return false;
+	file_.reset(fopen(filename.c_str(), "rb"));
+	if (!file_) {
+		int rc = errno;
+		logg(E, "failed to open: ", filename, " (errno=", rc, ").\n");
+		return false;
+	}
 
-	buffer_ = static_cast<uchar*>(malloc(buf_size_));
-	fread(buffer_, 1, buf_size_, file_);
+	fseeko(file_.get(), 0L, SEEK_END);
+	off_t sz = ftello(file_.get());
+	fseeko(file_.get(), 0L, SEEK_SET);
+	if (sz < 0)
+		return false;
+	file_size_ = sz;
 
+	if (buffered) {
+		static_assert(Buf_Size_ < std::numeric_limits<off_t>::max());
+		buffer_.resize(Buf_Size_);
+		if (fillBuffer(-1) == 0 && file_size_ > 0)
+			return false;
+	}
 	return true;
 }
 
-bool FileWrite::create(string filename) {
-	file_ = fopen(filename.c_str(), "wb");
-	if (file_ == NULL) return false;
-	return true;
+void FileRead::close() {
+	file_.reset();
+	file_size_      = -1;  // Size of the file.
+	buf_begin_pos_  = -1;  // File position of beginning of the buffer.
+	buf_size_       =  0;  // Size of buffered data.
+	buf_index_      =  0;  // Index into the buffer.
+	buffer_.clear();
 }
 
-void FileRead::seek(off_t p) {
-	if (p < buf_begin_ || p >= buf_begin_ + buf_size_) {
-		fillBuffer(p);
+
+void FileRead::seek(off_t pos) {
+	if (!file_)
+		return;
+#ifdef FILE_SEEK_FROM_END
+	logg(VV, ((pos < 0) ? "seek file from end: " : "seek file to position: "),
+		 pos, ".\n");
+
+	// Convert to absolute file position.
+	if (pos < 0) {
+		if (file_size_ < 0 || (pos += file_size_) < 0)
+			pos = 0;
+	}
+#else
+	logg(VV, "seek file to position: ", pos, ".\n");
+
+	if (pos < 0) {
+		logg(E, "failed to seek to position: ", pos, ".\n");
+		return;
+	}
+#endif
+
+	if (pos >= buf_begin_pos_ && pos < buf_end_pos()) {
+		buf_index_ = static_cast<size_t>(pos - buf_begin_pos_);
 	} else {
-		buf_off_ = p - buf_begin_;
+		if (fillBuffer(pos) == 0 && buffer_.empty()) {
+			if (fseeko(file_.get(), pos, SEEK_SET) < 0) {
+				int rc = errno;
+				logg(E, "failed to seek to position: ", pos, " (errno=", rc, ").\n");
+			}
+		}
 	}
+}
+
+void FileRead::rewind() {
+	if (!file_) {
+		close();          // Just in case.
+		return;
+	}
+	logg(VV, "rewind file.\n");
+
+	buf_begin_pos_ = -1;
+	buf_size_      =  0;
+	buf_index_     =  0;
+	clearerr(file_.get());
+	if (fillBuffer(0) == 0) {
+		clearerr(file_.get());
+		if (fseeko(file_.get(), 0L, SEEK_SET) < 0) {
+			int rc = errno;
+			logg(E, "failed to seek to position: 0 (errno=", rc, ").\n");
+		}
+	}
+	clearerr(file_.get());
+	fflush(file_.get());  // Sync std::FILE buffer to file position.
+	clearerr(file_.get());
 }
 
 off_t FileRead::pos() {
-	return buf_begin_ + buf_off_;
+	if (!file_)
+		return -1;
+
+	off_t pos = (!buffer_.empty()) ? buf_current_pos() : off_t(-1);
+	return (pos >= 0) ? pos : ftello(file_.get());
 }
+
 
 bool FileRead::atEnd() {
-	return pos() == size_;
+	off_t pos = this->pos();
+	return (pos < 0 || pos >= file_size_);
 }
 
-size_t FileRead::fillBuffer(off_t location) {
-	off_t avail = (buf_begin_ + buf_size_) - location;
-	off_t buf_loc = location - buf_begin_;
 
-	buf_begin_ = location;
-	buf_off_ = 0;
-	if (avail < 0 || avail >= buf_size_) {
-		fseeko(file_, location, SEEK_SET);
-		int n = fread(buffer_, 1, buf_size_, file_);
-		return n;
-	} else if (avail > 0) {
-		memcpy(buffer_, buffer_ + buf_loc, buf_size_ - buf_loc);
+// Fill the buffer with file data starting at file position 'pos'.
+// Return: 0 on failure and size of buffered data on success (which could be 0).
+//
+// Show buffer changes in fillBuffer().
+//#define FILE_FILLBUFFER_PRINT 1
+size_t FileRead::fillBuffer(off_t pos) {
+	if (!file_ || buffer_.empty())
+		return 0;
+	logg(VV, "fill the file buffer from position: ", pos, ".\n");
+#ifdef FILE_FILLBUFFER_PRINT
+	cout << "buffer_:\n";
+	printBuffer(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)));
+#endif
+
+	size_t avail = 0;
+	if (pos < 0) {
+		pos = ftello(file_.get());
+		if (pos < 0) {
+			int rc = errno;
+			logg(E, "failed to tell the position (errno=", rc, ").\n");
+			return 0;
+		}
+	} else if (buf_begin_pos_ < 0 ||
+			   pos <= buf_begin_pos_ || pos > buf_end_pos()) {
+		// Re-read buffer data if pos == buf_begin_pos_.
+		if (fseeko(file_.get(), pos, SEEK_SET) < 0) {
+			int rc = errno;
+			logg(E, "failed to seek to position: ", pos,
+				 " (errno=", rc, ").\n");
+			return 0;
+		}
+	} else {
+		off_t index = pos - buf_begin_pos_;  // 0 < index <= buf_size_
+		avail = buf_size_ - index;
+		if (avail > 0)
+			memmove(buffer_.data(), &buffer_[index], avail);
 	}
-	int n = fread(buffer_ + avail, 1, buf_size_ - avail, file_);
-	return n;
+	buf_begin_pos_ = pos;
+	buf_size_      = avail;
+	buf_index_     = 0;
+	size_t fill_size = buffer_.size() - avail;
+	size_t len = fread(&buffer_[avail], sizeof(uchar), fill_size, file_.get());
+	buf_size_ += len;
+	if (len != fill_size) {
+		if (ferror(file_.get()))
+			logg(E, "failed to read (", len, " < ", fill_size, ").\n");
+		if (buf_size_ < buffer_.size())
+			memset(&buffer_[buf_size_], 0, buffer_.size() - buf_size_);
+	}
+#ifdef FILE_FILLBUFFER_PRINT
+	cout << "buffer_:\n";
+	printBuffer(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)));
+#endif
+	return buf_size_;
 }
 
 size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
-	logg(VV, "requests: ", size * n, " at offset : ", buf_off_, '\n');
+	assert((dest || n == 0) && size > 0 &&
+		   (std::numeric_limits<size_t>::max() / size) >= n);
+	logg(VV, "read buffer: ", size * n, " at position: ", buf_current_pos(),
+		 " at index: ", buf_index_, '\n');
+
 	size_t total = size * n;
-	size_t avail = buf_size_ - buf_off_;
-	size_t nread = 0;
-	if (avail < total) {
-		logg(VV, "reallocating the file buffer\n");
-		memcpy(dest, buffer_ + buf_off_, avail);
-		nread = avail;
-		total -= avail;
-		buf_off_ = buf_size_;
-		if (total >= buf_size_) {
-			size_t x = fread(dest + nread, 1, total, file_);
-			nread += x;
-			fillBuffer(ftello(file_));
-		} else {
-			size_t x = min(fillBuffer(buf_begin_ + buf_off_), total);
-			memcpy(dest + nread, buffer_, x);
-			buf_off_ += x;
-			nread += x;
+	if (total == 0)
+		return 0;
+	size_t avail = buf_size_ - buf_index_;
+	if (total <= avail) {
+		memcpy(dest, &buffer_[buf_index_], total);
+		buf_index_ += total;
+		return n;
+	}
+	if (avail > 0) {
+		memcpy(dest, &buffer_[buf_index_], avail);
+		buf_index_  = buf_size_;
+		dest       += avail;
+		total      -= avail;
+	}
+	size_t nread = avail;
+	if (total < buffer_.size()) {
+		avail = fillBuffer(buf_end_pos());
+		size_t len = min(avail, total);
+		memcpy(dest, buffer_.data(), len);
+		buf_index_ += len;
+		nread      += len;
+	} else if (file_) {
+		if (!buffer_.empty()) logg(VV, "reading data unbuffered.\n");
+		size_t len = fread(dest, sizeof(uint8_t), total, file_.get());
+		nread += len;
+		if (len != total) {
+			if (ferror(file_.get()))
+				logg(E, "failed to read (", len, " < ", total, ").\n");
 		}
-	} else {
-		memcpy(dest, buffer_ + buf_off_, total);
-		buf_off_ += total;
-		nread = total;
+		fillBuffer(-1);
 	}
 	return nread / size;
 }
 
-int FileRead::readInt() {
-	int value;
-	int n = readBuffer(reinterpret_cast<uchar*>(&value), sizeof(int), 1);
-	//cout << "n = " << n << '\n';
-	if (n != 1)
-		throw string("Could not read atom length");
-	return swap32(value);
+const uchar* FileRead::getPtr(size_t size) {
+	logg(VV, "get read pointer: ", size,
+		 " at position: ", buf_current_pos(), '\n');
+	if (!buffer_.empty()) {
+		size_t avail = buf_size_ - buf_index_;
+		if (size >  avail)
+			avail = fillBuffer(buf_current_pos());
+		if (size <= avail)
+			return &buffer_[buf_index_];
+	}
+	logg(E, "failed to get read pointer: ", size,
+		 " at position: ", buf_current_pos(), ".\n");
+	throw string("Could not get read pointer");
+	return nullptr;
+}
+
+const uchar* FileRead::getPtr(size_t size, off_t pos) {
+	logg(VV, "get read pointer: ", size, " from position: ", pos, '\n');
+	if (pos < 0)
+		pos = buf_current_pos();
+	if (pos >= 0 && !buffer_.empty()) {
+		if (pos >= buf_begin_pos_ && pos < buf_end_pos()) {
+			buf_index_ = static_cast<size_t>(pos - buf_begin_pos_);
+			size_t avail = buf_size_ - buf_index_;
+			if (size <= avail)
+				return &buffer_[buf_index_];
+		}
+		size_t avail = fillBuffer(pos);
+		if (size <= avail)
+			return &buffer_[buf_index_];
+	}
+	logg(E, "failed to get read pointer: ", size,
+		 " from position: ", pos, ".\n");
+	throw string("Could not get read pointer");
+	return nullptr;
+}
+
+
+int32_t FileRead::readInt32() {
+	uint8_t data[sizeof(int32_t)] = {};
+	size_t len = readBuffer(data, sizeof(data), 1);
+	if (len != 1) {
+		logg(E, "failed to read 32-bit value at position: ", buf_current_pos(),
+			 ".\n");
+		throw string("Could not read 32-bit value");
+	}
+	return readBE<int32_t>(data);
 }
 
 int64_t FileRead::readInt64() {
-	int64_t value;
-	int n = readBuffer(reinterpret_cast<uchar*>(&value), sizeof(value), 1);
-	if (n != 1)
-		throw string("Could not read atom length");
-
-	return swap64(value);
+	uint8_t data[sizeof(int64_t)] = {};
+	size_t len = readBuffer(data, sizeof(data), 1);
+	if (len != 1) {
+		logg(E, "failed to read 64-bit value at position: ", buf_current_pos(),
+			 ".\n");
+		throw string("Could not read 64-bit value");
+	}
+	return readBE<int64_t>(data);
 }
 
 void FileRead::readChar(char* dest, size_t n) {
-	size_t len = readBuffer(reinterpret_cast<uchar*>(dest), sizeof(char), n);
-	if (len != n) {
-		cout << "expected " << n << " but got " << len << '\n';
-		throw string("Could not read chars");
+	assert(dest || n == 0);
+	if (n > 0) {
+		uchar* udest = reinterpret_cast<uchar*>(dest);
+		size_t len = readBuffer(udest, sizeof(char), n);
+		if (len != n) {
+			logg(E, "failed to read chars at position: ", buf_current_pos(),
+				 " (", len, " < ", n, ").\n");
+			throw string("Could not read chars");
+		}
 	}
 }
 
 vector<uchar> FileRead::read(size_t n) {
 	vector<uchar> dest(n);
-	size_t len = readBuffer(&*dest.begin(), 1, n);
-	if (len != n)
-		throw string("Could not read at position");
+	if (n > 0) {
+		size_t len = readBuffer(dest.data(), sizeof(uchar), n);
+		if (len != n) {
+			logg(E, "failed to read at position: ", buf_current_pos(),
+				 " (", len, " < ", n, ").\n");
+			throw string("Could not read at position");
+		}
+	}
 	return dest;
 }
 
-const uchar* FileRead::getPtr(int size_requested) {
-	// Check if requested size exceeds buffer.
-	if (buf_off_ + size_requested > buf_size_) {
-		logg(VV, "size_requested: ", size_requested, '\n');
-		//cout << "buffer_:\n"; printBuffer(buffer_, 30);
-		fillBuffer(buf_begin_ + buf_off_);
-		//cout << "buffer_:\n"; printBuffer(buffer_, 30);
+
+// Writing to a file.
+FileWrite::FileWrite(const string& filename) {
+	if (!filename.empty() && !create(filename))
+		throw string("Could not create file: ") + filename;
+}
+
+bool FileWrite::create(const string& filename) {
+	file_.reset();
+
+	if (filename.empty())
+		return false;
+	file_.reset(fopen(filename.c_str(), "wb"));
+	if (!file_) {
+		int rc = errno;
+		logg(E, "failed to create: ", filename, " (errno=", rc, ").\n");
+		return false;
 	}
-	return buffer_ + buf_off_;
+	return true;
 }
 
-off_t FileWrite::pos() { return ftell(file_); }
 
-int FileWrite::writeInt(int n) {
-	n = swap32(n);
-	fwrite(&n, sizeof(int), 1, file_);
-	return 4;
+off_t FileWrite::pos() {
+	return (file_) ? ftello(file_.get()) : off_t(-1);
 }
 
-int FileWrite::writeInt64(int64_t n) {
-	n = swap64(n);
-	fwrite(&n, sizeof(n), 1, file_);
-	return 8;
+off_t FileWrite::size() {
+	if (!file_)
+		return -1;
+	off_t pos = ftello(file_.get());
+	if (pos < 0)
+		return -1;
+	fseeko(file_.get(), 0L,  SEEK_END);
+	off_t sz  = ftello(file_.get());
+	fseeko(file_.get(), pos, SEEK_SET);
+	if (sz < 0)
+		return -1;
+	return sz;
 }
 
-int FileWrite::writeChar(char* source, size_t n) {
-	fwrite(source, 1, n, file_);
-	return n;
+
+ssize_t FileWrite::writeInt32(int32_t value) {
+	if (!file_)
+		return -1;
+
+	uint8_t data[sizeof(value)] = {};
+	writeBE(data, value);
+
+	size_t len = fwrite(data, sizeof(data), 1, file_.get());
+	if (len != 1) {
+		logg(E, "failed to write 32-bit value.\n");
+		if (ferror(file_.get()))
+			return -1;
+	}
+	return len;
 }
 
-int FileWrite::write(vector<uchar> const& v) {
-	fwrite(&*v.begin(), 1, v.size(), file_);
-	return v.size();
+ssize_t FileWrite::writeInt64(int64_t value) {
+	if (!file_)
+		return -1;
+
+	uint8_t data[sizeof(value)] = {};
+	writeBE(data, value);
+
+	size_t len = fwrite(data, sizeof(data), 1, file_.get());
+	if (len != 1) {
+		logg(E, "failed to write 64-bit value.\n");
+		if (ferror(file_.get()))
+			return -1;
+	}
+	return len;
+}
+
+ssize_t FileWrite::writeChar(const char* source, size_t n) {
+	assert(source || n == 0);
+	assert(n <= std::numeric_limits<ssize_t>::max() / sizeof(char));
+	if (n == 0)
+		return  0;
+	if (!file_)
+		return -1;
+
+	size_t len = fwrite(source, sizeof(char), n, file_.get());
+	if (len != n) {
+		logg(E, "failed to write chars (", len, " < ", n, ").\n");
+		if (ferror(file_.get()))
+			return -1;
+	}
+	return len;
+}
+
+ssize_t FileWrite::write(const vector<uchar>& v) {
+	assert(v.size() <= std::numeric_limits<ssize_t>::max() / sizeof(uchar));
+	if (v.empty())
+		return  0;
+	if (!file_)
+		return -1;
+
+	size_t len = fwrite(v.data(), sizeof(uint8_t), v.size(), file_.get());
+	if (len != v.size()) {
+		logg(E, "failed to write at position (", len, " < ", v.size(), ").\n");
+		if (ferror(file_.get()))
+			return -1;
+	}
+	return len;
 }
 
 

@@ -30,8 +30,8 @@
 #include <utility>
 
 
-typedef unsigned int uint;
-typedef unsigned char uchar;
+using uint = unsigned int;
+using uchar = unsigned char;
 
 enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
@@ -40,7 +40,7 @@ extern size_t g_max_partsize;
 
 template <class... Args>
 void logg(Args&&... args) {
-	//(std::cout << ... << args); // Binary left fold (C++17).
+	//(std::cout << ... << args);  // Binary left fold (C++17).
 	using creator = int[];  // Dummy.
 	creator{0, (std::cout << (std::forward<Args>(args)), 0)...};
 }
@@ -91,9 +91,51 @@ const std::map<std::string, std::string> g_atom_names = {
 	{"stco", "chunk to offset"}};
 
 
+// Swap the 8-bit bytes into their reverse order.
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);
 uint64_t swap64(uint64_t ull);
+
+
+// Unaligned access of 8-bit bytes.
+static_assert(sizeof(uint8_t) == 1 && sizeof(uint32_t) == 4,
+			  "Unsupported machine byte size");
+
+// Read an unaligned, big-endian value.
+// A compiler will optimize this (at -O2) to a single instruction if possible.
+template <typename T>
+constexpr T readBE(const uint8_t* p, size_t i = 0) {
+	return (i >= sizeof(T)) ? T(0) :
+		(T(*p) << ((sizeof(T) - 1 - i) * 8)) | readBE<T>(p + 1, i + 1);
+}
+
+template <typename T>
+constexpr void readBE(T* result, const uint8_t* p) { *result = readBE<T>(p); }
+
+// Write an unaligned, big-endian value.
+template <typename T>
+constexpr void writeBE(uint8_t* p, T value, size_t i = 0) {
+	(i >= sizeof(T)) ? void(0) :
+		(*p = ((value >> ((sizeof(T) - 1 - i) * 8)) & 0xFF)
+		, writeBE(p + 1, value, i + 1));
+}
+
+// Read an unaligned value in native-endian format.
+// Encode the unaligned access intention by using memcpy() with its
+//  destination and source pointing to types with the wanted alignment.
+// Some compilers use the alignments of these types for further optimizations.
+// A compiler can optimize this memcpy() into a single instruction.
+template <typename T>
+constexpr T readNE(const uint8_t* p) {
+	T value;
+	memcpy(&value, p, sizeof(value));
+	return value;
+}
+
+template <typename T>
+constexpr void readNE(T* result, const uint8_t* p) {
+	memcpy(result, p, sizeof(result));
+}
 
 
 int readGolomb(const uchar** buffer, int* offset);

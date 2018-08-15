@@ -26,57 +26,86 @@
 #include <cstdio>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "common.h"
 
 
-class FileRead {
-public:
-	FileRead();
-	~FileRead();
-
-	bool open(std::string filename);
-
-	void seek(off_t p);
-	off_t pos();
-	bool atEnd();
-	off_t length() { return size_; }
-
-	size_t readBuffer(uchar* target, size_t size, size_t n);
-
-	int readInt();
-	int64_t readInt64();
-	void readChar(char* dest, size_t n);
-	std::vector<uchar> read(size_t n);
-
-	const uchar* getPtr(int size_requested);
-
+// RAII wrapper for FILE, to make sure it gets closed.
+class File {
 protected:
-	size_t fillBuffer(off_t location);
-	uchar* buffer_;
-	off_t size_;
-	FILE* file_;
-	size_t buf_size_ = 15 * 1024 * 1024;  // 15 MiB.
-	off_t buf_off_;
-	off_t buf_begin_;
+	struct FileCloser {
+		constexpr FileCloser()                  noexcept = default;
+		constexpr FileCloser(const FileCloser&) noexcept = default;
+
+		void operator()(std::FILE *fp) const;
+	};
+
+	std::unique_ptr<std::FILE, File::FileCloser> file_;
 };
 
-class FileWrite {
-public:
-	FileWrite();
-	~FileWrite();
 
-	bool create(std::string filename);
+// Reading from a file.
+class FileRead : protected File {
+public:
+	FileRead() = default;
+	explicit FileRead(const std::string& filename);
+
+	bool open(const std::string& filename, bool buffered = true);
+
+	explicit operator bool() const { return static_cast<bool>(file_); }
 
 	off_t pos();
+	void  seek(off_t pos);
+	void  rewind();
+	bool  atEnd();
+	off_t size()   const { return file_size_; }
+	off_t length() const { return file_size_; }
 
-	int writeInt(int n);
-	int writeInt64(int64_t n);
-	int writeChar(char* source, size_t n);
-	int write(std::vector<uchar> const& v);
+	int32_t readInt32();
+	int64_t readInt64();
+	void    readChar(char* dest, size_t n);
+	std::vector<uchar> read(size_t n);
 
-protected:
-	FILE* file_;
+	const uchar* getPtr(size_t size);
+	const uchar* getPtr(size_t size, off_t pos);
+
+private:
+	static constexpr size_t Buf_Size_ = 15UL*1024*1024;  // 15 MiB.
+
+	off_t  file_size_     = -1;
+	std::vector<uchar> buffer_;
+	off_t  buf_begin_pos_ = -1;
+	size_t buf_size_      =  0;
+	size_t buf_index_     =  0;
+
+	off_t  buf_end_pos()     const { return buf_begin_pos_ + buf_size_;  }
+	off_t  buf_current_pos() const { return buf_begin_pos_ + buf_index_; }
+
+	void   close();
+	size_t fillBuffer(off_t pos);
+	size_t readBuffer(uchar* target, size_t size, size_t n);
+};
+
+
+// Writing to a file.
+class FileWrite : protected File {
+public:
+	FileWrite() = default;
+	explicit FileWrite(const std::string& filename);
+
+	bool create(const std::string& filename);
+
+	explicit operator bool() const { return static_cast<bool>(file_); }
+
+	off_t pos();
+	off_t size();
+	off_t length() { return size(); }
+
+	ssize_t writeInt32(int32_t value);
+	ssize_t writeInt64(int64_t value);
+	ssize_t writeChar(const char* source, size_t n);
+	ssize_t write(const std::vector<uchar>& v);
 };
 
 

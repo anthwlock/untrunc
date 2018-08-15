@@ -46,7 +46,7 @@ void Atom::parseHeader(const FileRead& file_rd) {
 	FileRead& file = const_cast<FileRead&>(file_rd);
 	start_ = file.pos();
 	logg(V, "start_ = ", start_, '\n');
-	length_ = file.readInt();
+	length_ = file.readInt32();
 	logg(V, "length_ = ", length_, '\n');
 	if (length_ < 0)
 		throw length_error("length of atom < 0");
@@ -88,7 +88,7 @@ void Atom::write(FileWrite* file) {
 	// 1 write length.
 	int start = file->pos();
 
-	file->writeInt(length_);
+	file->writeInt32(length_);
 	file->writeChar(name_, 4);
 	if (content_.size())
 		file->write(content_);
@@ -351,7 +351,7 @@ void WriteAtom::write(FileWrite* file) {
 	// 1 write length.
 	int start = file->pos();
 
-	file->writeInt(length_);
+	file->writeInt32(length_);
 	file->writeChar(name_, 4);
 	char buff[1 << 20];
 	int offset = file_begin_;
