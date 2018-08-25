@@ -106,7 +106,7 @@ bool NalInfo::parseNal(const uchar* buffer, uint32_t maxlength) {
 		}
 	}
 #else
-	payload_.reserve(len);
+	payload_.resize(len);
 	memcpy(payload_.data(), buffer, len);
 #endif
 	return true;
