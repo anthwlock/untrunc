@@ -40,6 +40,7 @@ using std::vector;
 
 // Code requires 8-bit bytes.
 static_assert(sizeof(uint8_t) == sizeof(char) && sizeof(uint8_t) == 1 &&
+			  sizeof(uint32_t) == 4 &&
 			  std::numeric_limits<unsigned char>::digits == 8,
 			  "Unsupported machine byte size");
 
@@ -61,8 +62,7 @@ bool FileRead::open(const string& filename, bool buffered) {
 		 filename, ".\n");
 	close();
 
-	if (filename.empty())
-		return false;
+	if (filename.empty()) return false;
 	file_.reset(fopen(filename.c_str(), "rb"));
 	if (!file_) {
 		int rc = errno;
@@ -73,15 +73,13 @@ bool FileRead::open(const string& filename, bool buffered) {
 	fseeko(file_.get(), 0L, SEEK_END);
 	off_t sz = ftello(file_.get());
 	fseeko(file_.get(), 0L, SEEK_SET);
-	if (sz < 0)
-		return false;
+	if (sz < 0) return false;
 	file_size_ = sz;
 
 	if (buffered) {
-		static_assert(Buf_Size_ < std::numeric_limits<off_t>::max());
-		buffer_.resize(Buf_Size_);
-		if (fillBuffer(-1) == 0 && file_size_ > 0)
-			return false;
+		static_assert(kBufSize < std::numeric_limits<off_t>::max());
+		buffer_.resize(kBufSize);
+		if (fillBuffer(-1) == 0 && file_size_ > 0) return false;
 	}
 	return true;
 }
@@ -97,8 +95,7 @@ void FileRead::close() {
 
 
 void FileRead::seek(off_t pos) {
-	if (!file_)
-		return;
+	if (!file_) return;
 #ifdef FILE_SEEK_FROM_END
 	logg(VV, ((pos < 0) ? "seek file from end: " : "seek file to position: "),
 		 pos, ".\n");
@@ -153,8 +150,7 @@ void FileRead::rewind() {
 }
 
 off_t FileRead::pos() {
-	if (!file_)
-		return -1;
+	if (!file_) return -1;
 
 	off_t pos = (!buffer_.empty()) ? buf_current_pos() : off_t(-1);
 	return (pos >= 0) ? pos : ftello(file_.get());
@@ -173,8 +169,7 @@ bool FileRead::atEnd() {
 // Show buffer changes in fillBuffer().
 //#define FILE_FILLBUFFER_PRINT 1
 size_t FileRead::fillBuffer(off_t pos) {
-	if (!file_ || buffer_.empty())
-		return 0;
+	if (!file_ || buffer_.empty()) return 0;
 	logg(VV, "fill the file buffer from position: ", pos, ".\n");
 #ifdef FILE_FILLBUFFER_PRINT
 	cout << "buffer_:\n";
@@ -230,8 +225,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 		 " at index: ", buf_index_, '\n');
 
 	size_t total = size * n;
-	if (total == 0)
-		return 0;
+	if (total == 0) return 0;
 	size_t avail = buf_size_ - buf_index_;
 	if (total <= avail) {
 		memcpy(dest, &buffer_[buf_index_], total);
@@ -253,7 +247,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 		nread      += len;
 	} else if (file_) {
 		if (!buffer_.empty()) logg(VV, "reading data unbuffered.\n");
-		size_t len = fread(dest, sizeof(uint8_t), total, file_.get());
+		size_t len = fread(dest, sizeof(uchar), total, file_.get());
 		nread += len;
 		if (len != total) {
 			if (ferror(file_.get()))
@@ -280,7 +274,7 @@ const uchar* FileRead::getPtr(size_t size) {
 	return nullptr;
 }
 
-const uchar* FileRead::getPtr(size_t size, off_t pos) {
+const uchar* FileRead::getPtr(off_t pos, size_t size) {
 	logg(VV, "get read pointer: ", size, " from position: ", pos, '\n');
 	if (pos < 0)
 		pos = buf_current_pos();
@@ -302,33 +296,66 @@ const uchar* FileRead::getPtr(size_t size, off_t pos) {
 }
 
 
-int32_t FileRead::readInt32() {
-	uint8_t data[sizeof(int32_t)] = {};
+uint8_t FileRead::readUint8() {
+	uint8_t data = 0;
+	size_t len = readBuffer(&data, sizeof(data), 1);
+	if (len != 1) {
+		logg(E, "failed to read 8-bit value at position: ", buf_current_pos(),
+			 ".\n");
+		throw string("Could not read 8-bit value");
+	}
+	return data;
+}
+
+uint16_t FileRead::readUint16() {
+	uint8_t data[sizeof(uint16_t)] = {};
+	size_t len = readBuffer(data, sizeof(data), 1);
+	if (len != 1) {
+		logg(E, "failed to read 16-bit value at position: ", buf_current_pos(),
+			 ".\n");
+		throw string("Could not read 16-bit value");
+	}
+	return readBE<uint16_t>(data);
+}
+
+uint32_t FileRead::readUint24() {
+	uint8_t data[sizeof(uint8_t) * 3] = {};
+	size_t len = readBuffer(data, sizeof(data), 1);
+	if (len != 1) {
+		logg(E, "failed to read 24-bit value at position: ", buf_current_pos(),
+			 ".\n");
+		throw string("Could not read 24-bit value");
+	}
+	return readBE<uint32_t,sizeof(data)>(data);
+}
+
+uint32_t FileRead::readUint32() {
+	uint8_t data[sizeof(uint32_t)] = {};
 	size_t len = readBuffer(data, sizeof(data), 1);
 	if (len != 1) {
 		logg(E, "failed to read 32-bit value at position: ", buf_current_pos(),
 			 ".\n");
 		throw string("Could not read 32-bit value");
 	}
-	return readBE<int32_t>(data);
+	return readBE<uint32_t>(data);
 }
 
-int64_t FileRead::readInt64() {
-	uint8_t data[sizeof(int64_t)] = {};
+uint64_t FileRead::readUint64() {
+	uint8_t data[sizeof(uint64_t)] = {};
 	size_t len = readBuffer(data, sizeof(data), 1);
 	if (len != 1) {
 		logg(E, "failed to read 64-bit value at position: ", buf_current_pos(),
 			 ".\n");
 		throw string("Could not read 64-bit value");
 	}
-	return readBE<int64_t>(data);
+	return readBE<uint64_t>(data);
 }
 
 void FileRead::readChar(char* dest, size_t n) {
 	assert(dest || n == 0);
 	if (n > 0) {
 		uchar* udest = reinterpret_cast<uchar*>(dest);
-		size_t len = readBuffer(udest, sizeof(char), n);
+		size_t len = readBuffer(udest, sizeof(uchar), n);
 		if (len != n) {
 			logg(E, "failed to read chars at position: ", buf_current_pos(),
 				 " (", len, " < ", n, ").\n");
@@ -360,8 +387,7 @@ FileWrite::FileWrite(const string& filename) {
 bool FileWrite::create(const string& filename) {
 	file_.reset();
 
-	if (filename.empty())
-		return false;
+	if (filename.empty()) return false;
 	file_.reset(fopen(filename.c_str(), "wb"));
 	if (!file_) {
 		int rc = errno;
@@ -377,23 +403,58 @@ off_t FileWrite::pos() {
 }
 
 off_t FileWrite::size() {
-	if (!file_)
-		return -1;
+	if (!file_)  return -1;
 	off_t pos = ftello(file_.get());
-	if (pos < 0)
-		return -1;
+	if (pos < 0) return -1;
 	fseeko(file_.get(), 0L,  SEEK_END);
 	off_t sz  = ftello(file_.get());
 	fseeko(file_.get(), pos, SEEK_SET);
-	if (sz < 0)
-		return -1;
+	if (sz  < 0) return -1;
 	return sz;
 }
 
 
-ssize_t FileWrite::writeInt32(int32_t value) {
-	if (!file_)
-		return -1;
+ssize_t FileWrite::writeUint8(uint8_t value) {
+	if (!file_) return -1;
+
+	size_t len = fwrite(&value, sizeof(value), 1, file_.get());
+	if (len != 1) {
+		logg(E, "failed to write 8-bit value.\n");
+		if (ferror(file_.get())) return -1;
+	}
+	return len;
+}
+
+ssize_t FileWrite::writeUint16(uint16_t value) {
+	if (!file_) return -1;
+
+	uint8_t data[sizeof(value)] = {};
+	writeBE(data, value);
+
+	size_t len = fwrite(data, sizeof(data), 1, file_.get());
+	if (len != 1) {
+		logg(E, "failed to write 16-bit value.\n");
+		if (ferror(file_.get())) return -1;
+	}
+	return len;
+}
+
+ssize_t FileWrite::writeUint24(uint32_t value) {
+	if (!file_) return -1;
+
+	uint8_t data[sizeof(uint8_t) * 3] = {};
+	writeBE<uint32_t,sizeof(data)>(data, value);
+
+	size_t len = fwrite(data, sizeof(data), 1, file_.get());
+	if (len != 1) {
+		logg(E, "failed to write 24-bit value.\n");
+		if (ferror(file_.get())) return -1;
+	}
+	return len;
+}
+
+ssize_t FileWrite::writeUint32(uint32_t value) {
+	if (!file_) return -1;
 
 	uint8_t data[sizeof(value)] = {};
 	writeBE(data, value);
@@ -401,15 +462,13 @@ ssize_t FileWrite::writeInt32(int32_t value) {
 	size_t len = fwrite(data, sizeof(data), 1, file_.get());
 	if (len != 1) {
 		logg(E, "failed to write 32-bit value.\n");
-		if (ferror(file_.get()))
-			return -1;
+		if (ferror(file_.get())) return -1;
 	}
 	return len;
 }
 
-ssize_t FileWrite::writeInt64(int64_t value) {
-	if (!file_)
-		return -1;
+ssize_t FileWrite::writeUint64(uint64_t value) {
+	if (!file_) return -1;
 
 	uint8_t data[sizeof(value)] = {};
 	writeBE(data, value);
@@ -417,8 +476,7 @@ ssize_t FileWrite::writeInt64(int64_t value) {
 	size_t len = fwrite(data, sizeof(data), 1, file_.get());
 	if (len != 1) {
 		logg(E, "failed to write 64-bit value.\n");
-		if (ferror(file_.get()))
-			return -1;
+		if (ferror(file_.get())) return -1;
 	}
 	return len;
 }
@@ -426,32 +484,26 @@ ssize_t FileWrite::writeInt64(int64_t value) {
 ssize_t FileWrite::writeChar(const char* source, size_t n) {
 	assert(source || n == 0);
 	assert(n <= std::numeric_limits<ssize_t>::max() / sizeof(char));
-	if (n == 0)
-		return  0;
-	if (!file_)
-		return -1;
+	if (n == 0) return  0;
+	if (!file_) return -1;
 
 	size_t len = fwrite(source, sizeof(char), n, file_.get());
 	if (len != n) {
 		logg(E, "failed to write chars (", len, " < ", n, ").\n");
-		if (ferror(file_.get()))
-			return -1;
+		if (ferror(file_.get())) return -1;
 	}
 	return len;
 }
 
 ssize_t FileWrite::write(const vector<uchar>& v) {
 	assert(v.size() <= std::numeric_limits<ssize_t>::max() / sizeof(uchar));
-	if (v.empty())
-		return  0;
-	if (!file_)
-		return -1;
+	if (v.empty()) return  0;
+	if (!file_)    return -1;
 
-	size_t len = fwrite(v.data(), sizeof(uint8_t), v.size(), file_.get());
+	size_t len = fwrite(v.data(), sizeof(uchar), v.size(), file_.get());
 	if (len != v.size()) {
 		logg(E, "failed to write at position (", len, " < ", v.size(), ").\n");
-		if (ferror(file_.get()))
-			return -1;
+		if (ferror(file_.get())) return -1;
 	}
 	return len;
 }

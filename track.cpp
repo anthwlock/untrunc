@@ -37,6 +37,7 @@ extern "C" {
 
 using std::cout;
 using std::endl;
+using std::move;
 using std::pair;
 using std::string;
 using std::vector;
@@ -45,12 +46,12 @@ using std::vector;
 Track::Track(Atom* t, AVCodecContext* c) : trak_(t), codec_(c), n_matched(0) { }
 
 void Track::parse(Atom* mdat) {
-	Atom* mdhd = trak_->atomByName("mdhd");
+	Atom* mdhd = trak_->find1stAtom("mdhd");
 	if (!mdhd)
 		throw string("No mdhd atom: unknown duration and timescale");
 
-	timescale_ = mdhd->readInt(12);
-	duration_ = mdhd->readInt(16);
+	timescale_ = mdhd->readInt32(12);
+	duration_ = mdhd->readInt32(16);
 
 	times_ = getSampleTimes(trak_);
 	keyframes_ = getKeyframes(trak_);
@@ -85,7 +86,7 @@ void Track::parse(Atom* mdat) {
 	}
 
 	// Move this stuff into track!
-	Atom* hdlr = trak_->atomByName("hdlr");
+	Atom* hdlr = trak_->find1stAtom("hdlr");
 	char type[5];
 	hdlr->readChar(type, 8, 4);
 
@@ -107,21 +108,21 @@ void Track::parse(Atom* mdat) {
 #endif
 
 #if 0
-	Atom *mdat = root->atomByName("mdat");
+	Atom *mdat = root->find1stAtom("mdat");
 	if(!mdat)
 		throw string("Missing data atom");
 
 	// Print sizes and offsets.
 	for (int i = 0; i < 10 && i < sizes.size(); i++) {
 		cout << "offset: " << offsets[i] << " size: " << sizes[i] << endl;
-		cout << mdat->readInt(offsets[i] - (mdat->start + 8)) << endl;
+		cout << mdat->readInt32(offsets[i] - mdat->contentPos()) << endl;
 	}
 #endif
 }
 
 void Track::writeToAtoms() {
 	if (!keyframes_.size())
-		trak_->prune("stss");
+		trak_->pruneAtoms("stss");
 
 	saveSampleTimes();
 	saveKeyframes();
@@ -129,8 +130,8 @@ void Track::writeToAtoms() {
 	saveSampleToChunk();
 	saveChunkOffsets();
 
-	Atom* mdhd = trak_->atomByName("mdhd");
-	mdhd->writeInt(duration_, 16);
+	Atom* mdhd = trak_->find1stAtom("mdhd");
+	mdhd->writeInt32(16, duration_);
 
 	// Avc1 codec writes something inside stsd.
 	// In particular the picture parameter set (PPS) in avcC
@@ -149,9 +150,9 @@ void Track::writeToAtoms() {
 				   0x28ee0d88, 0x28ee0f88, 0x28ee0462, 0x28ee04e2, 0x28ee0562,
 				   0x28ee05e2, 0x28ee0662, 0x28ee06e2, 0x28ee0762, 0x28ee07e2};
 	if (codec.name == "avc1") {
-		Atom* stsd = trak->atomByName("stsd");
-		stsd->writeInt(pps[SHANE],
-					   122);  // A bit complicated to find... find avcC... follow first link.
+		Atom* stsd = trak->find1stAtom("stsd");
+		// A bit complicated to find... find avcC... follow first link.
+		stsd->writeInt32(122, pps[SHANE]);
 	}
 #endif
 }
@@ -183,14 +184,14 @@ void Track::fixTimes() {
 vector<int> Track::getSampleTimes(Atom* t) {
 	vector<int> sample_times;
 	// Chunk offsets.
-	Atom* stts = t->atomByName("stts");
+	Atom* stts = t->find1stAtom("stts");
 	if (!stts)
 		throw string("Missing sample to time atom");
 
-	int entries = stts->readInt(4);
+	int entries = stts->readInt32(4);
 	for (int i = 0; i < entries; i++) {
-		int nsamples = stts->readInt(8 + 8 * i);
-		int time = stts->readInt(12 + 8 * i);
+		int nsamples = stts->readInt32(8 + 8 * i);
+		int time = stts->readInt32(12 + 8 * i);
 		for (int i = 0; i < nsamples; i++)
 			sample_times.push_back(time);
 	}
@@ -200,28 +201,28 @@ vector<int> Track::getSampleTimes(Atom* t) {
 vector<int> Track::getKeyframes(Atom* t) {
 	vector<int> sample_key;
 	// Chunk offsets.
-	Atom* stss = t->atomByName("stss");
+	Atom* stss = t->find1stAtom("stss");
 	if (!stss)
 		return sample_key;
 
-	int entries = stss->readInt(4);
+	int entries = stss->readInt32(4);
 	for (int i = 0; i < entries; i++)
-		sample_key.push_back(stss->readInt(8 + 4 * i) - 1);
+		sample_key.push_back(stss->readInt32(8 + 4 * i) - 1);
 	return sample_key;
 }
 
 vector<int> Track::getSampleSizes(Atom* t) {
 	vector<int> sample_sizes;
 	// Chunk offsets.
-	Atom* stsz = t->atomByName("stsz");
+	Atom* stsz = t->find1stAtom("stsz");
 	if (!stsz)
 		throw string("Missing sample to sizeatom");
 
-	int entries = stsz->readInt(8);
-	int default_size = stsz->readInt(4);
+	int entries = stsz->readInt32(8);
+	int default_size = stsz->readInt32(4);
 	if (default_size == 0) {
 		for (int i = 0; i < entries; i++)
-			sample_sizes.push_back(stsz->readInt(12 + 4 * i));
+			sample_sizes.push_back(stsz->readInt32(12 + 4 * i));
 	} else {
 		sample_sizes.resize(entries, default_size);
 	}
@@ -232,20 +233,20 @@ vector<int> Track::getSampleSizes(Atom* t) {
 vector<int> Track::getChunkOffsets(Atom* t) {
 	vector<int> chunk_offsets;
 	// Chunk offsets.
-	Atom* stco = t->atomByName("stco");
+	Atom* stco = t->find1stAtom("stco");
 	if (stco) {
-		int nchunks = stco->readInt(4);
+		int nchunks = stco->readInt32(4);
 		for (int i = 0; i < nchunks; i++)
-			chunk_offsets.push_back(stco->readInt(8 + i * 4));
+			chunk_offsets.push_back(stco->readInt32(8 + i * 4));
 
 	} else {
-		Atom* co64 = t->atomByName("co64");
+		Atom* co64 = t->find1stAtom("co64");
 		if (!co64)
 			throw string("Missing chunk offset atom");
 
-		int nchunks = co64->readInt(4);
+		int nchunks = co64->readInt32(4);
 		for (int i = 0; i < nchunks; i++)
-			chunk_offsets.push_back(co64->readInt(12 + i * 8));
+			chunk_offsets.push_back(co64->readInt32(12 + i * 8));
 	}
 	return chunk_offsets;
 }
@@ -253,20 +254,20 @@ vector<int> Track::getChunkOffsets(Atom* t) {
 vector<int> Track::getSampleToChunk(Atom* t, int nchunks) {
 	vector<int> sample_to_chunk;
 
-	Atom* stsc = t->atomByName("stsc");
+	Atom* stsc = t->find1stAtom("stsc");
 	if (!stsc)
 		throw string("Missing sample to chunk atom");
 
 	vector<int> first_chunks;
-	int entries = stsc->readInt(4);
+	int entries = stsc->readInt32(4);
 	for (int i = 0; i < entries; i++)
-		first_chunks.push_back(stsc->readInt(8 + 12 * i));
+		first_chunks.push_back(stsc->readInt32(8 + 12 * i));
 	first_chunks.push_back(nchunks + 1);
 
 	for (int i = 0; i < entries; i++) {
 		int first_chunk = first_chunks[i];
 		int last_chunk = first_chunks[i + 1];
-		int n_samples = stsc->readInt(12 + 12 * i);
+		int n_samples = stsc->readInt32(12 + 12 * i);
 
 		for (int k = first_chunk; k < last_chunk; k++) {
 			for (int j = 0; j < n_samples; j++)
@@ -279,7 +280,7 @@ vector<int> Track::getSampleToChunk(Atom* t, int nchunks) {
 
 
 void Track::saveSampleTimes() {
-	Atom* stts = trak_->atomByName("stts");
+	Atom* stts = trak_->find1stAtom("stts");
 	assert(stts);
 	vector<pair<int, int>> vp;
 	for (uint i = 0; i < times_.size(); i++) {
@@ -288,77 +289,76 @@ void Track::saveSampleTimes() {
 		else
 			vp.back().first++;
 	}
-	stts->content_.resize(4 +              // Version.
-						  4 +              // Number of entries.
-						  8 * vp.size());  // Time table.
-	stts->writeInt(vp.size(), 4);
+	stts->contentResize(4 +              // Version.
+						4 +              // Number of entries.
+						8 * vp.size());  // Time table.
+	stts->writeInt32(4, vp.size());
 	int cnt = 0;
 	for (auto p : vp) {
-		stts->writeInt(p.first, 8 + 8 * cnt);    // sample_count.
-		stts->writeInt(p.second, 12 + 8 * cnt);  // sample_time_delta.
+		stts->writeInt32( 8 + 8 * cnt, p.first);   // sample_count.
+		stts->writeInt32(12 + 8 * cnt, p.second);  // sample_time_delta.
 		cnt++;
 	}
 }
 
 void Track::saveKeyframes() {
-	Atom* stss = trak_->atomByName("stss");
+	Atom* stss = trak_->find1stAtom("stss");
 	if (!stss)
 		return;
 	assert(keyframes_.size());
 	if (!keyframes_.size())
 		return;
 
-	stss->content_.resize(4 +                      // Version.
-						  4 +                      // Number of entries.
-						  4 * keyframes_.size());  // Time table.
-	stss->writeInt(keyframes_.size(), 4);
+	stss->contentResize(4 +                      // Version.
+						4 +                      // Number of entries.
+						4 * keyframes_.size());  // Time table.
+	stss->writeInt32(4, keyframes_.size());
 	for (unsigned int i = 0; i < keyframes_.size(); i++)
-		stss->writeInt(keyframes_[i] + 1, 8 + 4 * i);
+		stss->writeInt32(8 + 4 * i, keyframes_[i] + 1);
 }
 
 void Track::saveSampleSizes() {
-	Atom* stsz = trak_->atomByName("stsz");
+	Atom* stsz = trak_->find1stAtom("stsz");
 	assert(stsz);
-	stsz->content_.resize(4 +                  // Version.
-						  4 +                  // Default size.
-						  4 +                  // Number of entries.
-						  4 * sizes_.size());  // Size table.
-	stsz->writeInt(0, 4);
-	stsz->writeInt(sizes_.size(), 8);
+	stsz->contentResize(4 +                  // Version.
+						4 +                  // Default size.
+						4 +                  // Number of entries.
+						4 * sizes_.size());  // Size table.
+	stsz->writeInt32(4, 0);
+	stsz->writeInt32(8, sizes_.size());
 	for (unsigned int i = 0; i < sizes_.size(); i++) {
-		stsz->writeInt(sizes_[i], 12 + 4 * i);
+		stsz->writeInt32(12 + 4 * i, sizes_[i]);
 	}
 }
 
 void Track::saveSampleToChunk() {
-	Atom* stsc = trak_->atomByName("stsc");
+	Atom* stsc = trak_->find1stAtom("stsc");
 	assert(stsc);
-	stsc->content_.resize(4 +   // Version.
-						  4 +   // Number of entries.
-						  12);  // One sample per chunk.
-	stsc->writeInt(1, 4);
-	stsc->writeInt(1, 8);   // First chunk (1 based).
-	stsc->writeInt(1, 12);  // One sample per chunk.
-	stsc->writeInt(1, 16);  // Id 1. (XXX WHAT IS THIS! XXX)
+	stsc->contentResize(4 +   // Version.
+						4 +   // Number of entries.
+						12);  // One sample per chunk.
+	stsc->writeInt32( 4, 1);
+	stsc->writeInt32( 8, 1);  // First chunk (1 based).
+	stsc->writeInt32(12, 1);  // One sample per chunk.
+	stsc->writeInt32(16, 1);  // Id 1. (XXX WHAT IS THIS! XXX)
 }
 
 void Track::saveChunkOffsets() {
-	Atom* co64 = trak_->atomByName("co64");
+	Atom* co64 = trak_->find1stAtom("co64");
 	if (co64) {
-		trak_->prune("co64");
-		Atom* stbl = trak_->atomByName("stbl");
-		Atom* new_stco = new Atom;
-		memcpy(new_stco->name_, "stco", 5);
-		stbl->children_.push_back(new_stco);
+		trak_->pruneAtoms("co64");
+		Atom* stbl = trak_->find1stAtom("stbl");
+		Atom* new_stco = new Atom("stco");
+		stbl->addChild(move(new_stco));
 	}
-	Atom* stco = trak_->atomByName("stco");
+	Atom* stco = trak_->find1stAtom("stco");
 	assert(stco);
-	stco->content_.resize(4 +  // Version.
-						  4 +  // Number of entries.
-						  4 * offsets_.size());
-	stco->writeInt(offsets_.size(), 4);
+	stco->contentResize(4 +  // Version.
+						4 +  // Number of entries.
+						4 * offsets_.size());
+	stco->writeInt32(4, offsets_.size());
 	for (unsigned int i = 0; i < offsets_.size(); i++)
-		stco->writeInt(offsets_[i], 8 + 4 * i);
+		stco->writeInt32(8 + 4 * i, offsets_[i]);
 }
 
 

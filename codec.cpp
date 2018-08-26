@@ -61,8 +61,8 @@ Codec::Codec(AVCodecContext* c) : avc_config_(NULL) {
 }
 
 void Codec::parse(Atom* trak, vector<int>& offsets, Atom* mdat) {
-	Atom* stsd = trak->atomByName("stsd");
-	int entries = stsd->readInt(4);
+	Atom* stsd = trak->find1stAtom("stsd");
+	int entries = stsd->readInt32(4);
 	if (entries != 1)
 		throw string("Multiplexed stream! Not supported");
 
@@ -90,18 +90,20 @@ void Codec::parse(Atom* trak, vector<int>& offsets, Atom* mdat) {
 	mask1_ = 0xffffffff;
 	mask0_ = 0xffffffff;
 	// Build the mask.
-	for (int i = 0; i < offsets.size(); i++) {
+	for (unsigned int i = 0; i < offsets.size(); i++) {
 		int offset = offsets[i];
-		if (offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
-			cout << "i = " << i;
-			cout << "\noffset = " << offset << "\nmdat->start = " << mdat->start_
-				 << "\nmdat->length = " << mdat->length_
-				 << "\noffset - mdat->start = " << offset - mdat->start_;
-			cout << "\nInvalid offset in track!\n";
+		if (offset < mdat->contentPos() ||
+			mdat->contentSize(offset - mdat->contentPos()) < sizeof(int32_t)) {
+			cout << "i = " << i
+			     << "\noffset (in file)    = " << offset
+				 << "\nmdat->contentPos    = " << mdat->contentPos()
+				 << "\nmdat->contentSize   = " << mdat->contentSize()
+				 << "\noffset (in content) = " << offset - mdat->contentPos()
+			     << "\nInvalid offset in track!\n";
 			exit(0);
 		}
 
-		int s = mdat->readInt(offset - mdat->start_ - 8);
+		int s = mdat->readInt32(offset - mdat->contentPos());
 		mask1_ &= s;
 		mask0_ &= ~s;
 
@@ -205,7 +207,7 @@ bool Codec::matchSample(const uchar* start) {
 	} else if (name_ == "samr") {
 		return start[0] == 0x3c;
 	} else if (name_ == "twos") {
-		// Weird audio codec: Each packet is 2 signed 16-bit integers.
+		// Uncompressed 16-bit big-endian PCM: Each packet is 2 signed 16-bit integers.
 		cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
 		exit(0);
 		return true;
@@ -220,8 +222,9 @@ bool Codec::matchSample(const uchar* start) {
 		// It's a codec id, in a case I found a pcm_s24le
 		// (little endian 24-bit). No way to know it's length.
 		return true;
-	} else if (name_ == "sowt") {
-		cerr << "Sowt is just  raw data, no way to guess length"
+	} else if (name_ == "sowt") {  // "sowt" = swap("twos").
+		// Uncompressed 16-bit little-endian PCM: Each packet is 2 signed 16-bit integers.
+		cerr << "Sowt is just raw data, no way to guess length"
 			    " (unless reliably detecting the other codec start)\n";
 		return false;
 	} else if (name_ == "sawb") {
@@ -384,9 +387,9 @@ int Codec::getLength(const uchar* start, uint maxlength, int& duration) {
 		}
 		return length;
 
-	} else if (name_ == "samr") {  // Lenght is multiple of 32, we split packets.
+	} else if (name_ == "samr") {  // Length is multiple of 32, we split packets.
 		return 32;
-	} else if (name_ == "twos") {  // Lenght is multiple of 32, we split packets.
+	} else if (name_ == "twos") {  // Length is multiple of 32, we split packets.
 		return 4;
 	} else if (name_ == "apcn") {
 		return swap32(*reinterpret_cast<const int*>(start));

@@ -42,6 +42,7 @@ using std::endl;
 using std::flush;
 using std::hex;
 using std::min;
+using std::move;
 using std::string;
 using std::swap;
 using std::to_string;
@@ -67,24 +68,24 @@ void Mp4::parseOk(const string& filename) {
 	while (true) {
 		Atom* atom = new Atom;
 		atom->parse(file);
-		root_atom_->children_.push_back(atom);
+		root_atom_->addChild(move(atom));
 		if (file.atEnd())
 			break;
 	}
 
-	if (root_atom_->atomByName("ctts"))
+	if (root_atom_->find1stAtom("ctts"))
 		cerr << "Composition time offset atom found."
 			    " Out of order samples possible." << endl;
 
-	if (root_atom_->atomByName("sdtp"))
+	if (root_atom_->find1stAtom("sdtp"))
 		cerr << "Sample dependency flag atom found."
 			    " I and P frames might need to recover that info." << endl;
 
-	Atom* mvhd = root_atom_->atomByName("mvhd");
+	Atom* mvhd = root_atom_->find1stAtom("mvhd");
 	if (!mvhd)
 		throw string("Missing movie header atom");
-	timescale_ = mvhd->readInt(12);
-	duration_ = mvhd->readInt(16);
+	timescale_ = mvhd->readInt32(12);
+	duration_ = mvhd->readInt32(16);
 
 	av_register_all();
 	if (g_log_mode < V)
@@ -122,50 +123,47 @@ void Mp4::makeStreamable(const string& filename, const string& output) {
 		while (true) {
 			Atom* atom = new Atom;
 			atom->parse(file);
-			cout << "Found atom: " << atom->name_ << endl;
-			root->children_.push_back(atom);
+			cout << "Found atom: " << atom->completeName() << endl;
+			root->addChild(move(atom));
 			if (file.atEnd()) break;
 		}
 	}
-	Atom* ftyp = root->atomByName("ftyp");
-	Atom* moov = root->atomByName("moov");
-	Atom* mdat = root->atomByName("mdat");
+	Atom* ftyp = root->find1stAtom("ftyp");
+	Atom* moov = root->find1stAtom("moov");
+	Atom* mdat = root->find1stAtom("mdat");
 
-	if (mdat->start_ > moov->start_) {
+	if (mdat->contentPos() > moov->contentPos()) {
 		cout << "FIle is already streamable" << endl;
 		return;
 	}
-	int old_start = (mdat->start_ + 8);
 
-	int new_start = moov->length_ + 8;
+	int old_start = mdat->contentPos();
+	int new_start = moov->length() + mdat->headerSize();
 	if (ftyp)
-		new_start += ftyp->length_ + 8;
+		new_start += ftyp->length();
 
 	int diff = new_start - old_start;
 	cout << "OLD: " << old_start << " new: " << new_start << endl;
 #if 0  // MIGHT HAVE TO FIX THIS ONE TOO?
-	Atom* co64 = trak->atomByName("co64");
+	Atom* co64 = trak->find1stAtom("co64");
 	if (co64) {
-		trak->prune("co64");
-		Atom* stbl = trak->atomByName("stbl");
+		trak->pruneAtoms("co64");
+		Atom* stbl = trak->find1stAtom("stbl");
 		if (stbl) {
-			Atom* new_stco = new Atom;
-			if (new_stco) {
-				memcpy(new_stco->name, "stco", 5);
-				stbl->children.push_back(new_stco);
-			}
+			Atom* new_stco = new Atom("stco");
+			stbl->addChild(move(new_stco));
 		}
 	}
 #endif
-	std::vector<Atom*> stcos = moov->atomsByName("stco");
+	std::vector<Atom*> stcos = moov->findAllAtoms("stco");
 	for (int i = 0; i < stcos.size(); i++) {
 		Atom* stco = stcos[i];
-		int offsets = stco->readInt(4);  // 4 version, 4 number of entries, 4 entries.
+		int offsets = stco->readInt32(4);  // 4 version, 4 number of entries, 4 entries.
 		for (unsigned int i = 0; i < offsets; i++) {
 			int pos = 8 + 4 * i;
-			int offset = stco->readInt(pos) + diff;
+			int offset = stco->readInt32(pos) + diff;
 			cout << "O: " << offset << endl;
-			stco->writeInt(offset, pos);
+			stco->writeInt32(pos, offset);
 		}
 	}
 
@@ -227,29 +225,29 @@ void Mp4::saveVideo(const string& filename) {
 		logg(I, "Duration of ", track.codec_.name_, ": ",
 			 s_hour, s_min, s_sec, s_msec, " (", bmsec, " ms)\n");
 
-		Atom* tkhd = track.trak_->atomByName("tkhd");
+		Atom* tkhd = track.trak_->find1stAtom("tkhd");
 		// In movie timescale, not track timescale.
-		tkhd->writeInt(track_duration, 20);
+		tkhd->writeInt32(20, track_duration);
 	}
 	logg(I, "saving ", filename, '\n');
-	Atom* mvhd = root_atom_->atomByName("mvhd");
-	mvhd->writeInt(duration_, 16);
+	Atom* mvhd = root_atom_->find1stAtom("mvhd");
+	mvhd->writeInt32(16, duration_);
 
 
-	Atom* ftyp = root_atom_->atomByName("ftyp");
-	Atom* moov = root_atom_->atomByName("moov");
-	Atom* mdat = root_atom_->atomByName("mdat");
+	Atom* ftyp = root_atom_->find1stAtom("ftyp");
+	Atom* moov = root_atom_->find1stAtom("moov");
+	Atom* mdat = root_atom_->find1stAtom("mdat");
 
-	moov->prune("ctts");
-	moov->prune("cslg");
-	moov->prune("stps");
+	moov->pruneAtoms("ctts");
+	moov->pruneAtoms("cslg");
+	moov->pruneAtoms("stps");
 
 	root_atom_->updateLength();
 
 	// Fix offsets.
-	int offset = 8 + moov->length_;
+	int offset = 8 + moov->length();
 	if (ftyp)
-		offset += ftyp->length_;  // Not all mov have a ftyp.
+		offset += ftyp->length();  // Not all mov have a ftyp.
 
 	for (unsigned int t = 0; t < tracks_.size(); t++) {
 		Track& track = tracks_[t];
@@ -271,7 +269,7 @@ void Mp4::saveVideo(const string& filename) {
 }
 
 void Mp4::analyze() {
-	Atom* mdat = root_atom_->atomByName("mdat");
+	Atom* mdat = root_atom_->find1stAtom("mdat");
 	for (unsigned int i = 0; i < tracks_.size(); i++) {
 		cout << "\n\n Track " << i << endl;
 		Track& track = tracks_[i];
@@ -281,22 +279,22 @@ void Mp4::analyze() {
 		cout << "Keyframes  " << track.keyframes_.size() << endl;
 		for (unsigned int i = 0; i < track.keyframes_.size(); i++) {
 			int k = track.keyframes_[i];
-			int offset = track.offsets_[k] - (mdat->start_ + 8);
-			int begin = mdat->readInt(offset);
-			int next = mdat->readInt(offset + 4);
+			int offset = track.offsets_[k] - mdat->contentPos();
+			int begin = mdat->readInt32(offset);
+			int next = mdat->readInt32(offset + 4);
 			cout << "\n"
 				 << k << " Size: " << track.sizes_[k] << " offset " << track.offsets_[k]
 				 << "  begin: " << hex << begin << " " << next << dec << endl;
 		}
 
 		for (unsigned int i = 0; i < track.offsets_.size(); i++) {
-			int offset = track.offsets_[i] - (mdat->start_ + 8);
-			uchar* start = &(mdat->content_[offset]);
-			uint maxlength = mdat->content_.size() - offset;
+			int offset = track.offsets_[i] - mdat->contentPos();
+			uint maxlength = mdat->contentSize() - offset;
+			const uchar* start = mdat->content(offset, maxlength);
 
-			int begin = mdat->readInt(offset);
-			int next = mdat->readInt(offset + 4);
-			int end = mdat->readInt(offset + track.sizes_[i] - 4);
+			int begin = mdat->readInt32(offset);
+			int next = mdat->readInt32(offset + 4);
+			int end = mdat->readInt32(offset + track.sizes_[i] - 4);
 			cout << i << " Size: " << track.sizes_[i]
 				 << " offset " << track.offsets_[i]
 				 << "  begin: " << hex << begin << " " << next
@@ -326,8 +324,8 @@ void Mp4::writeTracksToAtoms() {
 }
 
 void Mp4::parseTracks() {
-	Atom* mdat = root_atom_->atomByName("mdat");
-	vector<Atom*> traks = root_atom_->atomsByName("trak");
+	Atom* mdat = root_atom_->find1stAtom("mdat");
+	vector<Atom*> traks = root_atom_->findAllAtoms("trak");
 	for (unsigned int i = 0; i < traks.size(); i++) {
 		Track track(traks[i], context_->streams[i]->codec);
 		track.parse(mdat);
@@ -336,42 +334,28 @@ void Mp4::parseTracks() {
 }
 
 void Mp4::repair(const string& filename, const string& filename_fixed) {
-	FileRead file_read;
-	if (!file_read.open(filename))
-		throw "Could not open file: " + filename;
-
 	// Find mdat. Fails with krois and a few other.
 	// TODO(ponchio): Check for multiple mdat, or just look for the first one.
 
 	logg(I, "parsing mdat from truncated file ... \n");
-	WriteAtom* mdat = new WriteAtom(file_read);
+	AtomWrite* mdat = new AtomWrite(filename);
 	while (true) {
-		Atom* atom = new Atom;
 		try {
-			atom->parseHeader(file_read);
+			mdat->parseHeader();
 		} catch (string) {
-			throw string("Failed to parse atoms in truncated file");
+			delete mdat;
+			throw string("Failed to parse atoms in truncated file: ") +
+				         filename;
+			return;
 		}
-
-		if (atom->name_ != string("mdat")) {
-			int pos = file_read.pos();
-			file_read.seek(pos - 8 + atom->length_);
-			delete atom;
-			continue;
+		if (*mdat == "mdat") break;
+		if (!mdat->nextHeader()) {
+			delete mdat;
+			throw string("Failed to find in truncated file atom: ") +
+				         Atom::completeName("mdat");
+			return;
 		}
-
-		mdat->start_ = atom->start_;
-		memcpy(mdat->name_, atom->name_, 4);
-		memcpy(mdat->head_, atom->head_, 4);
-		memcpy(mdat->version_, atom->version_, 4);
-
-		//cout << "file.pos() = " << file_read.pos() << '\n';
-		//cout << "file.length() = " << file_read.length() << '\n';
-		mdat->file_begin_ = file_read.pos();
-		mdat->file_end_ = file_read.length();
-		break;
 	}
-
 
 	for (unsigned int i = 0; i < tracks_.size(); i++)
 		tracks_[i].clear();
@@ -394,19 +378,19 @@ void Mp4::repair(const string& filename, const string& filename_fixed) {
 		logg(V, "\n(reading element from mdat)\n");
 		if (g_log_mode == I) {  // output progress
 			if (loop_cnt >= 2000) {
-				double p = round(1000.0 * (static_cast<double>(offset) / mdat->file_end_));
+				double p = round(1000.0 * (static_cast<double>(offset) /
+							     (mdat->contentPos() + mdat->contentSize())));
 				cout << p / 10 << "%  \r" << flush;
 				loop_cnt = 0;
 			}
 			loop_cnt++;
 		}
 
-		// Maximal length is 1.6 MiB.
-		uint maxlength =
-			min(int64_t(g_max_partsize), mdat->contentSize() - offset);
-		const uchar* start = mdat->getFragment(offset, maxlength);
+		// Maximal length is 1.6 MB.
+		uint maxlength = min(g_max_partsize, mdat->contentSize(offset));
+		const uchar* start = mdat->content(offset, maxlength);
 
-		uint begin = mdat->readInt(offset);
+		uint begin = mdat->readInt32(offset);
 
 		if (begin == 0) {
 #if 0  // AARRGH this sometimes is not very correct, unless it's all zeros.
@@ -419,15 +403,15 @@ void Mp4::repair(const string& filename, const string& filename_fixed) {
 			continue;
 		}
 
-		uint next = mdat->readInt(offset + 4);
+		uint next = mdat->readInt32(offset + 4);
 
 		logg(V, "Offset: ", offset, " ", hex, begin, " ", next, dec, '\n');
 
 		// Skip fake moov.
 		if (start[4] == 'm' && start[5] == 'o' &&
 			start[6] == 'o' && start[7] == 'v') {
-			logg(V, "Skipping moov atom: ", swap32(begin), '\n');
-			offset += swap32(begin);
+			logg(V, "Skipping moov atom: ", begin, '\n');
+			offset += begin;
 			continue;
 		}
 
@@ -473,15 +457,13 @@ void Mp4::repair(const string& filename, const string& filename_fixed) {
 
 		if (!found) {
 			// This could be a problem for large files.
-			//assert(mdat->content_.size() + 8 == mdat->length_);
-			mdat->file_end_ = mdat->file_begin_ + offset;
-			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
-			if (mdat->content_.size() + 8 != mdat->length_) {
+			//assert(mdat->length() == mdat->headerSize() + mdat->contentSize());
+			mdat->contentResize(offset);
+			if (mdat->headerSize() + mdat->contentSize() != mdat->length()) {
 				logg(E, "unable to find correct codec -> premature end\n");
-				logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
+				logg(V, "Atom mdat content end pos: ",
+					    mdat->contentPos() + mdat->contentSize(), '\n');
 			}
-			//mdat->content.resize(offset);
-			//mdat->length = mdat->content.size() + 8;
 			break;
 		}
 		cnt_packets++;
@@ -504,9 +486,8 @@ void Mp4::repair(const string& filename, const string& filename_fixed) {
 		track.fixTimes();
 	}
 
-	Atom* original_mdat = root_atom_->atomByName("mdat");
-	mdat->start_ = original_mdat->start_;
-	root_atom_->replace(original_mdat, mdat);
+	if (!root_atom_->replaceChild("mdat", move(mdat)))
+		throw string("Could not replace atom: ") + Atom::completeName("mdat");
 
 	saveVideo(filename_fixed);
 }

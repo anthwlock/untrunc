@@ -25,7 +25,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <map>
 #include <string>
 #include <utility>
 
@@ -33,10 +32,16 @@
 using uint = unsigned int;
 using uchar = unsigned char;
 
-enum LogMode { E, W, I, V, VV };
-extern LogMode g_log_mode;
+
+// Width in spaces of an indentation step.
+const int kIndentStep = 2;
+
 
 extern size_t g_max_partsize;
+
+
+enum LogMode { E, W, I, V, VV };
+extern LogMode g_log_mode;
 
 template <class... Args>
 void logg(Args&&... args) {
@@ -77,20 +82,6 @@ enum {
 };
 
 
-const std::map<std::string, std::string> g_atom_names = {
-	{"esds", "ES Descriptor"},
-	{"stsd", "sample description"},
-	{"minf", "media information"},
-	{"stss", "sync samples"},
-	{"udta", "user data"},
-	{"stsz", "sample to size"},
-	{"ctts", "sample to composition time"},
-	{"stsc", "sample to chunk"},
-	{"stts", "sample to decode time"},
-	{"co64", "chunk to offset 64"},
-	{"stco", "chunk to offset"}};
-
-
 // Swap the 8-bit bytes into their reverse order.
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);
@@ -103,23 +94,24 @@ static_assert(sizeof(uint8_t) == 1 && sizeof(uint32_t) == 4,
 
 // Read an unaligned, big-endian value.
 // A compiler will optimize this (at -O2) to a single instruction if possible.
-template <typename T>
+template <typename T, size_t N = sizeof(T)>
 constexpr T readBE(const uint8_t* p, size_t i = 0) {
-	return (i >= sizeof(T)) ? T(0) :
-		(T(*p) << ((sizeof(T) - 1 - i) * 8)) | readBE<T>(p + 1, i + 1);
+	return (i >= N) ? T(0) :
+		(T(*p) << ((N - 1 - i) * 8)) | readBE<T,N>(p + 1, i + 1);
 }
 
 template <typename T>
 constexpr void readBE(T* result, const uint8_t* p) { *result = readBE<T>(p); }
 
 // Write an unaligned, big-endian value.
-template <typename T>
+template <typename T, size_t N = sizeof(T)>
 constexpr void writeBE(uint8_t* p, T value, size_t i = 0) {
-	(i >= sizeof(T)) ? void(0) :
-		(*p = ((value >> ((sizeof(T) - 1 - i) * 8)) & 0xFF)
-		, writeBE(p + 1, value, i + 1));
+	(i >= N) ? void(0) :
+		(*p = (value >> ((N - 1 - i) * 8)) & 0xFF
+		 , writeBE<T,N>(p + 1, value, i + 1));
 }
 
+#if 0  // Unused
 // Read an unaligned value in native-endian format.
 // Encode the unaligned access intention by using memcpy() with its
 //  destination and source pointing to types with the wanted alignment.
@@ -128,20 +120,48 @@ constexpr void writeBE(uint8_t* p, T value, size_t i = 0) {
 template <typename T>
 constexpr T readNE(const uint8_t* p) {
 	T value;
-	memcpy(&value, p, sizeof(value));
+	std::memcpy(&value, p, sizeof(value));
 	return value;
 }
 
 template <typename T>
 constexpr void readNE(T* result, const uint8_t* p) {
-	memcpy(result, p, sizeof(result));
+	std::memcpy(result, p, sizeof(result));
+}
+#endif
+
+
+// Read an unaligned, Golomb encoded value. 
+int readGolomb(const uchar** buffer, int* bit_offset);
+
+// Read bits from an unaligned buffer. 
+uint readBits(int numbits, const uchar** buffer, int* bit_offset);
+
+
+// Convert an Atom name to its Id code.
+constexpr uint32_t name2Id(const unsigned char* p, size_t i = 0) {
+	return (i >= 4) ? 0U :
+		(uint32_t(*p) << ((3 - i) * 8)) | name2Id(p + 1, i + 1);
 }
 
+constexpr uint32_t name2Id(const char* p, size_t i = 0) {
+	return (i >= 4) ? 0U :
+		(uint32_t(uint8_t(*p)) << ((3 - i) * 8)) | name2Id(p + 1, i + 1);
+}
 
-int readGolomb(const uchar** buffer, int* offset);
-uint readBits(int n, const uchar** buffer, int* offset);
+extern uint32_t name2Id(const std::string& name);
+
+// Convert an Atom Id code to its name.
+// Note: Some Atoms may contain non-printable chars (e.g. in user-data).
+constexpr void id2Name(char* p, uint32_t id, size_t i = 0) {
+	(i >= 4) ? void(0) :
+		(*p = (id >> ((3 - i) * 8)) & 0xFF , id2Name(p + 1, id, i + 1));
+}
+
+extern void id2Name(std::string* name, uint32_t id);
 
 void printBuffer(const uchar* pos, int n);
+size_t hexDump(const uchar *p, size_t n, size_t addr);
 
 
 // vim:set ts=4 sw=4 sts=4 noet:

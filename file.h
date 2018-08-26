@@ -48,6 +48,8 @@ protected:
 // Reading from a file.
 class FileRead : protected File {
 public:
+	static const size_t kBufSize = 15UL*1024*1024;  // 15 MiB.
+
 	FileRead() = default;
 	explicit FileRead(const std::string& filename);
 
@@ -60,19 +62,22 @@ public:
 	void  rewind();
 	bool  atEnd();
 	off_t size()   const { return file_size_; }
-	off_t length() const { return file_size_; }
+	off_t length() const { return size(); }
 
-	int32_t readInt32();
-	int64_t readInt64();
-	void    readChar(char* dest, size_t n);
+	uint8_t  readUint8();
+	uint16_t readUint16();
+	uint32_t readUint24();
+	uint32_t readUint32();
+	uint64_t readUint64();
+	int32_t  readInt32() { return readUint32(); }
+	int64_t  readInt64() { return readUint64(); }
+	void     readChar(char* dest, size_t n);
 	std::vector<uchar> read(size_t n);
 
 	const uchar* getPtr(size_t size);
-	const uchar* getPtr(size_t size, off_t pos);
+	const uchar* getPtr(off_t pos, size_t size);
 
 private:
-	static constexpr size_t Buf_Size_ = 15UL*1024*1024;  // 15 MiB.
-
 	off_t  file_size_     = -1;
 	std::vector<uchar> buffer_;
 	off_t  buf_begin_pos_ = -1;
@@ -102,8 +107,13 @@ public:
 	off_t size();
 	off_t length() { return size(); }
 
-	ssize_t writeInt32(int32_t value);
-	ssize_t writeInt64(int64_t value);
+	ssize_t writeUint8(uint8_t value);
+	ssize_t writeUint16(uint16_t value);
+	ssize_t writeUint24(uint32_t value);
+	ssize_t writeUint32(uint32_t value);
+	ssize_t writeUint64(uint64_t value);
+	ssize_t writeInt32(int32_t value) { return writeUint32(value); }
+	ssize_t writeInt64(int64_t value) { return writeUint64(value); }
 	ssize_t writeChar(const char* source, size_t n);
 	ssize_t write(const std::vector<uchar>& v);
 };

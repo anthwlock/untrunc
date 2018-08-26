@@ -25,12 +25,14 @@
 #include "sps-info.h"
 
 
+AvcConfig::~AvcConfig() { delete sps_info_; }
+
 AvcConfig::AvcConfig(const Atom& stsd) {
-	// find avcC payload
-	const uchar* start = stsd.content_.data() + 12;
+	// Find avcC atom payload.
+	int limit = stsd.contentSize() - 12 - 8;  // avcC payload is at least 8 byte.
+	const uchar* start = stsd.content(12, limit);
 	char pattern[5] = "avcC";
 	int found = 0;
-	int limit = stsd.length_ - 16;
 	while (limit--) {
 		if (*start++ == pattern[found])
 			found++;
@@ -44,18 +46,17 @@ AvcConfig::AvcConfig(const Atom& stsd) {
 		is_ok = false;
 		return;
 	}
-	int off = start - stsd.content_.data();
-	int len = stsd.length_ - off;
-	logg(V, "found avcC after: ", off, '\n');
-	logg(V, "remaining len:", len, '\n');
+	size_t off = (start - stsd.content());
+	size_t len = stsd.contentSize(off);
+	logg(V, "found avcC atom after: ", off, '\n');
+	logg(V, "remaining content size: ", len, '\n');
 
 	is_ok = decode(start);
 }
 
-AvcConfig::~AvcConfig() { delete sps_info_; }
-
 bool AvcConfig::decode(const uchar* start) {
-	logg(V, "parsing avcC ...\n");
+	// start += 1+4+1+2 +SpsInfo = 8 +SpsInfo
+	logg(V, "parsing avcC atom.\n");
 	int off = 0;
 	int ver = readBits(8, &start, &off);  // config_version.
 	if (ver != 1) {
@@ -63,7 +64,7 @@ bool AvcConfig::decode(const uchar* start) {
 		return false;
 	}
 	start += 4;
-	uint reserved = readBits(3, &start, &off);  // 111.
+	uint reserved = readBits(3, &start, &off);  // reserved = 111.
 	if (reserved != 7) {
 		logg(V, "avcC - reserved is not reserved: ", reserved, '\n');
 		return false;
@@ -73,6 +74,7 @@ bool AvcConfig::decode(const uchar* start) {
 		logg(W, "avcC contains more than 1 SPS");
 	uint len_sps = readBits(16, &start, &off);
 	logg(V, "len_sps: ", len_sps, '\n');
+
 	sps_info_ = new SpsInfo(start);
 	return sps_info_->is_ok;
 }
