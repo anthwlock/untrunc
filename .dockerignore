@@ -1,0 +1,12 @@
+# When building a docker image via Dockerfile,
+# the current directory is passed to the docker engine as 'context'.
+
+# Exclude all hidden files and everything in the base directory.
+**/.*
+*
+# Include .dockerignore to invalidate the Docker image cache when .dockerignore changes.
+!.dockerignore
+# Include sources.
+!**/*.h
+!**/*.cpp
+
