@@ -1,2 +1,21 @@
+# Ignore [pre-]compiled object files.
+*.d
 *.o
+*.obj
+*.gch
+*.pch
+# Ignore resulting executables.
 untrunc
+*.app
+*.exe
+*.out
+# Ignore temporary tooling-related files.
+*~
+*.bak
+*.db
+*.orig
+*.swap
+*.sw?
+# Ignore OS-related files (macOS).
+.DS_Store
+
