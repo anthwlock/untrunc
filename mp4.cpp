@@ -209,7 +209,8 @@ void Mp4::saveVideo(const string& filename) {
 			duration_ = track_duration;
 
 		int hour, min, sec, msec;
-		int bmsec = track.duration_ / (track.timescale_ / 1000);
+		int bmsec = static_cast<int>(int64_t(track.duration_) * 1000 /
+									 track.timescale_);
 		auto x = div(bmsec, 1000);
 		msec = x.rem;
 		sec = x.quot;
