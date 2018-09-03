@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <iostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 
@@ -37,9 +38,7 @@ using uchar = unsigned char;
 const int kIndentStep = 2;
 
 
-extern size_t g_max_partsize;
-
-
+// Logging.
 enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
 
@@ -47,20 +46,41 @@ template <class... Args>
 void logg(Args&&... args) {
 	//(std::cout << ... << args);  // Binary left fold (C++17).
 	using creator = int[];  // Dummy.
-	creator{0, (std::cout << (std::forward<Args>(args)), 0)...};
+	creator{0, ((std::cout << std::forward<Args>(args)) , 0)...};
 }
 
-template <class... Args>
-void logg(LogMode m, Args&&... x) {
+template <typename... Args>
+void logg(LogMode m, Args&&... args) {
 	if (g_log_mode < m) return;
-	if (m == I)
-		std::cout << "Info: ";
-	else if (m == W)
-		std::cout << "Warning: ";
-	else if (m == E)
-		std::cout << "Error: ";
-	logg(std::forward<Args>(x)...);
+	switch (m) {
+		case E:   logg("Error: ",   std::forward<Args>(args)...); break;
+		case W:   logg("Warning: ", std::forward<Args>(args)...); break;
+		case I:   logg("Info: ",    std::forward<Args>(args)...); break;
+		case V:   logg(std::forward<Args>(args)...);              break;
+		case VV:  logg(std::forward<Args>(args)...);              break;
+	}
 }
+
+template <typename...>
+void logg(LogMode m) {
+	if (g_log_mode < m) return;
+	//std::cout << std::endl;
+	std::cout << '\n';
+}
+
+// Configure FFmpeg/Libav logging for use in C++.
+class AvLog {
+public:
+	explicit AvLog();
+	explicit AvLog(int level);
+	explicit AvLog(int level, int flags);
+	~AvLog();
+
+private:
+	int level_ = 0;
+	int flags_ = 0;
+};
+
 
 // NAL unit types.
 enum {
@@ -160,8 +180,38 @@ constexpr void id2Name(char* p, uint32_t id, size_t i = 0) {
 
 extern void id2Name(std::string* name, uint32_t id);
 
+
+// Is a Terminal/Console/TTY connected to the C++ stream?
+// Use on C++ standard I/O chararacter streams: cin, cout, cerr and clog.
+extern bool isATerminal(const std::ios& stream);
+
+
+// Dump contents of data.
 void printBuffer(const uchar* pos, int n);
-size_t hexDump(const uchar *p, size_t n, size_t addr);
+size_t hexDump(const uchar *p, size_t n, size_t address = 0);
+size_t hexDump(const uchar *p, size_t n, const std::string& header,
+			   size_t address = 0);
+
+
+// String conversions.
+std::string duration2String(uint64_t duration, uint32_t timescale,
+							bool iso_format = false);
+std::string duration2String(int64_t  duration, uint32_t timescale,
+							bool iso_format = false);
+
+template <typename T>
+typename std::enable_if_t<std::is_unsigned<T>::value, std::string>
+duration2String(T duration, uint32_t timescale, bool iso_format = false) {
+	return duration2String(static_cast<uint64_t>(duration), timescale,
+						   iso_format);
+}
+
+template <typename T>
+typename std::enable_if_t<std::is_signed<T>::value, std::string>
+duration2String(T duration, uint32_t timescale, bool iso_format = false) {
+	return duration2String(static_cast<int64_t>(duration), timescale,
+						   iso_format);
+}
 
 
 // vim:set ts=4 sw=4 sts=4 noet:

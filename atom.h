@@ -62,7 +62,7 @@ public:
 
 	void print(int indentation = 0) const;
 
-	// Direct siblings (children).
+	// Direct children.
 	Atom* findChild(uint32_t    id)   const;
 	Atom* findChild(const char* name) const { return findChild(name2Id(name)); }
 	void  addChild(Atom*&& newchild);

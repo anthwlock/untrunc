@@ -235,7 +235,7 @@ const std::map<uint32_t, const char*> AtomFullNames = {
 	{name2Id("urat"), "User 'star' Rating of the media"},
 	{name2Id("yrrc"), "Year when media was Recorded"},
 
-	// Quick Time codes.
+	// QuickTime codes.
 	{name2Id("clip"), "Visual Clipping region container"},
 	{name2Id("crgn"), "Visual Clipping Region definition"},
 	{name2Id("ctab"), "Track Colour-Table"},
@@ -806,10 +806,17 @@ const std::map<uint32_t, const char*> AtomFullNames = {
 	{name2Id("MAC6"), "MACE 6-to-1 (Apple)"},
 	{name2Id("QDMC"), "QDesign Music"},
 	{name2Id("SDX2"), "Square Root Delta (BE) (3DO, Mac)"},  // Big-endian; 3DO (Panasonic) / MAC (Apple).
+	{name2Id("clef"), "Track Clean aperture dimensions"},
+	{name2Id("cmov"), "Compressed Movie"},
+	{name2Id("enof"), "Track Encoded pixels dimensions"},
+	{name2Id("mhlr"), "Media Handler"},
+	//{name2Id("prof"), "Track Production aperture dimensions"},
+	{name2Id("rmra"), "Reference Movie"},
 	{name2Id("rt24"), "RT24 50:1 (Voxware)"},
 	{name2Id("rt29"), "RT29 50:1 (Voxware)"},
 	{name2Id("sowt"), "Uncompressed 16-bit PCM audio (LE)"},  // Signed 16-bit little-endian PCM audio (see: twos).
-	{name2Id("mhlr"), "Media Handler"},
+	{name2Id("tapt"), "Track Aperture mode dimensions"},
+	{name2Id("txas"), "Track Exclude from Auto-selection"},
 
 	// iTunes codes.
 	{name2Id("ilst"), "iTunes meta-data container"},
@@ -921,9 +928,6 @@ const std::map<uint32_t, const char*> AtomFullNames = {
 
 #if 0 // TODO(Hacklin): Find full names in AtomicParsley sources or on the Internet.
 	{"drm ",	{"moov"},			CHILD_ATOM,			OPTIONAL_ONCE,		VERSIONED_ATOM },   // 3gp/MobileMP4
-	{"tapt",	{"trak"},			PARENT_ATOM,		OPTIONAL_ONE,		SIMPLE_ATOM },
-	{"clef",	{"tapt"},			CHILD_ATOM,			OPTIONAL_ONE,		VERSIONED_ATOM },
-	{"enof",	{"tapt"},			CHILD_ATOM,			OPTIONAL_ONE,		VERSIONED_ATOM },
 	{"gmhd",	{"minf"},			CHILD_ATOM,			REQ_FAMILIAL_ONE,	VERSIONED_ATOM },   //present in chapterized
 	{"cios",	{"dref"},			CHILD_ATOM,			OPTIONAL_MANY,		VERSIONED_ATOM },
 	{"stps",	{"stbl"},			CHILD_ATOM,			OPTIONAL_ONE,		VERSIONED_ATOM },

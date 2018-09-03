@@ -24,11 +24,9 @@
 #include <cassert>
 #include <cstring>
 #include <algorithm>
-#include <iostream>
 #include <limits>
 
 
-using std::cout;
 using std::min;
 using std::string;
 using std::vector;
@@ -43,6 +41,19 @@ static_assert(sizeof(uint8_t) == sizeof(char) && sizeof(uint8_t) == 1 &&
 			  sizeof(uint32_t) == 4 &&
 			  std::numeric_limits<unsigned char>::digits == 8,
 			  "Unsupported machine byte size");
+
+
+// Redirect C files.
+FileRedirect::FileRedirect(std::FILE*& file, std::FILE* to_file)
+	: file_ref(file), file_value(file) {
+	file = to_file;
+	if (file_ref) std::fflush(file_ref);
+}
+
+FileRedirect::~FileRedirect() {
+	if (file_ref) std::fflush(file_ref);
+	file_ref = file_value;
+}
 
 
 // RAII wrapper for FILE, to make sure it gets closed if an error occurs.
@@ -69,6 +80,7 @@ bool FileRead::open(const string& filename, bool buffered) {
 		logg(E, "failed to open: ", filename, " (errno=", rc, ").\n");
 		return false;
 	}
+	name_ = filename;
 
 	fseeko(file_.get(), 0L, SEEK_END);
 	off_t sz = ftello(file_.get());
@@ -91,6 +103,7 @@ void FileRead::close() {
 	buf_size_       =  0;  // Size of buffered data.
 	buf_index_      =  0;  // Index into the buffer.
 	buffer_.clear();
+	name_.clear();
 }
 
 
@@ -172,8 +185,8 @@ size_t FileRead::fillBuffer(off_t pos) {
 	if (!file_ || buffer_.empty()) return 0;
 	logg(VV, "fill the file buffer from position: ", pos, ".\n");
 #ifdef FILE_FILLBUFFER_PRINT
-	cout << "buffer_:\n";
-	printBuffer(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)));
+	hexDump(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)),
+			"FileRead: Fill Buffer Before:", buf_index_);
 #endif
 
 	size_t avail = 0;
@@ -212,8 +225,8 @@ size_t FileRead::fillBuffer(off_t pos) {
 			memset(&buffer_[buf_size_], 0, buffer_.size() - buf_size_);
 	}
 #ifdef FILE_FILLBUFFER_PRINT
-	cout << "buffer_:\n";
-	printBuffer(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)));
+	hexDump(&buffer_[buf_index_], min(buf_size_ - buf_index_, size_t(32)),
+			"FileRead: Fill Buffer After:", buf_index_);
 #endif
 	return buf_size_;
 }
@@ -386,6 +399,7 @@ FileWrite::FileWrite(const string& filename) {
 
 bool FileWrite::create(const string& filename) {
 	file_.reset();
+	name_.clear();
 
 	if (filename.empty()) return false;
 	file_.reset(fopen(filename.c_str(), "wb"));
@@ -394,6 +408,7 @@ bool FileWrite::create(const string& filename) {
 		logg(E, "failed to create: ", filename, " (errno=", rc, ").\n");
 		return false;
 	}
+	name_ = filename;
 	return true;
 }
 

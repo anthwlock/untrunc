@@ -22,6 +22,7 @@
 #ifndef TRACK_H_
 #define TRACK_H_
 
+#include <cstdint>
 #include <vector>
 
 #include "codec.h"
@@ -34,8 +35,8 @@ class Atom;
 class Track {
 public:
 	Atom* trak_;
-	int timescale_;
-	int duration_;
+	uint32_t timescale_;
+	uint32_t duration_;
 	int n_matched;
 	Codec codec_;
 

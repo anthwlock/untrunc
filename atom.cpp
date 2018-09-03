@@ -283,19 +283,20 @@ void Atom::write(FileWrite* file) {
 
 void Atom::print(int indentation) const {
 	if (indentation < 0) indentation = 0;
-	const string indent(indentation  +     kIndentStep, ' ');
+	const string indent1(indentation + 1 * kIndentStep, ' ');
 	const string indent2(indentation + 2 * kIndentStep, ' ');
 
 	string complete_name(completeName());
 	if (complete_name.empty()) {
 		complete_name =
-			(file_atom_pos_ != 0 || length_ != 0)
-			? "(""????"")"  // Prevent trigraph.
-			: (!children_.empty()) ? "(root)"
-			: "(uninitialized)";
+			(file_atom_pos_ == -1 && !children_.empty())
+			? "(root)"
+			: (file_atom_pos_ == -1 && length_ == 0)
+			? "(uninitialized)"
+			: "(""????"")";  // Prevent trigraph.
 	}
 	cout << string(indentation, '-') << "Atom: " << complete_name;
-	if (file_atom_pos_ != 0 || length_ != 0)
+	if (file_atom_pos_ != -1 || length_ != 0)
 		cout << " [" << file_atom_pos_ << ": " << length_ << " byte]";
 	cout << '\n';
 
@@ -304,28 +305,38 @@ void Atom::print(int indentation) const {
 		case name2Id("mdhd"):
 			// Timescale: time units per second
 			// Duration:  in time units
-			cout << indent << "Timescale: " << readUint32(12)
-						<< " Duration: " << readUint32(16) << '\n';
+			cout << indent1 << "Timescale: " << readUint32(12)
+							<< " Duration: " << readUint32(16) << '\n';
 			break;
 
-		case name2Id("tkhd"):
-			// Track id:
-			// Duration:  in time units
-			cout << indent << "Trak: "      << readInt32(12)
-						<< " Duration: " << readUint32(20) << '\n';
-			break;
+		case name2Id("tkhd"): {
+				// 4 vers+flags, 4 ctime, 4 mtime, 4 id, 4 rsrvd, 4 duration, ..
+				// 4 vers+flags, 8 ctime, 8 mtime, 4 id, 4 rsrvd, 8 duration, ..
+				// Duration:  in time units
+				uint32_t vers_flags = readUint32(0);
+				if ((vers_flags >> 24) == 0) {
+					cout << indent1 << "Trak: "      << readUint32(12)
+									<< ((vers_flags & 1) ? " (on)" : " (off)")
+									<< " Duration: " << readUint32(20) << '\n';
+				} else {
+					cout << indent1 << "Trak: "      << readUint32(20)
+									<< ((vers_flags & 1) ? " (on)" : " (off)")
+									<< " Duration: " << readUint64(28) << '\n';
+				}
+				break;
+			}
 
 		case name2Id("hdlr"):
 			// For meta.hdlr and moov.trak.mdia.hdlr,
 			//   moov.trak.udta.meta.hdlr & moov.trak.mdia.udta.meta.hdlr atoms;
 			// incomplete for moov.trak.mdia.minf.hdlr atom.
-			cout << indent << "Type: " << completeName(readUint32(8)) << '\n';
+			cout << indent1 << "Type: " << completeName(readUint32(8)) << '\n';
 			break;
 
 		case name2Id("dref"):
 			// For moov.trak.mdia.minf.dinf.dref atom;
 			// not for moov.mdra.dref atom.
-			cout << indent << "Entries: " << readUint32(4) << '\n';
+			cout << indent1 << "Entries: " << readUint32(4) << '\n';
 			break;
 
 		case name2Id("stsd"): {  // Sample description (which codec).
@@ -350,12 +361,12 @@ void Atom::print(int indentation) const {
 				//                 (28 ee 04 62), (28 ee 1e 20)
 #if 0
 				// Lets just read the first entry.
-				cout << indent << "Entries: " << readUint32(4)
-							   << " codec: "
-							   << completeName(readUint32(12)) << '\n';
+				cout << indent1 << "Entries: " << readUint32(4)
+								<< " codec: "
+								<< completeName(readUint32(12)) << '\n';
 #else
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
+				cout << indent1 << "Entries: " << entries << '\n';
 				int64_t ofs = 8;
 				for (unsigned int i = 0; i < entries && i < 10; ++i) {
 					cout << indent2 << "codec: "
@@ -380,7 +391,7 @@ void Atom::print(int indentation) const {
 
 		case name2Id("stts"): {  // Run-length compressed duration of samples.
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
+				cout << indent1 << "Entries: " << entries << '\n';
 				for (unsigned int i = 0; i < entries && i < 30; ++i) {
 					cout << indent2 << "samples: " << readUint32( 8 + 8 * i)
 									<< " for: "    << readUint32(12 + 8 * i)
@@ -391,8 +402,8 @@ void Atom::print(int indentation) const {
 
 		case name2Id("stss"): {  // Sync sample (keyframes).
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
-				for (unsigned int i = 0; i < entries && i < 10; i++) {
+				cout << indent1 << "Entries: " << entries << '\n';
+				for (unsigned int i = 0; i < entries && i < 10; ++i) {
 					cout << indent2 << "keyframe: " << readUint32(8 + 4 * i)
 									<< '\n';
 				}
@@ -401,8 +412,8 @@ void Atom::print(int indentation) const {
 
 		case name2Id("stsc"): {  // Samples to chucnk.
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
-				for (unsigned int i = 0; i < entries && i < 10; i++) {
+				cout << indent1 << "Entries: " << entries << '\n';
+				for (unsigned int i = 0; i < entries && i < 10; ++i) {
 					cout << indent2 << "chunk: "     << readUint32( 8 + 12 * i)
 									<< " nsamples: " << readUint32(12 + 12 * i)
 									<< " id: "       << readUint32(16 + 12 * i)
@@ -412,12 +423,12 @@ void Atom::print(int indentation) const {
 			}
 
 		case name2Id("stsz"): {  // Sample size atoms.
-				int32_t  sample_size = readInt32(4);
+				uint32_t sample_size = readUint32(4);
 				uint32_t entries     = readUint32(8);
-				cout << indent << "Sample size: " << sample_size
-							   << " Entries: "    << entries << '\n';
+				cout << indent1 << "Sample size: " << sample_size
+								<< " Entries: "    << entries << '\n';
 				if (sample_size == 0) {
-					for (unsigned int i = 0; i < entries && i < 10; i++)
+					for (unsigned int i = 0; i < entries && i < 10; ++i)
 						cout << indent2 << "size: " << readUint32(12 + i * 4)
 										<< '\n';
 				}
@@ -426,8 +437,8 @@ void Atom::print(int indentation) const {
 
 		case name2Id("stco"): {  // Sample chunk offset atoms.
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
-				for (unsigned int i = 0; i < entries && i < 10; i++) {
+				cout << indent1 << "Entries: " << entries << '\n';
+				for (unsigned int i = 0; i < entries && i < 10; ++i) {
 					cout << indent2 << "chunk: " << readUint32(8 + i * 4)
 									<< '\n';
 				}
@@ -436,8 +447,8 @@ void Atom::print(int indentation) const {
 
 		case name2Id("co64"): {  // Sample chunk offset atoms.
 				uint32_t entries = readUint32(4);
-				cout << indent << "Entries: " << entries << '\n';
-				for (unsigned int i = 0; i < entries && i < 10; i++) {
+				cout << indent1 << "Entries: " << entries << '\n';
+				for (unsigned int i = 0; i < entries && i < 10; ++i) {
 					cout << indent2 << "chunk: " << readUint64(8 + i * 8)
 									<< '\n';
 				}
@@ -490,7 +501,7 @@ bool Atom::isVersioned() const {
 }
 
 
-// Manipulate direct siblings (children).
+// Manipulate direct children.
 Atom* Atom::findChild(uint32_t id) const {
 	for (auto& child : children_)
 		if (child->id_ == id) return child;
@@ -703,7 +714,7 @@ void Atom::readChar(char* str, int64_t offset, size_t length) const {
 	assert(str);
 	const uchar* p = content(offset, length);
 	if (p) {
-		for (unsigned int i = 0; i < length; i++)
+		for (unsigned int i = 0; i < length; ++i)
 			*str++ = *p++;
 	}
 	*str = '\0';

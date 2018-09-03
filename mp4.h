@@ -22,6 +22,7 @@
 #ifndef MP4_H_
 #define MP4_H_
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -34,29 +35,36 @@ class Atom;
 
 class Mp4 {
 public:
-	int timescale_;
-	int duration_;
-	Atom* root_atom_;
-
-	Mp4();
+	Mp4() = default;
 	~Mp4();
 
-	void parseOk(const std::string& filename);  // Parse the healthy one.
+	void parseOk(const std::string& filename_ok);  // Parse the healthy one.
 
 	void printMediaInfo();
 	void printAtoms();
-	void makeStreamable(const std::string& filename, const std::string& output);
 
-	void analyze();
-	void writeTracksToAtoms();
-	void repair(const std::string& filename, const std::string& filname_fixed);
+	void analyze(bool interactive = true);
 
-protected:
+	bool repair(const std::string& filename_corrupt,
+				const std::string& filename_fixed);
+
+	static bool makeStreamable(const std::string& filename,
+							   const std::string& filename_fixed);
+
+private:
+	const size_t kMaxPartSize = 1600000;  // 1.6 MB.
+
+	uint32_t         timescale_ = 0;
+	uint32_t         duration_  = 0;
+	Atom*            root_atom_ = nullptr;
+	AVFormatContext* context_   = nullptr;
 	std::vector<Track> tracks_;
-	AVFormatContext* context_;
+	std::string filename_;
 
-	void saveVideo(const std::string& filename);
-	void parseTracks();
+	void close();
+	bool parseTracks();
+	void writeTracksToAtoms();
+	bool save(const std::string& filename);
 };
 
 

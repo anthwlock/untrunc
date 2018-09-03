@@ -50,8 +50,8 @@ void Track::parse(Atom* mdat) {
 	if (!mdhd)
 		throw string("No mdhd atom: unknown duration and timescale");
 
-	timescale_ = mdhd->readInt32(12);
-	duration_ = mdhd->readInt32(16);
+	timescale_ = mdhd->readUint32(12);
+	duration_  = mdhd->readUint32(16);
 
 	times_ = getSampleTimes(trak_);
 	keyframes_ = getKeyframes(trak_);
@@ -131,7 +131,7 @@ void Track::writeToAtoms() {
 	saveChunkOffsets();
 
 	Atom* mdhd = trak_->find1stAtom("mdhd");
-	mdhd->writeInt32(16, duration_);
+	mdhd->writeUint32(16, duration_);
 
 	// Avc1 codec writes something inside stsd.
 	// In particular the picture parameter set (PPS) in avcC

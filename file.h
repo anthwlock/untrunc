@@ -24,11 +24,24 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "common.h"
+
+
+// Redirect C files.
+// This does not effect C++ standard I/O streams (cin, cout, cerr, clog).
+class FileRedirect {
+public:
+	explicit FileRedirect(std::FILE*& file, std::FILE* to_file);
+	~FileRedirect();
+
+private:
+	std::FILE*& file_ref;
+	std::FILE*  file_value;
+};
 
 
 // RAII wrapper for FILE, to make sure it gets closed.
@@ -57,6 +70,8 @@ public:
 
 	explicit operator bool() const { return static_cast<bool>(file_); }
 
+	std::string name() const { return name_; }
+
 	off_t pos();
 	void  seek(off_t pos);
 	void  rewind();
@@ -78,6 +93,8 @@ public:
 	const uchar* getPtr(off_t pos, size_t size);
 
 private:
+	std::string name_;
+
 	off_t  file_size_     = -1;
 	std::vector<uchar> buffer_;
 	off_t  buf_begin_pos_ = -1;
@@ -103,6 +120,8 @@ public:
 
 	explicit operator bool() const { return static_cast<bool>(file_); }
 
+	std::string name() const { return name_; }
+
 	off_t pos();
 	off_t size();
 	off_t length() { return size(); }
@@ -116,6 +135,9 @@ public:
 	ssize_t writeInt64(int64_t value) { return writeUint64(value); }
 	ssize_t writeChar(const char* source, size_t n);
 	ssize_t write(const std::vector<uchar>& v);
+
+private:
+	std::string name_;
 };
 
 
