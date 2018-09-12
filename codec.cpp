@@ -53,14 +53,14 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 		else
 			logg(I, "avcC got decoded\n");
 	}
-//	else if (codec == string("mp4a")) {
-//		audio_config_ = new AudioConfig(*stsd);
-//		if (!audio_config_->is_ok)
-//			logg(W, "audio-config (esds) was not decoded correctly\n");
-//		else
-//			logg(I, "audio-config (esds) got decoded\n");
-////		exit(1);
-//	}
+	else if (codec == string("mp4a")) {
+		audio_config_ = new AudioConfig(*stsd);
+		if (!audio_config_->is_ok)
+			logg(W, "audio-config (esds) was not decoded correctly\n");
+		else
+			logg(I, "audio-config (esds) got decoded\n");
+		exit(1);
+	}
 
 	//this was a stupid attempt at trying to detect packet type based on bitmasks
 	mask1_ = 0xffffffff;
