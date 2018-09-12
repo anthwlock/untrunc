@@ -11,7 +11,6 @@ class AVCodecContext;
 class AVCodec;
 
 class AvcConfig;
-class AudioConfig;
 
 class Codec {
 public:
@@ -27,7 +26,6 @@ public:
 	AVCodec *codec_;
 
 	AvcConfig* avc_config_;
-	AudioConfig* audio_config_;
 
 	bool was_keyframe;
 };

@@ -17,7 +17,6 @@ extern "C" {
 #include "sps-info.h"
 #include "nal-slice.h"
 #include "avc-config.h"
-#include "audio-config.h"
 
 using namespace std;
 
@@ -53,14 +52,6 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 		else
 			logg(I, "avcC got decoded\n");
 	}
-//	else if (codec == string("mp4a")) {
-//		audio_config_ = new AudioConfig(*stsd);
-//		if (!audio_config_->is_ok)
-//			logg(W, "audio-config (esds) was not decoded correctly\n");
-//		else
-//			logg(I, "audio-config (esds) got decoded\n");
-////		exit(1);
-//	}
 
 	//this was a stupid attempt at trying to detect packet type based on bitmasks
 	mask1_ = 0xffffffff;
@@ -71,9 +62,9 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 		if(offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
 			cout << "i = " << i;
 			cout << "\noffset = " << offset
-				 << "\nmdat->start = " << mdat->start_
-				 << "\nmdat->length = " << mdat->length_
-				 << "\noffset - mdat->start = " << offset - mdat->start_;
+			     << "\nmdat->start = " << mdat->start_
+			     << "\nmdat->length = " << mdat->length_
+			     << "\noffset - mdat->start = " << offset - mdat->start_;
 			cout << "\nInvalid offset in track!\n";
 			exit(0);
 		}

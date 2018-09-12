@@ -26,7 +26,6 @@ SOURCES += main.cpp \
     sps-info.cpp \
     nal-slice.cpp \
     avc-config.cpp \
-    audio-config.cpp
 
 HEADERS += \
     atom.h \
@@ -39,6 +38,5 @@ HEADERS += \
     sps-info.h \
     nal-slice.h \
     avc-config.h \
-    audio-config.h
 
 LIBS += -lavformat -lavcodec -lavutil
