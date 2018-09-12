@@ -41,6 +41,8 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	}
 
 	if(length_ > maxlength) {
+//		cout << "maxlength = " << maxlength << '\n';
+//		cout << "length_ = " << length_ << '\n';
 		logg(W, "buffer exceeded by: ", len-maxlength, '\n');
 		return false;
 	}

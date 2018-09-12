@@ -10,8 +10,8 @@ typedef unsigned char uchar;
 
 enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
-
 extern size_t g_max_partsize;
+extern bool g_interactive;
 
 template<class... Args>
 void logg(Args&&... args){
@@ -76,5 +76,8 @@ int readGolomb(const uchar *&buffer, int &offset);
 uint readBits(int n, const uchar *&buffer, int &offset);
 
 void printBuffer(const uchar* pos, int n);
+std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
+
+void hitEnterToContinue();
 
 #endif // HELPER_H

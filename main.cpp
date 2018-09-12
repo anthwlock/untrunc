@@ -30,10 +30,11 @@ void usage() {
 	cerr << "Usage: untrunc [options] <ok.mp4> [corrupt.mp4]\n"
 	     << "\noptions:\n"
 		 << "-a  - analyze\n"
-		 << "-i  - info\n"
+	     << "-i  - info\n"
 		 << "-v  - verbose\n"
 		 << "-vv - more verbose\n"
-		 << "-q  - only errors\n";
+	     << "-q  - only errors\n"
+	     << "-n  - no interactive\n"; // in Mp4::analyze()
 }
 
 int main(int argc, char *argv[]) {
@@ -49,6 +50,7 @@ int main(int argc, char *argv[]) {
 			else if(arg[1] == 'v' && arg[2] == 'v') g_log_mode = LogMode::VV;
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;
 			else if(arg[1] == 'q') g_log_mode = LogMode::E;
+			else if(arg[1] == 'n') g_interactive = false;
 			else {usage(); return -1;}
 		} else if (argc > i + 2) {
 			usage();

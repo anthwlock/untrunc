@@ -41,6 +41,7 @@ Track::Track(Atom *t, AVCodecContext *c) : trak_(t), codec_(c), n_matched(0) {
 
 }
 
+/* healthy trak atom */
 void Track::parse(Atom *mdat) {
 
 	Atom *mdhd = trak_->atomByName("mdhd");

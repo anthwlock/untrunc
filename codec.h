@@ -18,8 +18,8 @@ public:
 	Codec(AVCodecContext* c);
 	std::string name_;
 	void parse(Atom *trak, std::vector<int> &offsets, Atom *mdat);
-	bool matchSample(const uchar *start);
-	int getLength(const uchar *start, uint maxlength, int &duration);
+	bool matchSample(const uchar *start) const;
+	int getSize(const uchar *start, uint maxlength, int &duration);
 	//used by: mp4a
 	int mask1_;
 	int mask0_;
@@ -29,7 +29,7 @@ public:
 	AvcConfig* avc_config_;
 	AudioConfig* audio_config_;
 
-	bool last_frame_was_idr_;
+	bool was_keyframe;
 };
 
 #endif // CODEC_HPP

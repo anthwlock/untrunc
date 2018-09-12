@@ -33,6 +33,7 @@ public:
 	int timescale_;
 	int duration_;
 	int n_matched;
+	int duration_in_timescale_; //in movie timescale, not track timescale
 	Codec codec_;
 
 	std::vector<int> times_;
@@ -46,6 +47,8 @@ public:
 	void writeToAtoms();
 	void clear();
 	void fixTimes();
+
+	int getDurationInMs() {return duration_ / (timescale_ / 1000);}
 
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);

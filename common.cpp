@@ -1,11 +1,13 @@
 #include "common.h"
 
 #include <iostream>
+#include <sstream>
 
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;
 size_t g_max_partsize = 1600000;
+bool g_interactive = true;
 
 uint16_t swap16(uint16_t us) {
 	return (us >> 8) | (us << 8);
@@ -63,14 +65,18 @@ int readGolomb(const uchar *&buffer, int &offset) {
 }
 
 void printBuffer(const uchar* pos, int n){
-	cout << hex;
+	cout << mkHexStr(pos, n, true) << '\n';
+}
+
+string mkHexStr(const uchar* pos, int n, bool bytes_seperated){
+	stringstream out;
+	out << hex;
 	for (int i=0; i != n; ++i) {
 		int x = (int) *(pos+i);
-		if (x < 16)
-			cout << '0';
-		cout << x << ' ';
+		if (x < 16) out << '0';
+		out << x << (bytes_seperated?" ":"");
 	}
-	cout << dec << '\n';
+	return out.str();
 }
 
 uint readBits(int n, const uchar *&buffer, int &offset) {
@@ -124,3 +130,10 @@ uint readBits(int n, const uchar *&buffer, int &offset) {
 //    return res;
 //}
 
+
+void hitEnterToContinue() {
+	if (g_interactive) {
+		cout << " Hit enter to continue." << endl;
+		getchar();
+	} else cout << '\n';
+}

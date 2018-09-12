@@ -87,7 +87,7 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 	}
 }
 
-bool Codec::matchSample(const uchar *start) {
+bool Codec::matchSample(const uchar *start) const{
 	int s = swap32(*(int *)start);
 	if(name_ == "avc1") {
 
@@ -200,7 +200,7 @@ bool Codec::matchSample(const uchar *start) {
 	return false;
 }
 
-int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
+int Codec::getSize(const uchar *start, uint maxlength, int &duration) {
 	if(name_ == "mp4a" || name_ == "sawb") {
 		AVFrame *frame = av_frame_alloc();
 		if(!frame)
@@ -287,7 +287,7 @@ int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
 
 		SliceInfo previous_slice;
 		NalInfo previous_nal;
-		last_frame_was_idr_ = false;
+		was_keyframe = false;
 
 		while(1) {
 			logg(V, "---\n");
@@ -311,7 +311,7 @@ int Codec::getLength(const uchar *start, uint maxlength, int &duration) {
 					break;
 				return length;
 			case NAL_IDR_SLICE:
-				last_frame_was_idr_ = true; // keyframe
+				was_keyframe = true; // keyframe
 			case NAL_SLICE:
 			{
 				SliceInfo slice_info(nal_info, sps_info);
