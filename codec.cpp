@@ -53,10 +53,6 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 			logg(I, "avcC got decoded\n");
 	}
 
-	//this was a stupid attempt at trying to detect packet type based on bitmasks
-	mask1_ = 0xffffffff;
-	mask0_ = 0xffffffff;
-	//build the mask:
 	for(int i = 0; i < offsets.size(); i++) {
 		int offset = offsets[i];
 		if(offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
@@ -68,13 +64,6 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 			cout << "\nInvalid offset in track!\n";
 			exit(0);
 		}
-
-		int s = mdat->readInt(offset - mdat->start_ - 8);
-		mask1_ &= s;
-		mask0_ &= ~s;
-
-		assert((s & mask1_) == mask1_);
-		assert((~s & mask0_) == mask0_);
 	}
 }
 
