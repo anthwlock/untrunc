@@ -30,10 +30,6 @@ extern "C" {
 
 #include "common.h"
 
-uint16_t swap16(uint16_t us);
-uint32_t swap32(uint32_t ui);
-uint64_t swap64(uint64_t ull);
-
 class FileRead {
 public:
 	FileRead();
@@ -48,7 +44,7 @@ public:
 
 	size_t readBuffer(uchar* target, size_t size, size_t n);
 
-	int readInt();
+	uint readInt();
 	int64_t readInt64();
 	void readChar(char *dest, size_t n);
 	std::vector<uchar> read(size_t n);
@@ -60,7 +56,7 @@ protected:
 	uchar* buffer_;
 	off_t size_;
 	FILE *file_;
-	size_t buf_size_ = 15*1024*1024; // 15 MB
+	size_t buf_size_ = 15*(1<<20); // 15 MB
 	off_t buf_off_;
 	off_t buf_begin_;
 };

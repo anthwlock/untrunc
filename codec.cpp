@@ -34,7 +34,7 @@ Codec::Codec(AVCodecContext* c) : avc_config_(NULL) {
 
 }
 
-void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
+void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>& offsets_64, Atom *mdat, const bool is64) {
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
 	if(entries != 1)
@@ -53,8 +53,9 @@ void Codec::parse(Atom *trak, vector<int> &offsets, Atom *mdat) {
 			logg(I, "avcC got decoded\n");
 	}
 
-	for(int i = 0; i < offsets.size(); i++) {
-		int offset = offsets[i];
+	size_t len_offs = is64? offsets_64.size() : offsets.size();
+	for(int i = 0; i < len_offs; i++) {
+		int64_t offset = is64? offsets_64[i] : offsets[i];
 		if(offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
 			cout << "i = " << i;
 			cout << "\noffset = " << offset

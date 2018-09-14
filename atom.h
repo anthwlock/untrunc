@@ -44,10 +44,12 @@ public:
 	static bool isDual(char *id);
 	static bool isVersioned(char *id);
 
-	virtual int readInt(int64_t offset);
+	virtual uint readInt(int64_t offset);
+	int64_t readInt64(int64_t offset);
 	void writeInt(int value, int64_t offset);
 	void readChar(char *str, int64_t offset, int64_t length);
 
+	void writeInt64(int64_t value, int64_t offset);
 };
 
 class WriteAtom: public Atom {
@@ -62,7 +64,7 @@ public:
 	int64_t contentSize() { return file_end_ - file_begin_; }
 	void updateLength();
 
-	int readInt(int64_t offset);
+	uint readInt(int64_t offset);
 	void write(FileWrite &file);
 
 };

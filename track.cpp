@@ -41,7 +41,7 @@ Track::Track(Atom *t, AVCodecContext *c) : trak_(t), codec_(c), n_matched(0) {
 
 }
 
-/* healthy trak atom */
+/* parse healthy trak atom */
 void Track::parse(Atom *mdat) {
 
 	Atom *mdhd = trak_->atomByName("mdhd");
@@ -50,13 +50,18 @@ void Track::parse(Atom *mdat) {
 
 	timescale_ = mdhd->readInt(12);
 	duration_ = mdhd->readInt(16);
+	const bool is64 = trak_->atomByName("co64");
 
 	times_ = getSampleTimes(trak_);
 	keyframes_ = getKeyframes(trak_);
 	sizes_ = getSampleSizes(trak_);
 
-	vector<int> chunk_offsets = getChunkOffsets(trak_);
-	vector<int> sample_to_chunk = getSampleToChunk(trak_, chunk_offsets.size());
+	vector<int64_t> chunk_offsets_64;
+	vector<uint> chunk_offsets;
+	if(is64) chunk_offsets_64 = getChunkOffsets64(trak_);
+	else chunk_offsets = getChunkOffsets(trak_);
+	int len_chunk_offs = is64? chunk_offsets_64.size() : chunk_offsets.size();
+	vector<int> sample_to_chunk = getSampleToChunk(trak_, len_chunk_offs);
 
 	if(times_.size() != sizes_.size()) {
 		cout << "Mismatch between time offsets and size offsets: \n";
@@ -68,19 +73,21 @@ void Track::parse(Atom *mdat) {
 		cout << "Time offsets: " << times_.size() << " Chunk offsets: " << sample_to_chunk.size() << endl;
 	}
 	//compute actual offsets
-	int old_chunk = -1;
-	int offset = -1;
+	int64_t old_chunk = -1;
+	int64_t offset = -1;
 	for(unsigned int i = 0; i < sizes_.size(); i++) {
 		int chunk = sample_to_chunk[i];
 		int size = sizes_[i];
 		if(chunk != old_chunk) {
-			offset = chunk_offsets[chunk];
+			if(is64) offset = chunk_offsets_64[chunk];
+			else offset = chunk_offsets[chunk];
+//			cout << "- offset: " << offset << '\n';
 			old_chunk= chunk;
 		}
-		offsets_.push_back(offset);
+		if(is64) offsets64_.push_back(offset);
+		else offsets_.push_back(offset);
 		offset += size;
 	}
-
 	//move this stuff into track!
 	Atom *hdlr = trak_->atomByName("hdlr");
 	char type[5];
@@ -93,7 +100,7 @@ void Track::parse(Atom *mdat) {
 
 	//	//move this to Codec
 
-	codec_.parse(trak_, offsets_, mdat);
+	codec_.parse(trak_, offsets_, offsets64_, mdat, is64);
 	//if audio use next?
 
 //	if(!codec.codec) throw string("No codec found!");
@@ -115,7 +122,7 @@ void Track::parse(Atom *mdat) {
 
 void Track::writeToAtoms() {
 
-	if(!keyframes_.size())
+	if (!keyframes_.size())
 		trak_->prune("stss");
 
 	saveSampleTimes();
@@ -164,25 +171,27 @@ void Track::writeToAtoms() {
 void Track::clear() {
 //	times_.clear();
 	offsets_.clear();
+	offsets64_.clear();
 	sizes_.clear();
 	keyframes_.clear();
 }
 
-void Track::fixTimes() {
+void Track::fixTimes(const bool is64) {
+	const size_t len_offs = is64? offsets64_.size() : offsets_.size();
 	if(codec_.name_ == "samr") {
 		times_.clear();
-		times_.resize(offsets_.size(), 160);
+		times_.resize(len_offs, 160);
 		return;
 	}
 //	for(int i=0; i != 100; i++)
 //		cout << "times_[" << i << "] = " << times_[i] << '\n';
-	while(times_.size() < offsets_.size())
+	while(times_.size() < len_offs)
 		times_.insert(times_.end(), times_.begin(), times_.end());
-	times_.resize(offsets_.size());
+	times_.resize(len_offs);
 
 	duration_ = 0;
-	for(unsigned int i = 0; i < times_.size(); i++)
-		duration_ += times_[i];
+	for(auto time : times_)
+		duration_ += time;
 }
 
 vector<int> Track::getSampleTimes(Atom *t) {
@@ -235,24 +244,29 @@ vector<int> Track::getSampleSizes(Atom *t) {
 
 
 
-vector<int> Track::getChunkOffsets(Atom *t) {
-	vector<int> chunk_offsets;
-	//chunk offsets
-	Atom *stco = t->atomByName("stco");
-	if(stco) {
-		int nchunks = stco->readInt(4);
-		for(int i = 0; i < nchunks; i++)
-			chunk_offsets.push_back(stco->readInt(8 + i*4));
+vector<int64_t> Track::getChunkOffsets64(Atom *trak) {
+	vector<int64_t> chunk_offsets;
+	Atom *co64 = trak->atomByName("co64");
+	if(!co64)
+		throw string("Missing chunk offset atom 'co64'");
 
-	} else {
-		Atom *co64 = t->atomByName("co64");
-		if(!co64)
-			throw string("Missing chunk offset atom");
-
-		int nchunks = co64->readInt(4);
-		for(int i = 0; i < nchunks; i++)
-			chunk_offsets.push_back(co64->readInt(12 + i*8));
+	int nchunks = co64->readInt(4);
+	for(int i = 0; i < nchunks; i++) {
+		int64_t off = co64->readInt64(8 + i*8);
+		chunk_offsets.push_back(off);
 	}
+	return chunk_offsets;
+}
+
+vector<uint> Track::getChunkOffsets(Atom *trak) {
+	vector<uint> chunk_offsets;
+	//chunk offsets
+	Atom *stco = trak->atomByName("stco");
+	if(!stco)
+		throw string("Missing chunk offset atom 'stco'");
+	int nchunks = stco->readInt(4);
+	for(int i = 0; i < nchunks; i++)
+		chunk_offsets.push_back(stco->readInt(8 + i*4));
 	return chunk_offsets;
 }
 
@@ -349,20 +363,23 @@ void Track::saveSampleToChunk() {
 void Track::saveChunkOffsets() {
 	Atom *co64 = trak_->atomByName("co64");
 	if(co64) {
-		trak_->prune("co64");
-		Atom *stbl = trak_->atomByName("stbl");
-		Atom *new_stco = new Atom;
-		memcpy(new_stco->name_, "stco", 5);
-		stbl->children_.push_back(new_stco);
+		co64->content_.resize(4 + //version
+		                      4 + //number of entries
+		                      8*offsets64_.size());
+		co64->writeInt(offsets64_.size(), 4);
+		for(unsigned int i = 0; i < offsets64_.size(); i++)
+			co64->writeInt64(offsets64_[i], 8 + 8*i);
 	}
-	Atom *stco = trak_->atomByName("stco");
-	assert(stco);
-	stco->content_.resize(4 + //version
-						  4 + //number of entries
-						  4*offsets_.size());
-	stco->writeInt(offsets_.size(), 4);
-	for(unsigned int i = 0; i < offsets_.size(); i++)
-		stco->writeInt(offsets_[i], 8 + 4*i);
+	else {
+		Atom *stco = trak_->atomByName("stco");
+		assert(stco);
+		stco->content_.resize(4 + //version
+		                      4 + //number of entries
+		                      4*offsets_.size());
+		stco->writeInt(offsets_.size(), 4);
+		for(unsigned int i = 0; i < offsets_.size(); i++)
+			stco->writeInt(offsets_[i], 8 + 4*i);
+	}
 }
 
 

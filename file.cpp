@@ -127,7 +127,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 	return nread/size;
 }
 
-int FileRead::readInt() {
+uint FileRead::readInt() {
 	int value;
 	int n = readBuffer((uchar*)&value, sizeof(int), 1);
 //    cout << "n = " << n << '\n';

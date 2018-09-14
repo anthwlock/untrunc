@@ -46,7 +46,6 @@ public:
 	void makeStreamable(std::string& filename, std::string& output);
 
 	void analyze();
-	void writeTracksToAtoms();
 	void repair(std::string& filename, const std::string& filname_fixed);
 
 protected:    
@@ -55,6 +54,7 @@ protected:
 
 	void saveVideo(const std::string& filename);
 	void parseTracks();
+	bool broken_is_64_ = false;
 };
 
 

@@ -171,6 +171,19 @@ void Mp4::saveVideo(const string& filename) {
 
 //	duration_ = 0;
 	for(Track& track : tracks_) {
+		Atom *stbl = track.trak_->atomByName("stbl");
+		if (broken_is_64_ && stbl->atomByName("stco")){
+			stbl->prune("stco");
+			Atom *new_co64 = new Atom;
+			memcpy(new_co64->name_, "co64", 5);
+			stbl->children_.push_back(new_co64);
+		}
+		else if (!broken_is_64_ && stbl->atomByName("co64")) {
+			stbl->prune("co64");
+			Atom *new_stco = new Atom;
+			memcpy(new_stco->name_, "stco", 5);
+			stbl->children_.push_back(new_stco);
+		}
 		track.writeToAtoms();
 		Atom *tkhd = track.trak_->atomByName("tkhd");
 		tkhd->writeInt(track.duration_in_timescale_, 20); //in movie timescale, not track timescale
@@ -202,14 +215,16 @@ void Mp4::saveVideo(const string& filename) {
 	root_atom_->updateLength();
 
 	//fix offsets
-	int offset = 8 + moov->length_;
+	int64_t offset = 8 + moov->length_;
 	if(ftyp)
 		offset += ftyp->length_; //not all mov have a ftyp.
 
 	for(unsigned int t = 0; t < tracks_.size(); t++) {
 		Track &track = tracks_[t];
-		for(unsigned int i = 0; i < track.offsets_.size(); i++)
-			track.offsets_[i] += offset;
+		const int len_chunk_offs = broken_is_64_? track.offsets64_.size() : track.offsets_.size();
+		for(unsigned int i = 0; i < len_chunk_offs; i++)
+			if(broken_is_64_) track.offsets64_[i] += offset;
+			else track.offsets_[i] += offset;
 
 		track.writeToAtoms();  //need to save the offsets back to the atoms
 	}
@@ -242,6 +257,7 @@ void Mp4::analyze() {
 //			        << "  begin: " << hex << begin << " " << next << dec << endl;
 //		}
 
+		const bool is64 = root_atom_->atomByName("co64");
 		int k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 		for(unsigned int i = 0; i < track.offsets_.size(); i++) {
 			int offset = track.offsets_[i] - (mdat->start_ + 8);
@@ -298,11 +314,6 @@ void Mp4::analyze() {
 
 }
 
-void Mp4::writeTracksToAtoms() {
-	for(unsigned int i = 0; i < tracks_.size(); i++)
-		tracks_[i].writeToAtoms();
-}
-
 void Mp4::parseTracks() {
 	Atom *mdat = root_atom_->atomByName("mdat");
 	vector<Atom *> traks = root_atom_->atomsByName("trak");
@@ -351,7 +362,10 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		break;
 	}
 
-
+	if (file_read.length() > (1LL<<32)) {
+		broken_is_64_ = true;
+		logg(I, "using 64-bit offsets in the broken file\n");
+	}
 	for(unsigned int i = 0; i < tracks_.size(); i++)
 		tracks_[i].clear();
 
@@ -362,6 +376,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	vector<int> audiotimes;
+	vector<int64_t> audiotimes64;
 	unsigned long cnt_packets = 0;
 	off_t offset = 0;
 
@@ -369,13 +384,9 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	int loop_cnt = 0;
 	while (offset < mdat->contentSize()) {
 		logg(V, "\n(reading element from mdat)\n");
-		if (g_log_mode == I) { // output progress
-			if (loop_cnt >= 2000) {
-				double p = round(1000*((double)offset/(double)mdat->file_end_));
-				cout << p/10 << "%  \r" << flush;
-				loop_cnt = 0;
-			}
-			loop_cnt++;
+		if (g_log_mode == I &&  loop_cnt++ >= 2000) { // output progress
+			outProgress(offset, mdat->file_end_);
+			loop_cnt = 0;
 		}
 
 		uint maxlength = min((int64_t) g_max_partsize, mdat->contentSize() - offset); // maximal 1.6MB
@@ -431,9 +442,11 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 				logg(V, "- found as ", track.codec_.name_, '\n');
 
 			bool keyframe = track.codec_.was_keyframe;
-			if(keyframe)
-				track.keyframes_.push_back(track.offsets_.size());
-			track.offsets_.push_back(offset);
+			if(keyframe) {
+				if(broken_is_64_) track.keyframes_.push_back(track.offsets64_.size());
+				else track.keyframes_.push_back(track.offsets_.size()); }
+			if(broken_is_64_) track.offsets64_.push_back(offset);
+			else track.offsets_.push_back(offset);
 			track.sizes_.push_back(length);
 			offset += length;
 			if(duration)
@@ -471,9 +484,9 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	}
 
 	for(auto& track : tracks_) {
-		if(audiotimes.size() == track.offsets_.size())
+		if(audiotimes.size() == track.offsets_.size() || audiotimes.size() == track.offsets64_.size())
 			swap(audiotimes, track.times_);
-		track.fixTimes();
+		track.fixTimes(broken_is_64_);
 		int track_duration = (int)(double)track.duration_ * ((double)timescale_ / (double)track.timescale_);
 		if(track_duration > duration_) duration_ = track_duration;
 		track.duration_in_timescale_ = track_duration;

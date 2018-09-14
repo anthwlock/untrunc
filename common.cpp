@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <cmath>
 
 using namespace std;
 
@@ -136,4 +137,9 @@ void hitEnterToContinue() {
 		cout << " Hit enter to continue." << endl;
 		getchar();
 	} else cout << '\n';
+}
+
+void outProgress(double now, double all) {
+	double x = round(1000*(now/all));
+	cout << x/10 << "%  \r" << flush;
 }

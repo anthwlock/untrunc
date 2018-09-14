@@ -18,20 +18,20 @@ Atom::~Atom() {
 
 void Atom::parseHeader(FileRead &file) {
 	start_ = file.pos();
-	logg(V, "start_ = ", start_, '\n');
 	length_ = file.readInt();
-	logg(V, "length_ = ", length_, '\n');
-	if (length_ < 0)
-		throw length_error("length of atom < 0");
 	file.readChar(name_, 4);
-	logg(V, "name_ = ", name_, '\n');
-
 	if(length_ == 1) {
 		length_ = file.readInt64() - 8;
 		start_ += 8;
-	} else if(length_ == 0) {
-		length_ = file.length() - start_;
 	}
+	else if(length_ == 0)
+		length_ = file.length() - start_;
+
+	logg(V, "start_ = ", start_, '\n');
+	logg(V, "length_ = ", length_, '\n');
+	logg(V, "name_ = ", name_, '\n');
+	if (length_ < 0)
+		throw length_error("length of atom < 0");
 }
 
 void Atom::parse(FileRead &file) {
@@ -64,8 +64,6 @@ void Atom::write(FileWrite &file) {
 	for(unsigned int i = 0; i < children_.size(); i++)
 		children_[i]->write(file);
 	int end = file.pos();
-	//    cout << "end = " << end << '\n';
-	//    cout << "length_ = " << length_ << '\n';
 	assert(end - start == length_);
 }
 
@@ -259,8 +257,17 @@ void Atom::updateLength() {
 	}
 }
 
-int Atom::readInt(int64_t offset) {
-	return swap32(*(int *)&(content_[offset]));
+int64_t Atom::readInt64(int64_t offset) {
+	return swap64(*(int64_t *)&(content_[offset]));
+}
+
+uint Atom::readInt(int64_t offset) {
+	return swap32(*(uint *)&(content_[offset]));
+}
+
+void Atom::writeInt64(int64_t value, int64_t offset) {
+	assert(content_.size() >= offset + 8);
+	*(int64_t *)&(content_[offset]) = swap64(value);
 }
 
 void Atom::writeInt(int value, int64_t offset) {
@@ -303,22 +310,28 @@ void WriteAtom::updateLength() {
 	}
 }
 
-int WriteAtom::readInt(int64_t offset) {
+uint WriteAtom::readInt(int64_t offset) {
 	file_read_.seek(file_begin_ + offset); // not needed in currently
-	return *(int*) file_read_.getPtr(sizeof(int));
+	return *(uint*) file_read_.getPtr(sizeof(int));
 }
 
 void WriteAtom::write(FileWrite &output) {
 	//1 write length
-	int start = output.pos();
+	off_t start = output.pos();
 
 	output.writeInt(length_);
 	output.writeChar(name_, 4);
-	char buff[1<<20];
-	int offset = file_begin_;
+	int buf_size = (1<<20)*7;
+	char buff[buf_size];
+	off_t offset = file_begin_;
 	file_read_.seek(file_begin_);
+	int loop_cnt = 0;
 	while(offset < file_end_) {
-		int toread = 1<<20;
+		if (name_ == string("mdat") && g_log_mode == I && loop_cnt++ >= 10) {
+			outProgress(offset, file_end_);
+			loop_cnt = 0;
+		}
+		int toread = buf_size;
 		if(toread + offset > file_end_)
 			toread = file_end_ - offset;
 		file_read_.readChar(buff, toread);
@@ -327,6 +340,6 @@ void WriteAtom::write(FileWrite &output) {
 	}
 	for(unsigned int i = 0; i < children_.size(); i++)
 		children_[i]->write(output);
-	int end = output.pos();
+	off_t end = output.pos();
 	assert(end - start == length_);
 }

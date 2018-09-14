@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <iostream>
 #include <map>
+#include <vector>
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -53,7 +54,6 @@ enum {
 };
 
 
-
 const std::map<std::string, std::string> g_atom_names = {
     {"esds", "ES Descriptor"},
     {"stsd", "sample description"},
@@ -71,6 +71,8 @@ const std::map<std::string, std::string> g_atom_names = {
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);
 uint64_t swap64(uint64_t ull);
+
+void outProgress(double now, double all);
 
 int readGolomb(const uchar *&buffer, int &offset);
 uint readBits(int n, const uchar *&buffer, int &offset);

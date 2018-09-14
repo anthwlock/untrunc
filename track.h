@@ -30,14 +30,15 @@ class Codec;
 class Track {
 public:
 	Atom *trak_;
+	Codec codec_;
 	int timescale_;
 	int duration_;
 	int n_matched;
 	int duration_in_timescale_; //in movie timescale, not track timescale
-	Codec codec_;
 
 	std::vector<int> times_;
-	std::vector<int> offsets_;
+	std::vector<uint> offsets_;
+	std::vector<int64_t> offsets64_;
 	std::vector<int> sizes_;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
 
@@ -46,15 +47,17 @@ public:
 	void parse(Atom *mdat);
 	void writeToAtoms();
 	void clear();
-	void fixTimes();
+	void fixTimes(bool is64);
 
 	int getDurationInMs() {return duration_ / (timescale_ / 1000);}
 
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);
 	std::vector<int> getSampleSizes(Atom *t);
-	std::vector<int> getChunkOffsets(Atom *t);
+	std::vector<uint> getChunkOffsets(Atom* t);
 	std::vector<int> getSampleToChunk(Atom *t, int nchunks);
+
+	std::vector<int64_t> getChunkOffsets64(Atom* t);
 
 	void saveSampleTimes();
 	void saveKeyframes();
