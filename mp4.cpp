@@ -240,34 +240,32 @@ void Mp4::saveVideo(const string& filename) {
 	mdat->write(file);
 }
 
-void Mp4::analyze() {
+void Mp4::analyze(const string& filename) {
+	FileRead file;
+	bool success = file.open(filename);
+	if(!success) throw string("Could not open file: ") + filename;
 
-	Atom *mdat = root_atom_->atomByName("mdat");
+//	Atom *mdat = root_atom_->atomByName("mdat");
+	BufferedAtom* mdat = findMdat(file);
 	for(unsigned int i = 0; i < tracks_.size(); i++) {
 		Track &track = tracks_[i];
 		cout << "\nTrack " << i << " codec: " << track.codec_.name_ << endl;
 
-//		cout << "Keyframes  " << track.keyframes_.size() << endl;
-//		for(unsigned int i = 0; i < track.keyframes_.size(); i++) {
-//			int k = track.keyframes_[i];
-//			int offset = track.offsets_[k] - (mdat->start_ + 8);
-//			int begin =  mdat->readInt(offset);
-//			int next =  mdat->readInt(offset + 4);
-//			cout << "\n" << k << " Size: " << track.sizes_[k] << " offset " << track.offsets_[k]
-//			        << "  begin: " << hex << begin << " " << next << dec << endl;
-//		}
-
 		const bool is64 = root_atom_->atomByName("co64");
+		size_t len_offs = is64? track.offsets64_.size() : track.offsets_.size();
 		int k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
-		for(unsigned int i = 0; i < track.offsets_.size(); i++) {
-			int offset = track.offsets_[i] - (mdat->start_ + 8);
-			uchar *start = &(mdat->content_[offset]);
-			uint maxlength = mdat->content_.size() - offset;
+		for(unsigned int i = 0; i < len_offs; i++) {
+			off_t offset;
+			if (is64) offset = track.offsets64_[i] - (mdat->start_ + 8);
+			else offset = track.offsets_[i] - (mdat->start_ + 8);
+
+			uint maxlength = min((int64_t) g_max_partsize, mdat->contentSize() - offset); // maximal 1.6MB
+			const uchar *start = mdat->getFragment(offset, maxlength);
 
 			int begin =  mdat->readInt(offset);
 			int next =  mdat->readInt(offset + 4);
 			int end = mdat->readInt(offset + track.sizes_[i] - 4);
-			cout << "\n(" << i << ") Size: " << track.sizes_[i] << " offset " << track.offsets_[i]
+			cout << "\n(" << i << ") Size: " << track.sizes_[i] << " offset " << offset
 			    << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4)
 			    << " end: " << mkHexStr(start+track.sizes_[i]-4, 4) << '\n';
 //			cout << "(" << i << ") Size: " << track.sizes_[i] << " offset " << track.offsets_[i]
@@ -277,11 +275,10 @@ void Mp4::analyze() {
 			for (const auto& t : tracks_)
 				if (t.codec_.matchSample(start)){
 					if (t.codec_.name_ != track.codec_.name_){
-						cout << "Matched wrong codec! " << t.codec_.name_ << "instead of " << track.codec_.name_;
+						cout << "Matched wrong codec! " << t.codec_.name_ << " instead of " << track.codec_.name_;
 						hitEnterToContinue();
 					} else matches = true;
 				}
-//			bool matches = track.codec_.matchSample(start);
 			int duration = 0;
 			int size = track.codec_.getSize(start, maxlength, duration);
 			//TODO check if duration is working with the stts duration.
@@ -290,7 +287,6 @@ void Mp4::analyze() {
 				cout << "Match failed! " << track.codec_.name_ << " not detected";
 				hitEnterToContinue();
 			}
-			//assert(matches);
 			cout << "detected size: " << size << " true: " << track.sizes_[i] << '\n';
 			if (track.codec_.name_ == "mp4a")
 				 cout << "detected duration: " << duration << " true: " << track.times_[i] << '\n';
@@ -324,16 +320,8 @@ void Mp4::parseTracks() {
 	}
 }
 
-void Mp4::repair(string& filename, const string& filename_fixed) {
-	FileRead file_read;
-	if(!file_read.open(filename))
-		throw "Could not open file: " + filename;
-
-	//find mdat. fails with krois and a few other.
-	//TODO check for multiple mdat, or just look for the first one.
-
-	logg(I, "parsing mdat from truncated file ... \n");
-	WriteAtom *mdat = new WriteAtom(file_read);
+BufferedAtom* Mp4::findMdat(FileRead& file_read) {
+	BufferedAtom *mdat = new BufferedAtom(file_read);
 	while(1) {
 
 		Atom *atom = new Atom;
@@ -361,10 +349,23 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		mdat->file_end_ = file_read.length();
 		break;
 	}
+	return mdat;
+}
+
+void Mp4::repair(string& filename, const string& filename_fixed) {
+	FileRead file_read;
+	if(!file_read.open(filename))
+		throw "Could not open file: " + filename;
+
+	//find mdat. fails with krois and a few other.
+	//TODO check for multiple mdat, or just look for the first one.
+
+	logg(I, "parsing mdat from truncated file ... \n");
+	BufferedAtom* mdat = findMdat(file_read);
 
 	if (file_read.length() > (1LL<<32)) {
 		broken_is_64_ = true;
-		logg(I, "using 64-bit offsets in the broken file\n");
+		logg(I, "using 64-bit offsets for the broken file\n");
 	}
 	for(unsigned int i = 0; i < tracks_.size(); i++)
 		tracks_[i].clear();
@@ -462,7 +463,8 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			//            assert(mdat->content_.size() + 8 == mdat->length_);
 			mdat->file_end_ = mdat->file_begin_ + offset;
 			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
-			if (mdat->content_.size() + 8 != mdat->length_){
+//			if (mdat->content_.size() + 8 != mdat->length_){
+			if (mdat->content_size_ != mdat->length_){
 				logg(E, "unable to find correct codec -> premature end\n");
 				logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
 			}

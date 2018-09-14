@@ -16,6 +16,7 @@ public:
 	char name_[5];
 	char head_[4];
 	char version_[4];
+	size_t content_size_;
 	std::vector<uchar> content_;
 	std::vector<Atom *> children_;
 
@@ -52,14 +53,14 @@ public:
 	void writeInt64(int64_t value, int64_t offset);
 };
 
-class WriteAtom: public Atom {
+class BufferedAtom: public Atom {
 public:
 	FileRead& file_read_;
 	int64_t file_begin_;
 	int64_t file_end_;
 
-	explicit WriteAtom(FileRead&);
-	~WriteAtom();
+	explicit BufferedAtom(FileRead&);
+	~BufferedAtom();
 	const uchar *getFragment(int64_t offset, int64_t size);
 	int64_t contentSize() { return file_end_ - file_begin_; }
 	void updateLength();

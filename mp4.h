@@ -27,6 +27,7 @@
 
 #include "track.h"
 class Atom;
+class BufferedAtom;
 class FileRead;
 class AVFormatContext;
 
@@ -45,10 +46,11 @@ public:
 	void printAtoms();
 	void makeStreamable(std::string& filename, std::string& output);
 
-	void analyze();
+	void analyze(const std::string& filename);
 	void repair(std::string& filename, const std::string& filname_fixed);
 
-protected:    
+protected:
+	BufferedAtom* findMdat(FileRead& file_read);
 	std::vector<Track> tracks_;
 	AVFormatContext *context_;
 

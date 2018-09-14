@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 			mp4.printAtoms();
 		}
 		if(analyze) {
-			mp4.analyze();
+			mp4.analyze(ok);
 		}
 		if(corrupt.size()) {
 			mp4.repair(corrupt, corrupt + "_fixed.mp4");

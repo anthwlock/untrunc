@@ -30,8 +30,8 @@ void Atom::parseHeader(FileRead &file) {
 	logg(V, "start_ = ", start_, '\n');
 	logg(V, "length_ = ", length_, '\n');
 	logg(V, "name_ = ", name_, '\n');
-	if (length_ < 0)
-		throw length_error("length of atom < 0");
+	if (!isprint(name_[0]))
+		throw string("invalid name_: ")+name_;
 }
 
 void Atom::parse(FileRead &file) {
@@ -46,7 +46,12 @@ void Atom::parse(FileRead &file) {
 		}
 		assert(file.pos() == start_ + length_);
 
-	} else {
+	}
+	else if (name_ == string("mdat")) {
+		content_size_ = length_ - 8;
+		file.seek(file.pos()+content_size_);
+	}
+	else {
 		content_ = file.read(length_ -8); //lenght includes header
 		if(content_.size() < length_ -8)
 			throw string("Failed reading atom content: ") + name_;
@@ -249,6 +254,7 @@ void Atom::prune(string name) {
 void Atom::updateLength() {
 	length_ = 8;
 	length_ += content_.size();
+//	assert(name_ != string("mdat"));
 
 	for(unsigned int i = 0; i < children_.size(); i++) {
 		Atom *child = children_[i];
@@ -284,13 +290,13 @@ void Atom::readChar(char *str, int64_t offset, int64_t length) {
 
 
 //WriteAtom::WriteAtom(FileRead& file): buffer_(NULL), buffer_begin_(0), file_read_(file) {
-WriteAtom::WriteAtom(FileRead& file): file_read_(file) {
+BufferedAtom::BufferedAtom(FileRead& file): file_read_(file) {
 }
 
-WriteAtom::~WriteAtom() {
+BufferedAtom::~BufferedAtom() {
 }
 
-const uchar *WriteAtom::getFragment(int64_t offset, int64_t size) {
+const uchar *BufferedAtom::getFragment(int64_t offset, int64_t size) {
 	if(offset < 0)
 		throw "Offset set before beginning of file";
 	if(offset + size > file_end_ - file_begin_)
@@ -299,7 +305,7 @@ const uchar *WriteAtom::getFragment(int64_t offset, int64_t size) {
 	return file_read_.getPtr(size);
 }
 
-void WriteAtom::updateLength() {
+void BufferedAtom::updateLength() {
 	length_ = 8;
 	length_ += file_end_ - file_begin_;
 
@@ -310,12 +316,12 @@ void WriteAtom::updateLength() {
 	}
 }
 
-uint WriteAtom::readInt(int64_t offset) {
+uint BufferedAtom::readInt(int64_t offset) {
 	file_read_.seek(file_begin_ + offset); // not needed in currently
 	return *(uint*) file_read_.getPtr(sizeof(int));
 }
 
-void WriteAtom::write(FileWrite &output) {
+void BufferedAtom::write(FileWrite &output) {
 	//1 write length
 	off_t start = output.pos();
 
