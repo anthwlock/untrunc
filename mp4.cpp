@@ -83,6 +83,9 @@ void Mp4::parseOk(string& filename) {
 	av_dump_format(context_, 0, filename.c_str(), 0);
 
 	parseTracks();
+	//mp4a matching gives less false positives
+	if(tracks_.size() > 1 && tracks_[1].codec_.name_ == "mp4a")
+		swap(tracks_[0], tracks_[1]);
 }
 
 void Mp4::printMediaInfo() {
@@ -277,7 +280,7 @@ void Mp4::analyze(const string& filename) {
 					if (t.codec_.name_ != track.codec_.name_){
 						cout << "Matched wrong codec! " << t.codec_.name_ << " instead of " << track.codec_.name_;
 						hitEnterToContinue();
-					} else matches = true;
+					} else {matches = true; break;}
 				}
 			int duration = 0;
 			int size = track.codec_.getSize(start, maxlength, duration);
@@ -369,10 +372,6 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	}
 	for(unsigned int i = 0; i < tracks_.size(); i++)
 		tracks_[i].clear();
-
-	//mp4a is more reliable than avc1.
-	if(tracks_.size() > 1 && tracks_[1].codec_.name_ == "mp4a")
-		swap(tracks_[0], tracks_[1]);
 
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
