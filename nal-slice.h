@@ -32,22 +32,25 @@ class SpsInfo;
 
 class SliceInfo {
 public:
-	int first_mb;         // Unused.
-	int slice_type;       // Should match the nal type (1, 5).
-	int pps_id;           // Which parameter set to use.
-	int frame_num;
-	int field_pic_flag;
-	int bottom_pic_flag;  // Only if field_pic_flag.
-	int idr_pic_id;       // Read only for nal_type 5.
-	int poc_type;         // If zero, check the lsb.
-	int poc_lsb;
+	int first_mb        = 0;  // Unused.
+	int slice_type      = 0;  // Should match the nal type (1, 5).
+	int pps_id          = 0;  // Which parameter set to use.
+	int frame_num       = 0;
+	int field_pic_flag  = 0;
+	int bottom_pic_flag = 0;  // Only if field_pic_flag.
+	int idr_pic_id      = 0;  // Read only for nal_type 5.
+	int poc_type        = 0;  // If zero, check the lsb.
+	int poc_lsb         = 0;
 
-	int idr_pic_flag;     // 1 = nal_type 5, 0 = nal_type 1.
-	bool is_ok;
+	int idr_pic_flag    = 0;  // 1 = nal_type 5, 0 = nal_type 1.
+	bool is_ok          = false;
 
+	SliceInfo() = default;
 	SliceInfo(const NalInfo&, const SpsInfo&);
-	SliceInfo() : is_ok(false) { }
+
 	bool isInNewFrame(const SliceInfo&);
+
+private:
 	bool decode(const NalInfo&, const SpsInfo&);
 };
 

@@ -34,35 +34,38 @@ class Atom;
 
 class Track {
 public:
-	Atom* trak_;
-	uint32_t timescale_;
-	uint32_t duration_;
-	int n_matched;
-	Codec codec_;
+	Atom*    trak_      = nullptr;
+	uint32_t timescale_ = 0;
+	uint32_t duration_  = 0;
+	uint32_t n_matched_ = 0;
+	Codec    codec_;
 
-	std::vector<int> times_;
-	std::vector<int> offsets_;
-	std::vector<int> sizes_;
-	std::vector<int> keyframes_;  // Used for 'avc1', 0 based!
+	std::vector<uint32_t> times_;
+	std::vector<uint32_t> keyframes_;  // Used for avc1, 0 based!
+	std::vector<uint32_t> sizes_;
+	std::vector<uint64_t> file_offsets_;
 
-	//Track(): trak_(0) { }
-	Track(Atom* t, AVCodecContext* c);
+	Track(Atom* trak, AVCodecContext* context);
 
-	void parse(Atom* mdat);
-	void writeToAtoms();
+	bool parse(Atom* mdat);
 	void clear();
+	void writeToAtoms();
 	void fixTimes();
 
-	std::vector<int> getSampleTimes(Atom* t);
-	std::vector<int> getKeyframes(Atom* t);
-	std::vector<int> getSampleSizes(Atom* t);
-	std::vector<int> getChunkOffsets(Atom* t);
-	std::vector<int> getSampleToChunk(Atom* t, int nchunks);
+private:
+	void cleanUp();
+
+	static std::vector<uint32_t> getSampleTimes(Atom* trak);
+	static std::vector<uint32_t> getKeyframes(Atom* trak);
+	static std::vector<uint32_t> getSampleSizes(Atom* trak);
+	static std::vector<uint64_t> getChunkOffsets(Atom* trak);
+	static std::vector<uint32_t> getSampleToChunk(Atom* trak,
+												  uint32_t num_chunks);
 
 	void saveSampleTimes();
 	void saveKeyframes();
-	void saveSampleToChunk();
 	void saveSampleSizes();
+	void saveSampleToChunk();
 	void saveChunkOffsets();
 };
 

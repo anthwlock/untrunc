@@ -53,7 +53,7 @@ bool NalInfo::parseNal(const uchar* buffer, uint32_t maxlength) {
 	logg(V, "Length: ", length_, "\n");
 
 
-	int MAX_AVC1_LENGTH = 8 * (1 << 20);  // 8 MiB.
+	const uint32_t MAX_AVC1_LENGTH = 8u * 1024 * 1024;  // 8 MiB.
 	if (len > MAX_AVC1_LENGTH) {
 		logg(V, "Max length exceeded\n");
 		return false;

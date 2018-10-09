@@ -204,7 +204,7 @@ bool Mp4::makeStreamable(const string& filename, const string& filename_fixed) {
 	}
 #endif
 	std::vector<Atom*> stcos = moov->findAllAtoms("stco");
-	for (auto& stco : stcos) {
+	for (const auto& stco : stcos) {
 		// stco: 4 vers+flags, 4 num-entries, 4* chunk-pos.
 		uint32_t entries = stco->readUint32(4);
 		for (unsigned int i = 0; i < entries; ++i) {
@@ -328,9 +328,8 @@ bool Mp4::save(const string& filename) {
 	uint64_t pos = moov->length() + mdat->headerSize();
 	if (ftyp) pos += ftyp->length();  // Not all .mov have an ftyp.
 	for (Track& track : tracks_) {
-		for (auto& track_offs : track.offsets_) {
-			track_offs += pos;
-		}
+		for (auto& track_foffset : track.file_offsets_)
+			track_foffset += pos;
 		track.writeToAtoms();  // Need to save the offsets back to the atoms.
 	}
 
@@ -379,45 +378,63 @@ void Mp4::analyze(bool interactive) {
 		clog.flush();
 	}
 
-	for (unsigned int i = 0; i < tracks_.size(); ++i) {
-		cout << "\n\nTrack " << i << '\n';
-		Track& track = tracks_[i];
+	unsigned int tracknum = 0;
+	for (Track& track : tracks_) {
+		cout << "\n\nTrack " << tracknum++ << '\n';
 		cout << "Track codec: " << track.codec_.name_ << '\n';
 		cout << "Keyframes  : " << track.keyframes_.size() << '\n';
-		for (auto k : track.keyframes_) {
-			int64_t  offset = track.offsets_[k] - mdat->contentPos();
+		for (const auto& key : track.keyframes_) {
+			if (mdat->contentPos() < 0 ||
+				track.file_offsets_[key] < static_cast<unsigned decltype(
+					mdat->contentPos())>(mdat->contentPos())) {
+				cout << setw(8) << key
+				     << " Size: " << setw(6) << track.sizes_[key]
+				     << " offset " << setw(10) << track.file_offsets_[key]
+				     << " < " << setw(10) << mdat->contentPos() << '\n';
+				continue;
+			}
+			int64_t  offset = track.file_offsets_[key] - mdat->contentPos();
 			uint32_t begin  = mdat->readUint32(offset);
 			uint32_t next   = mdat->readUint32(offset + 4);
-			cout << setw(8) << k
-				 << " Size: " << setw(6) << track.sizes_[k]
-				 << " offset " << setw(10) << track.offsets_[k]
+			cout << setw(8) << key
+				 << " Size: " << setw(6) << track.sizes_[key]
+				 << " offset " << setw(10) << track.file_offsets_[key]
 				 << "  begin: " << hex << setw(5) << begin << ' '
 				 << setw(8) << next << dec << '\n';
 		}
 
-		for (unsigned int i = 0; i < track.offsets_.size(); ++i) {
-			int64_t  offset = track.offsets_[i] - mdat->contentPos();
-			uint64_t maxlength64 = mdat->contentSize() - offset;
-			const uchar* start = mdat->content(offset, maxlength64);
-			uint32_t maxlength = min(maxlength64, kMaxPartSize);
+		for (unsigned int i = 0; i < track.file_offsets_.size(); ++i) {
+			bool matches = false;
+			int  length  = -1;
+			if (mdat->contentPos() < 0 ||
+				track.file_offsets_[i] < static_cast<unsigned decltype(
+					mdat->contentPos())>(mdat->contentPos())) {
+				cout << "\n\n>" << setw(7) << i
+				     << " Size: " << setw(6) << track.sizes_[i]
+				     << " offset " << setw(10) << track.file_offsets_[i]
+				     << " < " << setw(10) << mdat->contentPos() << '\n';
+			} else {
+				int64_t  offset = track.file_offsets_[i] - mdat->contentPos();
+				uint32_t begin  = mdat->readUint32(offset);
+				uint32_t next   = mdat->readUint32(offset + 4);
+				uint32_t end    = mdat->readUint32(offset + track.sizes_[i] - 4);
+				cout << "\n\n>" << setw(7) << i
+				     << " Size: " << setw(6) << track.sizes_[i]
+				     << " offset " << setw(10) << track.file_offsets_[i]
+				     << "  begin: " << hex << setw(5) << begin << ' '
+				     << setw(8) << next
+				     << " end: " << setw(8) << end << dec << '\n';
+				cout.flush();  // Flush here untill Codec code is fixed.
 
-			uint32_t begin = mdat->readUint32(offset);
-			uint32_t next  = mdat->readUint32(offset + 4);
-			uint32_t end   = mdat->readUint32(offset + track.sizes_[i] - 4);
-			cout << "\n\n>" << setw(7) << i
-				 << " Size: " << setw(6) << track.sizes_[i]
-				 << " offset " << setw(10) << track.offsets_[i]
-				 << "  begin: " << hex << setw(5) << begin << ' '
-				 << setw(8) << next
-				 << " end: " << setw(8) << end << dec << '\n';
-
-			cout.flush();  // Flush here untill track code is fixed.
-			//bool matches = track.codec_.matchSample(start, maxlength);
-			bool matches = track.codec_.matchSample(start);
-			int duration = 0;
-			int length = track.codec_.getLength(start, maxlength, duration);
-			// TODO(ponchio): Check if duration is working
-			//                with the stts duration.
+				uint64_t maxlength64 = mdat->contentSize() - offset;
+				const uchar* start = mdat->content(offset, maxlength64);
+				uint32_t maxlength = min(maxlength64, kMaxPartSize);
+				matches = track.codec_.matchSample(start);
+				int duration = 0;
+				length = track.codec_.getLength(start, maxlength, duration);
+				// TODO(ponchio): Check if duration is working
+				//                with the stts duration.
+			}
 			cout << "Length: " << length
 				 << " true-length: " << track.sizes_[i] << '\n';
 
@@ -426,12 +443,12 @@ void Mp4::analyze(bool interactive) {
 				cerr << "- Match failed!\n";
 				wait = interactive;
 			}
-			if (length != track.sizes_[i]) {
-				cerr << "- Length mismatch!\n";
-				wait = interactive;
-			}
-			if (length < -1 || length > kMaxPartSize) {
+			if (length < -1 || length > ssize_t(kMaxPartSize)) {
 				cerr << "- Invalid length!\n";
+				wait = interactive;
+			} else if (static_cast<decltype(track.sizes_)::value_type>(length)
+					   != track.sizes_[i]) {
+				cerr << "- Length mismatch!\n";
 				wait = interactive;
 			}
 			if (wait) {
@@ -440,7 +457,7 @@ void Mp4::analyze(bool interactive) {
 				cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 			}
 			//assert(matches);
-			//assert(length == track.sizes_[i]);
+			//assert(length == int64_t(track.sizes_[i]));
 		}
 	}
 	cout << std::endl;
@@ -460,8 +477,13 @@ bool Mp4::parseTracks() {
 		return false;
 	}
 	vector<Atom*> traks = root_atom_->findAllAtoms("trak");
+	if (traks.size() != context_->nb_streams) {
+		logg(W, "Found ", traks.size(), " trak atoms with ",
+			 context_->nb_streams, " AV streams.\n");
+	}
 	for (unsigned int i = 0; i < traks.size(); ++i) {
-		Track track(traks[i], context_->streams[i]->codec);
+		Track track(traks[i], (i < context_->nb_streams) ?
+					context_->streams[i]->codec : nullptr);
 		track.parse(mdat);
 		tracks_.push_back(track);
 	}
@@ -513,12 +535,12 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 	//  (duration in sample-rate scale).
 	// In some videos the duration (stts) can be variable and
 	//  we can rebuild them using these values.
-	vector<int> audiotimes;
-	size_t cnt_packets = 0;
-	off_t  offset      = 0;
-	int    loop_cnt    = 0;
+	vector<uint32_t> audiotimes;
+	size_t  cnt_packets = 0;
+	int64_t offset      = 0;
+	int     loop_cnt    = 0;
 	logg(V, "mdat->contentSize = ", mdat->contentSize(), '\n');
-	while (offset < mdat->contentSize()) {
+	while (uint64_t(offset) < mdat->contentSize()) {
 		logg(V, "\n(reading element from mdat)\n");
 		if (g_log_mode == I) {  // Output progress.
 			if (loop_cnt >= 2000) {
@@ -567,8 +589,9 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 				continue;
 			int duration = 0;
 			int length = track.codec_.getLength(start, maxlength, duration);
+			// Stol DEBUG: getLength(): int for duration and length?
 			logg(V, "frame-length: ", length, '\n');
-			if (length < -1 || length > kMaxPartSize) {
+			if (length < -1 || length > ssize_t(kMaxPartSize)) {
 				logg(E, "Invalid length: ", length,
 					    ". Wrong match in track ", i, ".\n");
 				continue;
@@ -577,7 +600,7 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 				logg(V, "Invalid part-length: ", length, ".\n");
 				continue;
 			}
-			if (length > maxlength) {
+			if (unsigned(length) > maxlength) {
 				logg(V, "Invalid part-length: ", length, " > ", maxlength,
 					    ".\n");
 				continue;
@@ -587,15 +610,16 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 
 			bool keyframe = track.codec_.last_frame_was_idr_;
 			if (keyframe)
-				track.keyframes_.push_back(track.offsets_.size());
-			track.offsets_.push_back(offset);
+				track.keyframes_.push_back(track.file_offsets_.size());
+			// XXX ERROR: Storing the content offset as a file offset! XXX
+			track.file_offsets_.push_back(offset);
 			track.sizes_.push_back(length);
 			offset += length;
-			if (duration)
+			if (duration > 0)
 				audiotimes.push_back(duration);
 
 			found = true;
-			track.n_matched++;
+			track.n_matched_++;
 			break;
 		}
 		logg(V);
@@ -617,7 +641,7 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 	if (g_log_mode >= I) {
 		cout << "Info: Found " << cnt_packets << " packets ( ";
 		for (const Track& t : tracks_) {
-			cout << t.codec_.name_ << ": " << t.n_matched << ' ';
+			cout << t.codec_.name_ << ": " << t.n_matched_ << ' ';
 			if (t.codec_.name_ == "avc1")
 				cout << "avc1-keyframes: " << t.keyframes_.size() << " ";
 		}
@@ -625,9 +649,8 @@ bool Mp4::repair(const string& filename_corrupt, const string& filename_fixed) {
 	}
 
 	for (auto& track : tracks_) {
-		if (audiotimes.size() == track.offsets_.size())
+		if (audiotimes.size() == track.file_offsets_.size())
 			swap(audiotimes, track.times_);
-
 		track.fixTimes();
 	}
 

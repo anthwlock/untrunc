@@ -38,24 +38,18 @@ class AudioConfig;
 
 class Codec {
 public:
+	std::string     name_;
+	AVCodecContext* context_            = nullptr;  // Used by "mp4a".
+	AVCodec*        codec_              = nullptr;  // Used by "mp4a".
+	AvcConfig*      avc_config_         = nullptr;
+	AudioConfig*    audio_config_       = nullptr;
+	bool            last_frame_was_idr_ = false;
+
 	explicit Codec(AVCodecContext* c);
 
-	std::string name_;
-
-	void parse(Atom* trak, std::vector<int>& offsets, Atom* mdat);
+	bool parse(Atom* trak, std::vector<uint64_t>& offsets, Atom* mdat);
 	bool matchSample(const uchar* start);
 	int getLength(const uchar* start, uint maxlength, int& duration);
-
-	// Used by "mp4a".
-	int mask1_;
-	int mask0_;
-	AVCodecContext* context_;
-	AVCodec* codec_;
-
-	AvcConfig* avc_config_;
-	AudioConfig* audio_config_;
-
-	bool last_frame_was_idr_;
 };
 
 

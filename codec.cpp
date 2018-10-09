@@ -47,24 +47,39 @@ using std::string;
 using std::vector;
 
 
-Codec::Codec(AVCodecContext* c) : avc_config_(NULL) {
-	context_ = c;
+Codec::Codec(AVCodecContext* c) : context_(c) {
+	if (!context_) {
+		logg(W, "No codec context.\n");
+		return;
+	}
 
 	//codec_.parse(trak, offsets, mdat);
 	codec_ = avcodec_find_decoder(context_->codec_id);
 	// If audio, use next?
-
-	if (!codec_)
-		throw string("No codec found!");
+	if (!codec_) {
+#if 0  // Only available in FFmpeg.
+		throw string("No decoder found for codec: ") +
+			  avcodec_get_name(context_->codec_id);
+#else
+		const char* codec_name =
+			(context_->codec && context_->codec->name &&
+			 context_->codec->name[0]) ? context_->codec->name : "???";
+		throw string("No decoder found for codec: ") + codec_name;
+#endif
+	}
 	if (avcodec_open2(context_, codec_, NULL) < 0)
-		throw string("Could not open codec: ?");  //+ context_->codec_name;
+		throw string("Could not open codec: ") + codec_->name;
 }
 
-void Codec::parse(Atom* trak, vector<int>& offsets, Atom* mdat) {
+bool Codec::parse(Atom* trak, vector<uint64_t>& offsets, Atom* mdat) {
+	if (!trak) return false;
+
 	Atom* stsd = trak->find1stAtom("stsd");
-	int entries = stsd->readInt32(4);
-	if (entries != 1)
+	uint32_t entries = stsd->readUint32(4);
+	if (entries != 1) {
 		throw string("Multiplexed stream! Not supported");
+		return false;
+	}
 
 	char codec[5];
 	stsd->readChar(codec, 12, 4);
@@ -83,36 +98,40 @@ void Codec::parse(Atom* trak, vector<int>& offsets, Atom* mdat) {
 			logg(W, "audio-config (esds) was not decoded correctly\n");
 		else
 			logg(I, "audio-config (esds) got decoded\n");
-		//exit(1);
 	}
 
-	// This was a stupid attempt at trying to detect packet type based on bitmasks.
-	mask1_ = 0xffffffff;
-	mask0_ = 0xffffffff;
-	// Build the mask.
-	for (unsigned int i = 0; i < offsets.size(); i++) {
-		int offset = offsets[i];
-		if (offset < mdat->contentPos() ||
-			mdat->contentSize(offset - mdat->contentPos()) < sizeof(int32_t)) {
-			cout << "i = " << i
-			     << "\noffset (in file)    = " << offset
-				 << "\nmdat->contentPos    = " << mdat->contentPos()
-				 << "\nmdat->contentSize   = " << mdat->contentSize()
-				 << "\noffset (in content) = " << offset - mdat->contentPos()
-			     << "\nInvalid offset in track!\n";
-			exit(0);
+	// Check atom mdat.
+	if (mdat) {
+		if (mdat->contentPos() < 0) {
+			cout << "\nmdat->contentPos    = " << mdat->contentPos()
+			     << "\nmdat->contentSize   = " << mdat->contentSize()
+			     << "\nInvalid content offset!\n";
+			throw string("Invalid content offset in: ") + mdat->completeName();
+			return false;
 		}
-
-		int s = mdat->readInt32(offset - mdat->contentPos());
-		mask1_ &= s;
-		mask0_ &= ~s;
-
-		assert((s & mask1_) == mask1_);
-		assert((~s & mask0_) == mask0_);
+		unsigned decltype(mdat->contentPos()) upos = mdat->contentPos();
+		for (unsigned int i = 0; i < offsets.size(); i++) {
+			uint64_t offset = offsets[i];
+			if (offset < upos ||
+				mdat->contentSize(offset - upos) < sizeof(uint32_t)) {
+				cout << "index = " << i
+				     << "\noffset (in file)    = " << offset
+				     << "\nmdat->contentPos    = " << mdat->contentPos()
+				     << "\nmdat->contentSize   = " << mdat->contentSize()
+				     << "\noffset (in content) = " << offset - upos
+				     << "\nInvalid offset in track!\n";
+				throw string("Invalid offset in track: ") +
+				      trak->completeName() + " for: " + mdat->completeName();
+				return false;
+			}
+		}
 	}
+	return true;
 }
 
 bool Codec::matchSample(const uchar* start) {
+	if (!start) return false;
+
 	int s = swap32(*reinterpret_cast<const int*>(start));
 	if (name_ == "avc1") {
 		// This works only for a very specific kind of video.
@@ -141,7 +160,7 @@ bool Codec::matchSample(const uchar* start) {
 			logg(V, "avc1: Match with 0 header\n");
 			return true;
 		}
-		logg(V, "avc1: failed for not particular reason\n");
+		logg(V, "avc1: failed for no particular reason\n");
 		return false;
 
 	} else if (name_ == "mp4a") {
@@ -236,13 +255,15 @@ bool Codec::matchSample(const uchar* start) {
 
 int Codec::getLength(const uchar* start, uint maxlength, int& duration) {
 	if (name_ == "mp4a" || name_ == "sawb") {
+		if (!start) return -1;
+
 		AVFrame* frame = av_frame_alloc();
 		if (!frame)
 			throw string("Could not create AVFrame");
 		AVPacket avp;
 		av_init_packet(&avp);
 
-		int got_frame;
+		int got_frame = 0;
 		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 
@@ -262,20 +283,22 @@ int Codec::getLength(const uchar* start, uint maxlength, int& duration) {
 		AVPacket avp;
 		av_init_packet(&avp);
 
-		int got_frame;
-		avp.data = reinterpret_cast<uchar*>(start);
+		int got_frame = 0;
+		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp);
 		av_freep(&frame);
 		return consumed;
-#endif
-
+#else
 		// Found no way to guess size, probably the only way is to use some
 		// functions in ffmpeg to decode the stream.
 		cout << "Unfortunately I found no way to guess size of mp4v packets. Sorry\n";
+#endif
 		return -1;
 
 	} else if (name_ == "avc1") {
+		if (!start) return -1;
+
 #if 0
 		AVFrame *frame = av_frame_alloc();
 		if (!frame)
@@ -392,7 +415,7 @@ int Codec::getLength(const uchar* start, uint maxlength, int& duration) {
 	} else if (name_ == "twos") {  // Length is multiple of 32, we split packets.
 		return 4;
 	} else if (name_ == "apcn") {
-		return swap32(*reinterpret_cast<const int*>(start));
+		return (start) ? swap32(*reinterpret_cast<const int*>(start)) : -1;
 	} else if (name_ == "lpcm") {
 		// Use hard-coded values for now....
 		const int num_samples = 4096;    // Empirical.
