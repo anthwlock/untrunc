@@ -39,14 +39,8 @@ extern "C" {
 LogMode g_log_mode = LogMode::I;
 
 // Configure FFmpeg/Libav logging for use in C++.
-#ifdef AV_LOG_PRINT_LEVEL
-# define DEFAULT_AVLOG_FLAGS	AV_LOG_PRINT_LEVEL
-#else
-# define DEFAULT_AVLOG_FLAGS	0
-#endif
-
-AvLog::AvLog()          : AvLog(AV_LOG_QUIET, DEFAULT_AVLOG_FLAGS) { }
-AvLog::AvLog(int level) : AvLog(level,        DEFAULT_AVLOG_FLAGS) { }
+AvLog::AvLog()          : AvLog(AV_LOG_QUIET, 0) { }
+AvLog::AvLog(int level) : AvLog(level,        0) { }
 
 AvLog::AvLog(int level, int flags)
 	: level_(av_log_get_level())
@@ -115,7 +109,7 @@ int readGolomb(const uchar** buffer, int* bit_offset) {
 			ofs = 0;
 		}
 		if (count > 20) {
-			std::cerr << "Failed reading golomb: too large!\n";
+			logg(E, "Failed reading golomb: too large!\n");
 			*buffer = buf;
 			*bit_offset = ofs;
 			return -1;

@@ -158,7 +158,7 @@ int readGolomb(const uchar** buffer, int* bit_offset);
 uint readBits(int numbits, const uchar** buffer, int* bit_offset);
 
 
-// Convert an Atom name to its Id code.
+// Convert an Atom name to its FourCC Id code.
 constexpr uint32_t name2Id(const unsigned char* p, size_t i = 0) {
 	return (i >= 4) ? 0U :
 		(uint32_t(*p) << ((3 - i) * 8)) | name2Id(p + 1, i + 1);
@@ -171,7 +171,7 @@ constexpr uint32_t name2Id(const char* p, size_t i = 0) {
 
 extern uint32_t name2Id(const std::string& name);
 
-// Convert an Atom Id code to its name.
+// Convert an Atom FourCC Id code to its name.
 // Note: Some Atoms may contain non-printable chars (e.g. in user-data).
 constexpr void id2Name(char* p, uint32_t id, size_t i = 0) {
 	(i >= 4) ? void(0) :

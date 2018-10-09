@@ -83,7 +83,9 @@ string atomCompleteName2(const char* name, const char* full_name) {
 }; // namespace
 
 
-// Atom.
+//
+// Atom Class.
+//
 Atom::Atom(uint32_t id) : id_(id) {
 	id2Name(name_, id);
 }
@@ -269,7 +271,7 @@ void Atom::write(FileWrite* file) {
 			logg(E, "Incomplete written atom: ", completeName(), ".\n");
 	}
 	// Write children.
-	for (auto& child : children_)
+	for (const auto& child : children_)
 		child->write(file);
 
 #ifndef NDEBUG
@@ -503,7 +505,7 @@ bool Atom::isVersioned() const {
 
 // Manipulate direct children.
 Atom* Atom::findChild(uint32_t id) const {
-	for (auto& child : children_)
+	for (const auto& child : children_)
 		if (child->id_ == id) return child;
 	return nullptr;
 }
@@ -533,8 +535,7 @@ bool Atom::replaceChild(uint32_t id, Atom*&& replacement) {
 vector<Atom*> Atom::findAllAtoms(uint32_t id) const {
 	vector<Atom*> atoms;
 	for (const auto& child : children_) {
-		if (child->id_ == id)
-			atoms.push_back(child);
+		if (child->id_ == id) atoms.push_back(child);
 		vector<Atom*> as = child->findAllAtoms(id);
 		atoms.insert(atoms.end(), as.begin(), as.end());
 	}
@@ -631,7 +632,7 @@ void Atom::pruneAtoms(uint32_t id) {
 void Atom::updateLength() {
 	length_ = headerSize() + contentSize();
 
-	for (auto& child : children_) {
+	for (const auto& child : children_) {
 		child->updateLength();
 		length_ += child->length_;
 	}
@@ -754,7 +755,9 @@ void Atom::writeChar(int64_t offset, const char* source, size_t length) {
 }
 
 
-// Atom for writing.
+//
+// AtomWrite Class.
+//
 AtomWrite::AtomWrite(const string& filename) : file_read_(filename) {
 	if (!file_read_)
 		throw string("Could not open file: ") + filename;
@@ -799,7 +802,7 @@ void AtomWrite::write(FileWrite* file) {
 		}
 	}
 	// Write children.
-	for (auto& child : children_)
+	for (const auto& child : children_)
 		child->write(file);
 
 #ifndef NDEBUG

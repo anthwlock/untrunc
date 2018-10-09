@@ -30,7 +30,6 @@
 #include "file.h"
 
 
-// Atom.
 class Atom {
 public:
 	Atom() = default;
@@ -99,8 +98,8 @@ public:
 	const uchar*   contentBegin() const { return content(); }
 	const uchar*   contentEnd()   const { return content(contentSize()); }
 
-	// Read content.
-	uint8_t  readUint8(int64_t  offset) const;
+	// Read content (offset is from the beginning of the content).
+	uint8_t  readUint8( int64_t offset) const;
 	uint16_t readUint16(int64_t offset) const;
 	uint32_t readUint24(int64_t offset) const;
 	uint32_t readUint32(int64_t offset) const;
@@ -109,8 +108,8 @@ public:
 	int64_t  readInt64(int64_t offset) const { return readUint64(offset); }
 	void     readChar(char* str, int64_t offset, size_t length) const;
 
-	// Write content.
-	void writeUint8(int64_t offset, uint8_t   value);
+	// Write content (offset is from the beginning of the content).
+	void writeUint8( int64_t offset, uint8_t  value);
 	void writeUint16(int64_t offset, uint16_t value);
 	void writeUint24(int64_t offset, uint32_t value);
 	void writeUint32(int64_t offset, uint32_t value);
@@ -152,7 +151,6 @@ inline bool operator!=(const Atom& a, const char* name) {
 }
 
 
-// Atom for writing.
 class AtomWrite : public Atom {
 public:
 	explicit AtomWrite(const std::string& filename);
