@@ -613,6 +613,12 @@ const std::map<uint32_t, const char*> AtomFullNames = {
 	{name2Id("iso7"), "ISO file format version 7"},
 	{name2Id("iso8"), "ISO file format version 8"},
 	{name2Id("iso9"), "ISO file format version 9"},
+	{name2Id("isoa"), "ISO file format version 10"},
+	{name2Id("isob"), "ISO file format version 11"},
+	{name2Id("isoc"), "ISO file format version 12"},
+	{name2Id("isod"), "ISO file format version 13"},
+	{name2Id("isoe"), "ISO file format version 14"},
+	{name2Id("isof"), "ISO file format version 15"},
 	{name2Id("isom"), "ISO Base Media File Format (ISOM)"},  // File based on the ISO Base Media File Format,ISO
 	{name2Id("J2P0"), "JPEG 2000 Profile 0"},
 	{name2Id("J2P1"), "JPEG 2000 Profile 1"},
@@ -795,7 +801,18 @@ const std::map<uint32_t, const char*> AtomFullNames = {
 
 	// MP4 codes.
 	{name2Id("alis"), "File Alias"},
+	{name2Id("auxl"), "Auxiliary media"},  // Track containing auxiliary media for the indicated track (e.g. depth map or alpha plane for video).
+	{name2Id("ipco"), "Item Property Container"},
+	{name2Id("ipma"), "Item Propertie Association"},
+	{name2Id("iprp"), "Item Properties"},
+	{name2Id("mime"), "MIME"},  // Multipurpose Internet Mail Extensions.
 	{name2Id("rsrc"), "Resource alias"},
+	// MP4 Grouping.
+	{name2Id("altr"), "Alternate entity to group"},
+	{name2Id("grpl"), "Group List"},
+	// MP4 Sample Groups.
+	{name2Id("drap"), "Dependent Random Access Point"},
+	{name2Id("stmi"), "Sample to Meta-data Item"},
 
 	// Apple QuickTime codes.
 	{name2Id("ACE2"), "Audio Compression/Expansion 2-to-1 (Apple IIGS)"},
