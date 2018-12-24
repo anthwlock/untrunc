@@ -21,7 +21,7 @@ Get the source code.
 
 Compile the source code using this command (all one line):
 
-    g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil
+    g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil -std=c++11
 
 
 ## Using
