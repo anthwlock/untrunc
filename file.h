@@ -56,9 +56,9 @@ protected:
 	uchar* buffer_;
 	off_t size_;
 	FILE *file_;
-	size_t buf_size_ = 15*(1<<20); // 15 MB
-	off_t buf_off_;
+	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 	off_t buf_begin_;
+	off_t buf_off_;
 };
 
 class FileWrite {

@@ -42,8 +42,7 @@ public:
 	std::vector<int> sizes_;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
 
-	//    Track(): trak_(0) {}
-	Track(Atom* t, AVCodecContext* c);
+	Track(Atom* t, AVCodecParameters* c);
 	void parse(Atom *mdat);
 	void writeToAtoms();
 	void clear();

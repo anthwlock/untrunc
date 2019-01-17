@@ -68,8 +68,13 @@ void Mp4::parseOk(string& filename) {
 	timescale_ = mvhd->readInt(12);
 	duration_ = mvhd->readInt(16);
 
+	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
+	#if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
 	av_register_all();
+	#endif
+
 	if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
+	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
 	context_ = avformat_alloc_context();
 	// Open video file
 	int error = avformat_open_input(&context_, filename.c_str(), NULL, NULL);
@@ -138,10 +143,10 @@ void Mp4::makeStreamable(string& filename, string& output) {
 		stbl->children.push_back(new_stco);
 	} */
 	std::vector<Atom *> stcos = moov->atomsByName("stco");
-	for(int i = 0; i < stcos.size(); i++) {
+	for(uint i = 0; i < stcos.size(); i++) {
 		Atom *stco = stcos[i];
-		int offsets = stco->readInt(4);   //4 version, 4 number of entries, 4 entries
-		for(unsigned int i = 0; i < offsets; i++) {
+		uint offsets = stco->readInt(4);   //4 version, 4 number of entries, 4 entries
+		for(uint i = 0; i < offsets; i++) {
 			int pos = 8 + 4*i;
 			int offset = stco->readInt(pos) + diff;
 			cout << "O: " << offset << endl;
@@ -224,8 +229,8 @@ void Mp4::saveVideo(const string& filename) {
 
 	for(unsigned int t = 0; t < tracks_.size(); t++) {
 		Track &track = tracks_[t];
-		const int len_chunk_offs = broken_is_64_? track.offsets64_.size() : track.offsets_.size();
-		for(unsigned int i = 0; i < len_chunk_offs; i++)
+		uint len_chunk_offs = broken_is_64_? track.offsets64_.size() : track.offsets_.size();
+		for(uint i = 0; i < len_chunk_offs; i++)
 			if(broken_is_64_) track.offsets64_[i] += offset;
 			else track.offsets_[i] += offset;
 
@@ -256,7 +261,7 @@ void Mp4::analyze(const string& filename) {
 
 		const bool is64 = root_atom_->atomByName("co64");
 		size_t len_offs = is64? track.offsets64_.size() : track.offsets_.size();
-		int k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
+		uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 		for(unsigned int i = 0; i < len_offs; i++) {
 			off_t offset;
 			if (is64) offset = track.offsets64_[i] - (mdat->start_ + 8);
@@ -265,12 +270,13 @@ void Mp4::analyze(const string& filename) {
 			uint maxlength = min((int64_t) g_max_partsize, mdat->contentSize() - offset); // maximal 1.6MB
 			const uchar *start = mdat->getFragment(offset, maxlength);
 
-			int begin =  mdat->readInt(offset);
-			int next =  mdat->readInt(offset + 4);
-			int end = mdat->readInt(offset + track.sizes_[i] - 4);
 			cout << "\n(" << i << ") Size: " << track.sizes_[i] << " offset " << offset
 			    << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4)
 			    << " end: " << mkHexStr(start+track.sizes_[i]-4, 4) << '\n';
+
+//			int begin =  mdat->readInt(offset);
+//			int next =  mdat->readInt(offset + 4);
+//			int end = mdat->readInt(offset + track.sizes_[i] - 4);
 //			cout << "(" << i << ") Size: " << track.sizes_[i] << " offset " << track.offsets_[i]
 //			        << "  begin: " << hex << begin << " " << next << " end: " << end << dec << endl;
 
@@ -317,7 +323,7 @@ void Mp4::parseTracks() {
 	Atom *mdat = root_atom_->atomByName("mdat");
 	vector<Atom *> traks = root_atom_->atomsByName("trak");
 	for(unsigned int i = 0; i < traks.size(); i++) {
-		Track track(traks[i], context_->streams[i]->codec);
+		Track track(traks[i], context_->streams[i]->codecpar);
 		track.parse(mdat);
 		tracks_.push_back(track);
 	}
@@ -424,18 +430,21 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			int duration = 0;
 			if (tracks_.size() > 1 && !track.codec_.matchSample(start))
 				continue;
-			int length = track.codec_.getSize(start, maxlength, duration);
-			logg(V, "frame-length: ", length, '\n');
-			if(length < -1 || length > g_max_partsize) {
+
+			int length_signed = track.codec_.getSize(start, maxlength, duration);
+			logg(V, "part-length: ", length_signed, '\n');
+			if(length_signed < 1) {
+				logg(V, "Invalid length: part-length is ", length_signed, '\n');
+				continue;
+			}
+
+			uint length = static_cast<uint>(length_signed);
+			if(length > g_max_partsize) {
 				logg(E, "Invalid length: ", length, ". Wrong match in track: ", i, '\n');
 				continue;
 			}
-			if(length == -1 || length == 0) {
-				logg(V, "Invalid length: part-length is -1 or 0\n");
-				continue;
-			}
 			if(length > maxlength){
-				logg(V, "Invalid length: part-length >= maxlength\n");
+				logg(V, "Invalid length: part-length > maxlength\n");
 				continue;
 			}
 			if(length > 8)
@@ -463,7 +472,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			mdat->file_end_ = mdat->file_begin_ + offset;
 			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
 //			if (mdat->content_.size() + 8 != mdat->length_){
-			if (mdat->content_size_ != mdat->length_){
+			if (mdat->content_size_ != to_uint(mdat->length_)){
 				logg(E, "unable to find correct codec -> premature end\n");
 				logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
 			}

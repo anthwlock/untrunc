@@ -47,10 +47,10 @@ public:
 
 	virtual uint readInt(int64_t offset);
 	int64_t readInt64(int64_t offset);
-	void writeInt(int value, int64_t offset);
+	void writeInt(int value, uint64_t offset);
 	void readChar(char *str, int64_t offset, int64_t length);
 
-	void writeInt64(int64_t value, int64_t offset);
+	void writeInt64(int64_t value, uint64_t offset);
 };
 
 class BufferedAtom: public Atom {

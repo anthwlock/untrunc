@@ -8,13 +8,15 @@
 
 class Atom;
 class AVCodecContext;
+class AVCodecParameters;
 class AVCodec;
 
 class AvcConfig;
 
 class Codec {
 public:
-	Codec(AVCodecContext* c);
+//	Codec(AVCodecContext* c);
+	Codec(AVCodecParameters* c);
 	std::string name_;
 	void parse(Atom *trak, std::vector<int> &offsets, Atom *mdat);
 	bool matchSample(const uchar *start) const;

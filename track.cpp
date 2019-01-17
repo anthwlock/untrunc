@@ -37,7 +37,7 @@ extern "C" {
 
 using namespace std;
 
-Track::Track(Atom *t, AVCodecContext *c) : trak_(t), codec_(c), n_matched(0) {
+Track::Track(Atom *t, AVCodecParameters *c) : trak_(t), codec_(c), n_matched(0) {
 
 }
 

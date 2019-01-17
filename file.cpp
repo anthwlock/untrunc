@@ -109,7 +109,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 		nread = avail;
 		total -= avail;
 		buf_off_ = buf_size_;
-		if (total >= buf_size_){
+		if (total >= to_uint(buf_size_)){
 			size_t x = fread(dest+nread, 1, total, file_);
 			nread += x;
 			fillBuffer(ftello(file_));

@@ -13,7 +13,7 @@
 
 using namespace std;
 
-NalInfo::NalInfo(const uchar* start, int max_size) : payload_(NULL){
+NalInfo::NalInfo(const uchar* start, int max_size) : payload_(){
 	is_ok = parseNal(start, max_size);
 }
 
@@ -34,7 +34,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	logg(V, "Length: ", length_, "\n");
 
 
-	int MAX_AVC1_LENGTH = 8*(1<<20); // 8MB
+	uint MAX_AVC1_LENGTH = 8*(1<<20); // 8MB
 	if(len > MAX_AVC1_LENGTH) {
 		logg(V, "Max length exceeded\n");
 		return false;

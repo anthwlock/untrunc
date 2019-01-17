@@ -11,7 +11,7 @@ public:
 	NalInfo() = default;
 	NalInfo(const uchar* start, int max_size);
 
-	int length_ = 0;
+	uint length_ = 0;
 	int ref_idc_ = 0;
 	int nal_type_ = 0;
 

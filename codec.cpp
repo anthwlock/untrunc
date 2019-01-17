@@ -20,16 +20,15 @@ extern "C" {
 
 using namespace std;
 
-Codec::Codec(AVCodecContext* c) : avc_config_(NULL) {
-	context_ = c;
+Codec::Codec(AVCodecParameters* c) : avc_config_(NULL) {
+	codec_ = avcodec_find_decoder(c->codec_id);
 
-	//    codec_.parse(trak, offsets, mdat);
-	codec_ = avcodec_find_decoder(context_->codec_id);
-	//if audio use next?
+	context_ = avcodec_alloc_context3(codec_);
+	avcodec_parameters_to_context(context_, c);
 
 	if (!codec_)
 		throw string("No codec found!");
-	if (avcodec_open2(context_, codec_, NULL)<0)
+	if (avcodec_open2(context_, codec_, NULL) < 0)
 		throw string("Could not open codec: ?"); //+ context_->codec_name;
 
 }
@@ -54,7 +53,7 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 	}
 
 	size_t len_offs = is64? offsets_64.size() : offsets.size();
-	for(int i = 0; i < len_offs; i++) {
+	for(uint i = 0; i < len_offs; i++) {
 		int64_t offset = is64? offsets_64[i] : offsets[i];
 		if(offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
 			cout << "i = " << i;
@@ -193,7 +192,13 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration) {
 		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 
+		/* new API does not work, why? */
+		// avcodec_send_packet(context_, &avp);
+		// int consumed = avcodec_receive_frame(context_, frame);
+
+		/* using deprecated API instead */
 		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
+
 		duration = frame->nb_samples;
 		logg(V, "nb_samples: ", duration, '\n');
 

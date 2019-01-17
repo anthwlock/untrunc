@@ -82,4 +82,6 @@ std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
 
 void hitEnterToContinue();
 
+#define to_uint(a) static_cast<unsigned int>(a)
+
 #endif // HELPER_H

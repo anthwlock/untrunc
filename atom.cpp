@@ -53,7 +53,7 @@ void Atom::parse(FileRead &file) {
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
-		if(content_.size() < length_ -8)
+		if(content_.size() < to_uint(length_ - 8))
 			throw string("Failed reading atom content: ") + name_;
 	}
 }
@@ -271,12 +271,12 @@ uint Atom::readInt(int64_t offset) {
 	return swap32(*(uint *)&(content_[offset]));
 }
 
-void Atom::writeInt64(int64_t value, int64_t offset) {
+void Atom::writeInt64(int64_t value, uint64_t offset) {
 	assert(content_.size() >= offset + 8);
 	*(int64_t *)&(content_[offset]) = swap64(value);
 }
 
-void Atom::writeInt(int value, int64_t offset) {
+void Atom::writeInt(int value, uint64_t offset) {
 	assert(content_.size() >= offset + 4);
 	*(int *)&(content_[offset]) = swap32(value);
 }
