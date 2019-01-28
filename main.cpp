@@ -29,7 +29,8 @@ using namespace std;
 void usage() {
 	cerr << "Usage: untrunc [options] <ok.mp4> [corrupt.mp4]\n"
 	     << "\noptions:\n"
-		 << "-a  - analyze\n"
+	     << "-s  - skip/ignore unknown sequences\n"
+	     << "-a  - analyze\n"
 	     << "-i  - info\n"
 		 << "-v  - verbose\n"
 		 << "-vv - more verbose\n"
@@ -46,6 +47,7 @@ int main(int argc, char *argv[]) {
 		string arg(argv[i]);
 		if (arg[0] == '-') {
 			if(arg[1] == 'i') info = true;
+			else if(arg[1] == 's') g_ignore_unknown = true;
 			else if(arg[1] == 'a') analyze = true;
 			else if(arg[1] == 'v' && arg[2] == 'v') g_log_mode = LogMode::VV;
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;

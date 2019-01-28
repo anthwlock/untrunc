@@ -12,7 +12,7 @@ typedef unsigned char uchar;
 enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
-extern bool g_interactive;
+extern bool g_interactive, g_muted, g_ignore_unknown;
 
 template<class... Args>
 void logg(Args&&... args){
@@ -21,9 +21,12 @@ void logg(Args&&... args){
 	creator{ 0, ( std::cout << (std::forward<Args>(args)), 0) ... };
 }
 
+void mute();
+void unmute();
+
 template<class... Args>
 void logg(LogMode m, Args&&... x){
-	if(g_log_mode < m)
+	if(g_muted || g_log_mode < m)
 		return;
 	if(m == I)
 		std::cout << "Info: ";
@@ -81,6 +84,8 @@ void printBuffer(const uchar* pos, int n);
 std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
 
 void hitEnterToContinue();
+
+std::string pretty_bytes(uint bytes);
 
 #define to_uint(a) static_cast<unsigned int>(a)
 

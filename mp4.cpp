@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <string>
 #include <iostream>
+#include <iomanip>  // setprecision
 
 extern "C" {
 #include <stdint.h>
@@ -73,8 +74,7 @@ void Mp4::parseOk(string& filename) {
 	av_register_all();
 	#endif
 
-	if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
-	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
+	unmute(); // sets AV_LOG_LEVEL
 	context_ = avformat_alloc_context();
 	// Open video file
 	int error = avformat_open_input(&context_, filename.c_str(), NULL, NULL);
@@ -207,6 +207,18 @@ void Mp4::saveVideo(const string& filename) {
 		string s_hour = (hour?to_string(hour)+"h ":"");
 		logg(I, "Duration of ", track.codec_.name_, ": ", s_hour, s_min, s_sec, s_msec, " (", bmsec, " ms)\n");
 	}
+
+	Atom *mdat = root_atom_->atomByName("mdat");
+
+	if (unknown_lengths_.size()) {
+		cout << setprecision(4);
+		int bytes_not_matched = 0;
+		for (auto n : unknown_lengths_) bytes_not_matched += n;
+		double percentage = bytes_not_matched / mdat->contentSize();
+		logg(W, "Unknown sequences: ", unknown_lengths_.size(), '\n');
+		logg(W, "Bytes not matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
+	}
+
 	logg(I, "saving ", filename, '\n');
 	Atom *mvhd = root_atom_->atomByName("mvhd");
 	mvhd->writeInt(duration_, 16);
@@ -214,7 +226,6 @@ void Mp4::saveVideo(const string& filename) {
 
 	Atom *ftyp = root_atom_->atomByName("ftyp");
 	Atom *moov = root_atom_->atomByName("moov");
-	Atom *mdat = root_atom_->atomByName("mdat");
 
 	moov->prune("ctts");
 	moov->prune("cslg");
@@ -289,7 +300,8 @@ void Mp4::analyze(const string& filename) {
 					} else {matches = true; break;}
 				}
 			int duration = 0;
-			int size = track.codec_.getSize(start, maxlength, duration);
+			bool is_bad = 0;
+			int size = track.codec_.getSize(start, maxlength, duration, is_bad);
 			//TODO check if duration is working with the stts duration.
 
 			if(!matches) {
@@ -297,8 +309,10 @@ void Mp4::analyze(const string& filename) {
 				hitEnterToContinue();
 			}
 			cout << "detected size: " << size << " true: " << track.sizes_[i] << '\n';
-			if (track.codec_.name_ == "mp4a")
+			if (track.codec_.name_ == "mp4a") {
 				 cout << "detected duration: " << duration << " true: " << track.times_[i] << '\n';
+				 if (is_bad) cout << "detected as bad\n";
+			}
 			if (size != track.sizes_[i] || (track.codec_.name_ == "mp4a" && duration != track.times_[i])) {
 				cout << "detected size or duration are wrong!";
 				hitEnterToContinue();
@@ -423,15 +437,18 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		}
 
 		bool found = false;
+//		uint max_length = 1;
+		uint max_length = 4;  // 4 seems to work better
 		for(unsigned int i = 0; i < tracks_.size(); i++) {
 			Track &track = tracks_[i];
 			logg(V, "Track codec: ", track.codec_.name_, '\n');
 			//sometime audio packets are difficult to match, but if they are the only ones....
-			int duration = 0;
 			if (tracks_.size() > 1 && !track.codec_.matchSample(start))
 				continue;
 
-			int length_signed = track.codec_.getSize(start, maxlength, duration);
+			int duration = 0;
+			bool is_bad = 0;
+			int length_signed = track.codec_.getSize(start, maxlength, duration, is_bad);
 			logg(V, "part-length: ", length_signed, '\n');
 			if(length_signed < 1) {
 				logg(V, "Invalid length: part-length is ", length_signed, '\n');
@@ -439,6 +456,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			}
 
 			uint length = static_cast<uint>(length_signed);
+			max_length = max(length, max_length);
 			if(length > g_max_partsize) {
 				logg(E, "Invalid length: ", length, ". Wrong match in track: ", i, '\n');
 				continue;
@@ -447,8 +465,23 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 				logg(V, "Invalid length: part-length > maxlength\n");
 				continue;
 			}
-			if(length > 8)
-				logg(V, "- found as ", track.codec_.name_, '\n');
+
+			if(track.codec_.name_ == "mp4a" && is_bad){
+				logg(V, "skipping mp4a (", length, ") - it is bad\n");
+				continue;
+			}
+
+			if(unknown_length_){
+				logg(V, "found healthy packet again (", track.codec_.name_, "), length: ", length,
+				    "duration: ", duration, '\n');
+			}
+
+//			if(length <= 8) {
+//				logg(V, "Invalid length: ", length, " <= 8");
+//				continue;
+//			}
+
+			logg(V, "- found as ", track.codec_.name_, '\n');
 
 			bool keyframe = track.codec_.was_keyframe;
 			if(keyframe) {
@@ -467,21 +500,37 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		}
 
 		if(!found) {
+			bool is_end = mdat->content_size_ == to_uint(mdat->length_);
+			if (g_ignore_unknown && !is_end) {
+				if (!g_muted && g_log_mode < LogMode::V) {
+					logg(I, "unknown sequence -> muting libav and warnings ..\n");
+					mute();
+				}
+				unknown_length_ += max_length;
+				offset += max_length;
+				continue;
+			}
+			if (g_muted) unmute();
 			//this could be a problem for large files
 			//            assert(mdat->content_.size() + 8 == mdat->length_);
 			mdat->file_end_ = mdat->file_begin_ + offset;
 			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
-//			if (mdat->content_.size() + 8 != mdat->length_){
-			if (mdat->content_size_ != to_uint(mdat->length_)){
-				logg(E, "unable to find correct codec -> premature end\n");
+			if (!is_end){
+				logg(E, "unable to find correct codec -> premature end\n",
+				"       try '-s' to skip unknown sequences\n\n");
 				logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
 			}
-			//mdat->content.resize(offset);
-			//mdat->length = mdat->content.size() + 8;
 			break;
 		}
+		else if(unknown_length_){
+			unknown_lengths_.emplace_back(unknown_length_);
+			unknown_length_ = 0;
+//			unmute();
+		}
+
 		cnt_packets++;
 	}
+	if (g_muted) unmute();
 
 	if(g_log_mode >= I){
 		cout << "Info: Found " << cnt_packets << " packets ( ";

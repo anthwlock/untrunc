@@ -1,14 +1,21 @@
 #include "common.h"
 
 #include <iostream>
+#include <iomanip>  // setprecision
 #include <sstream>
 #include <cmath>
+
+extern "C" {
+#include "libavcodec/avcodec.h"
+}
 
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;
 size_t g_max_partsize = 1600000;
 bool g_interactive = true;
+bool g_muted = false;
+bool g_ignore_unknown = false;
 
 uint16_t swap16(uint16_t us) {
 	return (us >> 8) | (us << 8);
@@ -142,4 +149,29 @@ void hitEnterToContinue() {
 void outProgress(double now, double all) {
 	double x = round(1000*(now/all));
 	cout << x/10 << "%  \r" << flush;
+}
+
+void mute() {
+	g_muted = true;
+	av_log_set_level(AV_LOG_QUIET);
+}
+
+void unmute() {
+	g_muted = false;
+	if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
+	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
+}
+
+string pretty_bytes(uint num)
+{
+	uint idx = 0;
+	vector<string> units = {"","Ki","Mi","Gi","Ti","Pi","Ei","Zi"};
+	while (idx+1 < units.size()) {
+		if (num < 1024) break;
+		num /= 1024;
+		idx++;
+	}
+	stringstream s;
+	s << setprecision(3) << num << units[idx] << "B";
+	return s.str();
 }

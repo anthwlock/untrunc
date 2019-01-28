@@ -68,7 +68,7 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 }
 
 bool Codec::matchSample(const uchar *start) const{
-	int s = swap32(*(int *)start);
+	int s = swap32(*(int *)start);  // big endian
 	if(name_ == "avc1") {
 
 		//this works only for a very specific kind of video
@@ -96,7 +96,7 @@ bool Codec::matchSample(const uchar *start) const{
 			logg(V, "avc1: Match with 0 header\n");
 			return true;
 		}
-		logg(V, "avc1: failed for not particular reason\n");
+		logg(V, "avc1: failed for no particular reason\n");
 		return false;
 
 	} else if(name_ == "mp4a") {
@@ -107,7 +107,7 @@ bool Codec::matchSample(const uchar *start) const{
 		//horrible hack... these values might need to be changed depending on the file
 		if((start[4] == 0xee && start[5] == 0x1b) ||
 		   (start[4] == 0x3e && start[5] == 0x64)) {
-			cout << "mp4a: Success because of horrible hack.\n";
+			logg(W, "mp4a: Success because of horrible hack.\n");
 			return true;
 		}
 
@@ -180,7 +180,7 @@ bool Codec::matchSample(const uchar *start) const{
 	return false;
 }
 
-int Codec::getSize(const uchar *start, uint maxlength, int &duration) {
+int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_bad) {
 	if(name_ == "mp4a" || name_ == "sawb") {
 		AVFrame *frame = av_frame_alloc();
 		if(!frame)
@@ -188,7 +188,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration) {
 		AVPacket avp;
 		av_init_packet(&avp);
 
-		int got_frame;
+		int got_frame = 0;
 		avp.data = const_cast<uchar*>(start);
 		avp.size = maxlength;
 
@@ -198,6 +198,17 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration) {
 
 		/* using deprecated API instead */
 		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
+
+//		cout << "audio_decoded:"
+//		     << frame->nb_samples << ", "
+//		     << frame->format << ", "
+//		     << frame->sample_rate << ", "
+//		     << frame->channel_layout << ", "
+//		     << frame->channels << "\n";
+
+		if (!n_channels_) n_channels_ = frame->channels;
+		is_bad = (!got_frame || frame->channels != n_channels_);
+//		if (frame->sample_rate != 16000) is_bad = true;
 
 		duration = frame->nb_samples;
 		logg(V, "nb_samples: ", duration, '\n');

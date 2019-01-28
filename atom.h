@@ -16,7 +16,7 @@ public:
 	char name_[5];
 	char head_[4];
 	char version_[4];
-	size_t content_size_;
+	size_t content_size_; // only used for mdat
 	std::vector<uchar> content_;
 	std::vector<Atom *> children_;
 

@@ -57,6 +57,8 @@ protected:
 	void saveVideo(const std::string& filename);
 	void parseTracks();
 	bool broken_is_64_ = false;
+	int unknown_length_ = 0;
+	std::vector<int> unknown_lengths_;
 };
 
 
