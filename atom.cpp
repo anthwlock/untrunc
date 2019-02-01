@@ -27,15 +27,15 @@ void Atom::parseHeader(FileRead &file) {
 	else if(length_ == 0)
 		length_ = file.length() - start_;
 
-	logg(V, "start_ = ", start_, '\n');
-	logg(V, "length_ = ", length_, '\n');
-	logg(V, "name_ = ", name_, '\n');
+	logg(VV, "start_ = ", start_, '\n');
+	logg(VV, "length_ = ", length_, '\n');
+	logg(VV, "name_ = ", name_, '\n');
+	logg(VV, '\n');
 	if (!isprint(name_[0]))
 		throw string("invalid name_: ")+name_;
 }
 
 void Atom::parse(FileRead &file) {
-	logg(V, '\n');
 	parseHeader(file);
 
 	if(isParent(name_) && name_ != string("udta")) { //user data atom is dangerous... i should actually skip all
@@ -48,8 +48,8 @@ void Atom::parse(FileRead &file) {
 
 	}
 	else if (name_ == string("mdat")) {
-		content_size_ = length_ - 8;
-		file.seek(file.pos()+content_size_);
+		int content_size = length_ - 8;
+		file.seek(file.pos() + content_size);
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header

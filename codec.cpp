@@ -9,6 +9,7 @@ extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/frame.h>
 }
 
 #include "common.h"
@@ -42,14 +43,19 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 	char codec[5];
 	stsd->readChar(codec, 12, 4);
 	name_ = codec;
-//	cout << "codec: " <<  codec << '\n';
 
-	if (codec == string("avc1")) {
+	if (name_ == "avc1") {
 		avc_config_ = new AvcConfig(*stsd);
 		if (!avc_config_->is_ok)
 			logg(W, "avcC was not decoded correctly\n");
 		else
 			logg(I, "avcC got decoded\n");
+	}
+
+	else if (name_ == "mp4a") {
+		frame_ = av_frame_alloc();
+		packet_ = av_packet_alloc();
+		packet_->size = g_max_partsize;
 	}
 
 	size_t len_offs = is64? offsets_64.size() : offsets.size();
@@ -180,40 +186,48 @@ bool Codec::matchSample(const uchar *start) const{
 	return false;
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt)
+{
+	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
+
+	// ffmpeg 3.4+ uses internal buffer which needs to be updated.
+	// this is slow because of the internal memory allocation
+	if (is_new_ffmpeg_api && consumed < 0) {
+		avcodec_flush_buffers(avctx);
+		pkt->size = g_max_partsize;
+		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
+		if (consumed < 0) {
+			avcodec_flush_buffers(avctx);
+		}
+	}
+	return consumed;
+}
+#pragma GCC diagnostic pop
+
+
 int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_bad) {
 	if(name_ == "mp4a" || name_ == "sawb") {
-		AVFrame *frame = av_frame_alloc();
-		if(!frame)
-			throw string("Could not create AVFrame");
-		AVPacket avp;
-		av_init_packet(&avp);
-
+		packet_->data = const_cast<uchar*>(start);
+		if(!is_new_ffmpeg_api) packet_->size = maxlength;
 		int got_frame = 0;
-		avp.data = const_cast<uchar*>(start);
-		avp.size = maxlength;
 
-		/* new API does not work, why? */
-		// avcodec_send_packet(context_, &avp);
-		// int consumed = avcodec_receive_frame(context_, frame);
+		int consumed = untr_decode_audio4(context_, frame_, &got_frame, packet_);
+//		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet_);
 
-		/* using deprecated API instead */
-		int consumed = avcodec_decode_audio4(context_, frame, &got_frame, &avp);
+		// simulate state for new API
+		if (is_new_ffmpeg_api && consumed >= 0) {
+			packet_->size -= consumed;
+			if (packet_->size <= 0) packet_->size = maxlength;
+		}
 
-//		cout << "audio_decoded:"
-//		     << frame->nb_samples << ", "
-//		     << frame->format << ", "
-//		     << frame->sample_rate << ", "
-//		     << frame->channel_layout << ", "
-//		     << frame->channels << "\n";
-
-		if (!n_channels_) n_channels_ = frame->channels;
-		is_bad = (!got_frame || frame->channels != n_channels_);
-//		if (frame->sample_rate != 16000) is_bad = true;
-
-		duration = frame->nb_samples;
+		duration = frame_->nb_samples;
 		logg(V, "nb_samples: ", duration, '\n');
 
-		av_freep(&frame);
+		if (!n_channels_) n_channels_ = frame_->channels;
+		is_bad = (!got_frame || frame_->channels != n_channels_);
+
 		return consumed;
 
 	} else if(name_ == "mp4v") {

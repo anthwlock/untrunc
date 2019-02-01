@@ -80,7 +80,7 @@ void Mp4::parseOk(string& filename) {
 	int error = avformat_open_input(&context_, filename.c_str(), NULL, NULL);
 
 	if(error != 0)
-		throw "Could not parse AV file: " + filename;
+		throw "Could not parse AV file (" + to_string(error) + "): " + filename;
 
 	if(avformat_find_stream_info(context_, NULL) < 0)
 		throw string("Could not find stream info");
@@ -122,7 +122,7 @@ void Mp4::makeStreamable(string& filename, string& output) {
 	Atom *mdat = root->atomByName("mdat");
 
 	if(mdat->start_ > moov->start_) {
-		cout << "FIle is already streamable" << endl;
+		cout << "File is already streamable" << endl;
 		return;
 	}
 	int old_start = (mdat->start_ + 8);
@@ -282,8 +282,8 @@ void Mp4::analyze(const string& filename) {
 			const uchar *start = mdat->getFragment(offset, maxlength);
 
 			cout << "\n(" << i << ") Size: " << track.sizes_[i] << " offset " << offset
-			    << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4)
-			    << " end: " << mkHexStr(start+track.sizes_[i]-4, 4) << '\n';
+			     << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4)
+			     << " end: " << mkHexStr(start+track.sizes_[i]-4, 4) << '\n';
 
 //			int begin =  mdat->readInt(offset);
 //			int next =  mdat->readInt(offset + 4);
@@ -425,9 +425,16 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			offset += 0x1000;
 			continue;
 		} */
-		uint next =  mdat->readInt(offset + 4);
+		if (g_log_mode >= LogMode::V) {
+			uint begin =  swap32(mdat->readInt(offset));
+			uint next =  swap32(mdat->readInt(offset + 4));
+//			printBuffer(start, 8);
+//			logg(V, "Offset: ", offset, ": ", hex, begin, " ", next, dec, '\n');
+			logg(V, "Offset: ", offset, ": ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
+//			cout << setfill('0') << setw(8) << hex << begin << " "
+//			            << setw(8) << next << dec << '\n';
+		}
 
-		logg(V, "Offset: ", offset, " ", hex, begin, " ", next, dec, '\n');
 
 		//skip fake moov
 		if(start[4] == 'm' && start[5] == 'o' && start[6] == 'o' && start[7] == 'v') {
@@ -499,27 +506,26 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			break;
 		}
 
-		if(!found) {
-			bool is_end = mdat->content_size_ == to_uint(mdat->length_);
-			if (g_ignore_unknown && !is_end) {
+		if(!found && offset < mdat->contentSize()) {
+			if (g_ignore_unknown) {
 				if (!g_muted && g_log_mode < LogMode::V) {
-					logg(I, "unknown sequence -> muting libav and warnings ..\n");
+					logg(I, "unknown sequence -> muting ffmpeg and warnings ..\n");
 					mute();
 				}
 				unknown_length_ += max_length;
 				offset += max_length;
 				continue;
 			}
+
 			if (g_muted) unmute();
 			//this could be a problem for large files
 			//            assert(mdat->content_.size() + 8 == mdat->length_);
 			mdat->file_end_ = mdat->file_begin_ + offset;
 			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
-			if (!is_end){
-				logg(E, "unable to find correct codec -> premature end\n",
-				"       try '-s' to skip unknown sequences\n\n");
-				logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
-			}
+
+			logg(E, "unable to find correct codec -> premature end\n",
+			"       try '-s' to skip unknown sequences\n\n");
+			logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
 			break;
 		}
 		else if(unknown_length_){
@@ -530,7 +536,12 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 
 		cnt_packets++;
 	}
+
 	if (g_muted) unmute();
+	if(unknown_length_) {
+		unknown_lengths_.emplace_back(unknown_length_);
+		unknown_length_ = 0;
+	}
 
 	if(g_log_mode >= I){
 		cout << "Info: Found " << cnt_packets << " packets ( ";
