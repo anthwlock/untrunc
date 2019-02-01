@@ -13,6 +13,8 @@ enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
 extern bool g_interactive, g_muted, g_ignore_unknown;
+extern const bool is_new_ffmpeg_api;
+extern std::string g_version_str;
 
 template<class... Args>
 void logg(Args&&... args){
@@ -86,6 +88,7 @@ std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
 void hitEnterToContinue();
 
 std::string pretty_bytes(uint bytes);
+void printVersion();
 
 #define to_uint(a) static_cast<unsigned int>(a)
 

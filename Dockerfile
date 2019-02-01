@@ -3,7 +3,7 @@ FROM ubuntu
 
 # install packaged dependencies
 RUN apt-get update
-RUN apt-get -y install libavformat-dev libavcodec-dev libavutil-dev g++
+RUN apt-get -y install libavformat-dev libavcodec-dev libavutil-dev g++ make
 
 # in case we alredy have the src (travis)
 ADD . /untrunc-src
@@ -18,7 +18,8 @@ RUN [ -f /untrunc-src/mp4.cpp ] || ln -s untrunc-master /untrunc-src
 WORKDIR /untrunc-src
 
 # build untrunc
-RUN /usr/bin/g++ -o untrunc *.cpp -lavformat -lavcodec -lavutil
+#RUN /usr/bin/g++ -o untrunc *.cpp -lavformat -lavcodec -lavutil
+RUN /usr/bin/make
 
 # package / push the build artifact somewhere (dockerhub, .deb, .rpm, tell me what you want)
 # ... 

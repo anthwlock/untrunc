@@ -11,17 +11,21 @@ You need:
 
 ## Building
 
-If you have an old Ubuntu version or other operational system, you might need to manually install a recent Libav version, go to the bottom of the page for instructions.
+In certain cases, using a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
-Install some pre-requisite libraries with this command:
+#### with system libraries
 
-    sudo apt-get install libavformat-dev libavcodec-dev libavutil-dev
+	sudo apt-get install libavformat-dev libavcodec-dev libavutil-dev
+	# get the source code
+	make
+	sudo cp untrunc /usr/local/bin
 
-Get the source code.
+#### with local libraries
 
-Compile the source code using this command (all one line):
+Just use following command, make will do the rest for you.
 
-    g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil -std=c++11
+	make FF_VER=3.3.9
+	sudo cp untrunc /usr/local/bin
 
 
 ## Using
@@ -30,7 +34,7 @@ You need both the broken video and an example working video (ideally from the sa
 
 Run this command in the folder where you have unzipped and compiled Untrunc but replace the `/path/to/...` bits with your 2 video files:
 
-    ./untrunc /path/to/working-video.m4v /path/to/broken-video.m4v
+	./untrunc /path/to/working-video.m4v /path/to/broken-video.m4v
 
 Then it should churn away and hopefully produce a playable file called `broken-video_fixed.m4v`.
 
@@ -38,12 +42,13 @@ That's it you're done!
 
 (Thanks to Tom Sparrow for providing the guide)
 
-## Reporting issues
-
-Use the `-v` parameter for a more detailed output. Both the healthy and corrupt file might be needed to help you.
 
 ### Help/Support
 
+##### Reporting issues
+Use the `-v` parameter for a more detailed output. Both the healthy and corrupt file might be needed to help you.
+
+##### Donation
 If you managed to recover the video, help me to find time to keep working on this software and make other people happy.
 If you didn't, I need more corrupted samples to improve the program and I might solve the issue, who knows... so write me.
 

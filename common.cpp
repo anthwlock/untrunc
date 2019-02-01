@@ -8,6 +8,18 @@
 extern "C" {
 #include "libavcodec/avcodec.h"
 }
+#include "libavutil/ffversion.h"
+
+#ifndef UNTR_VERSION
+#define UNTR_VERSION "?"
+#endif
+
+// http://git.ffmpeg.org/gitweb/ffmpeg.git/commit/061a0c14bb57
+#if (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 107, 100))
+const bool is_new_ffmpeg_api = false;
+#else
+const bool is_new_ffmpeg_api = true;
+#endif
 
 using namespace std;
 
@@ -16,6 +28,8 @@ size_t g_max_partsize = 1600000;
 bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;
+
+std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 
 uint16_t swap16(uint16_t us) {
 	return (us >> 8) | (us << 8);
@@ -27,13 +41,13 @@ uint32_t swap32(uint32_t ui) {
 
 uint64_t swap64(uint64_t ull) {
 	return (ull >> 56) |
-			((ull<<40) & 0x00FF000000000000) |
-			((ull<<24) & 0x0000FF0000000000) |
-			((ull<<8)  & 0x000000FF00000000) |
-			((ull>>8)  & 0x00000000FF000000) |
-			((ull>>24) & 0x0000000000FF0000) |
-			((ull>>40) & 0x000000000000FF00) |
-			(ull << 56);
+	        ((ull<<40) & 0x00FF000000000000) |
+	        ((ull<<24) & 0x0000FF0000000000) |
+	        ((ull<<8)  & 0x000000FF00000000) |
+	        ((ull>>8)  & 0x00000000FF000000) |
+	        ((ull>>24) & 0x0000000000FF0000) |
+	        ((ull>>40) & 0x000000000000FF00) |
+	        (ull << 56);
 }
 
 int readGolomb(const uchar *&buffer, int &offset) {

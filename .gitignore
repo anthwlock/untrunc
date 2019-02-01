@@ -1,2 +1,8 @@
 *.o
+.build
 untrunc
+untrunc-*
+ffmpeg-*
+libav-*
+build
+*.pro.user

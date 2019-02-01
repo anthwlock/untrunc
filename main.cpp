@@ -18,17 +18,21 @@
 
 							*/
 
+#include <iostream>
+#include <string>
+
+#include "libavutil/ffversion.h"
+
 #include "mp4.h"
 #include "atom.h"
 #include "common.h"
 
-#include <iostream>
-#include <string>
 using namespace std;
 
 void usage() {
 	cerr << "Usage: untrunc [options] <ok.mp4> [corrupt.mp4]\n"
 	     << "\noptions:\n"
+	     << "-V  - version\n"
 	     << "-s  - skip/ignore unknown sequences\n"
 	     << "-a  - analyze\n"
 	     << "-i  - info\n"
@@ -36,6 +40,12 @@ void usage() {
 		 << "-vv - more verbose\n"
 	     << "-q  - only errors\n"
 	     << "-n  - no interactive\n"; // in Mp4::analyze()
+	exit(-1);
+}
+
+void printVersion() {
+	cout << g_version_str << '\n';
+	exit(0);
 }
 
 int main(int argc, char *argv[]) {
@@ -44,32 +54,38 @@ int main(int argc, char *argv[]) {
 	bool analyze = false;
 	int i = 1;
 	for (; i < argc; i++) {
-		string arg(argv[i]);
+		string arg = argv[i];
+		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
 			if(arg[1] == 'i') info = true;
 			else if(arg[1] == 's') g_ignore_unknown = true;
 			else if(arg[1] == 'a') analyze = true;
+			else if(arg[1] == 'V') printVersion();
 			else if(arg[1] == 'v' && arg[2] == 'v') g_log_mode = LogMode::VV;
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;
 			else if(arg[1] == 'q') g_log_mode = LogMode::E;
 			else if(arg[1] == 'n') g_interactive = false;
-			else {usage(); return -1;}
-		} else if (argc > i + 2) {
-			usage();
-			return -1;
-		} else
-			break;
+			else usage();
+		}
+		else if (argc > i+2) usage();  // too many arguments
+		else break;
 	}
-	if(argc == i) {
-		usage();
-		return -1;
-	}
+	if(argc == i) usage();  // no filename given
 
 	string ok = argv[i];
 	string corrupt;
 	i++;
 	if(i < argc)
 		corrupt = argv[i];
+
+	if (g_ignore_unknown && is_new_ffmpeg_api) {
+		cout << "WARNING: Because of internal decoder changes, using ffmpeg '" FFMPEG_VERSION "' with '-s' can be slow!\n"
+		     << "         You are advised to compile untrunc against ffmpeg 3.3!\n"
+		     << "         See the README.md on how to do that. Press [ENTER] to continue ... ";
+		if (g_interactive) getchar();
+	}
+	logg(I, g_version_str, '\n');
+
 
 	logg(I, "reading ", ok, '\n');
 	Mp4 mp4;
