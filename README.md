@@ -11,7 +11,7 @@ You need:
 
 ## Building
 
-In certain cases, using a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
+In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
 #### with system libraries
 
@@ -22,8 +22,9 @@ In certain cases, using a specific version of ffmpeg is needed. Untrunc works gr
 
 #### with local libraries
 
-Just use following command, make will do the rest for you.
+Just use following commands, make will do the rest for you.
 
+	sudo apt-get install libva-dev liblzma-dev libx11-dev libbz2-dev zlib1g-dev yasm pkg-config wget
 	make FF_VER=3.3.9
 	sudo cp untrunc /usr/local/bin
 

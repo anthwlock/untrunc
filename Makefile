@@ -27,14 +27,14 @@ else
 	LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
 	LDFLAGS += -Lffmpeg-$(FF_VER)/libavcodec -lavcodec
 	LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
-	LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
+	#LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
 	#LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
 	LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
 endif
 
 CXXFLAGS += -std=c++11 -g
 
-VER = $(shell git describe --always --dirty --abbrev=7)
+VER = $(shell test -d .git && which git >/dev/null 2>&1 && git describe --always --dirty --abbrev=7)
 CPPFLAGS += -MMD -MP
 CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
