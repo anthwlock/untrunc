@@ -7,8 +7,8 @@ extern "C" {
 #include <string>
 
 #include "common.h"
-
 #include "file.h"
+
 class Atom {
 public:
 	int64_t start_;       //including 8 header bytes

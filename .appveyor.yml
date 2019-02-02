@@ -1,0 +1,81 @@
+version: '{build}'
+
+environment:
+  APPVEYOR: 1
+  _FF_VER: 3.3.4
+
+  matrix:
+    - JOB: "64"
+      _UNTR_DEST: untrunc_x64
+      _MINGW: C:\mingw-w64\x86_64-7.3.0-posix-seh-rt_v5-rev0\mingw64
+      _MINGW_TOOLCHAIN: x86_64-w64-mingw32
+      _ARCH: win64
+
+    - JOB: "32"
+      _UNTR_DEST: untrunc_x32
+      _MINGW: C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32
+      _MINGW_TOOLCHAIN: i686-w64-mingw32
+      _ARCH: win32
+
+build: Script
+
+install:
+  - cinst dependencywalker
+  #- cinst yasm
+  #- cinst pkgconfiglite
+
+init:
+  - git config --global core.autocrlf input
+
+  - set _BIN=%_MINGW%\bin
+  - set _INCLUDE=%_MINGW%\%_MINGW_TOOLCHAIN%\include
+  - set _LIB=%_MINGW%\%_MINGW_TOOLCHAIN%\lib
+  - set _BASH_PATH=C:\Program Files\Git\usr\bin
+
+  - set PATH=C:\MinGW\msys\1.0\bin;%PATH%
+  - set PATH=%_MINGW%\bin;%PATH%
+
+build_script:
+  #- curl -L https://www.ffmpeg.org/releases/ffmpeg-%FFMPEG_VER%.tar.xz -o ffmpeg-%FFMPEG_VER%.tar.xz
+  #- tar xf ffmpeg-%FFMPEG_VER%.tar.xz
+
+  - curl -s -L https://ffmpeg.zeranoe.com/builds/%_ARCH%/dev/ffmpeg-%_FF_VER%-%_ARCH%-dev.zip -o ffmpeg-dev.zip
+  - unzip -q ffmpeg-dev.zip
+  - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-dev\include %_INCLUDE%
+  - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-dev\lib %_LIB%
+
+  - curl -s -L https://ffmpeg.zeranoe.com/builds/%_ARCH%/shared/ffmpeg-%_FF_VER%-%_ARCH%-shared.zip -o ffmpeg-shared.zip
+  - unzip -q ffmpeg-shared.zip
+  - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-shared\bin %_BIN%
+
+  #- g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil -std=c++11
+  - mingw32-make
+
+  - depends /c /oc:deps.txt /f:1 untrunc.exe
+
+  - set PATH=%_BASH_PATH%;%PATH%
+  - mkdir %_UNTR_DEST%
+
+  - bash -c 'while read -r line; do path=$(cut -d\" -f2 <<<$line); cp -v $path %_UNTR_DEST%; done <<<$(grep "mingw.*mingw.*bin" deps.txt); exit 0'
+  - mv untrunc %_UNTR_DEST%
+  - zip -r %_UNTR_DEST%.zip %_UNTR_DEST%
+
+artifacts:
+  - path: $(_UNTR_DEST).zip
+
+deploy:
+  - provider: GitHub
+    tag: master
+    release: Master
+    draft: false
+    prerelease: true
+    force_update: true
+    artifact: $(_UNTR_DEST).zip
+    description: |
+      Automatically build by AppVeyor.
+      **Head:** $(APPVEYOR_REPO_COMMIT)
+      **Date:** $(APPVEYOR_REPO_COMMIT_TIMESTAMP)
+    auth_token:
+      secure: CC35GTlF/os9e190Xvk5q/119AkTlnVULwU9YIiwIrUBfwRZ8jzE1aDB0ojiU2O6
+    on:
+      branch: master

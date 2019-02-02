@@ -66,14 +66,14 @@ bool FileWrite::create(string filename) {
 	return true;
 }
 
-void FileRead::seek(off_t p) {
+void FileRead::seek(off64_t p) {
 	if (p < buf_begin_ || p >= buf_begin_ + buf_size_){
 		fillBuffer(p);
 	} else
 		buf_off_ = p - buf_begin_;
 }
 
-off_t FileRead::pos() {
+off64_t FileRead::pos() {
 	return buf_begin_ + buf_off_;
 }
 
@@ -81,9 +81,9 @@ bool FileRead::atEnd() {
 	return pos() == size_;
 }
 
-size_t FileRead::fillBuffer(off_t location) {
-	off_t avail = (buf_begin_+buf_size_) - location;
-	off_t buf_loc = location - buf_begin_;
+size_t FileRead::fillBuffer(off64_t location) {
+	off64_t avail = (buf_begin_+buf_size_) - location;
+	off64_t buf_loc = location - buf_begin_;
 
 	buf_begin_ = location;
 	buf_off_ = 0;
@@ -175,7 +175,7 @@ const uchar* FileRead::getPtr(int size_requested) {
 	return buffer_+buf_off_;
 }
 
-off_t FileWrite::pos() {
+off64_t FileWrite::pos() {
 	return ftell(file_);
 }
 

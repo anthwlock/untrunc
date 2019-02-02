@@ -23,6 +23,7 @@
 
 extern "C" {
 #include <stdint.h>
+#include <stdlib.h>
 }
 #include <stdio.h>
 #include <vector>
@@ -37,10 +38,10 @@ public:
 	bool open(std::string filename);
 	bool create(std::string filename);
 
-	void seek(off_t p);
-	off_t pos();
+	void seek(off64_t p);
+	off64_t pos();
 	bool atEnd();
-	off_t length() { return size_; }
+	off64_t length() { return size_; }
 
 	size_t readBuffer(uchar* target, size_t size, size_t n);
 
@@ -52,13 +53,13 @@ public:
 	const uchar* getPtr(int size_requested);
 
 protected:
-	size_t fillBuffer(off_t location);
+	size_t fillBuffer(off64_t location);
 	uchar* buffer_;
-	off_t size_;
+	off64_t size_;
 	FILE *file_;
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
-	off_t buf_begin_;
-	off_t buf_off_;
+	off64_t buf_begin_;
+	off64_t buf_off_;
 };
 
 class FileWrite {
@@ -67,7 +68,7 @@ public:
 	~FileWrite();
 	bool create(std::string filename);
 
-	off_t pos();
+	off64_t pos();
 
 	int writeInt(int n);
 	int writeInt64(int64_t n);

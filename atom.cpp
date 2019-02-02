@@ -323,13 +323,13 @@ uint BufferedAtom::readInt(int64_t offset) {
 
 void BufferedAtom::write(FileWrite &output) {
 	//1 write length
-	off_t start = output.pos();
+	off64_t start = output.pos();
 
 	output.writeInt(length_);
 	output.writeChar(name_, 4);
-	int buf_size = (1<<20)*7;
+	const int buf_size = (1<<20)*7;
 	char buff[buf_size];
-	off_t offset = file_begin_;
+	off64_t offset = file_begin_;
 	file_read_.seek(file_begin_);
 	int loop_cnt = 0;
 	while(offset < file_end_) {
@@ -346,6 +346,6 @@ void BufferedAtom::write(FileWrite &output) {
 	}
 	for(unsigned int i = 0; i < children_.size(); i++)
 		children_[i]->write(output);
-	off_t end = output.pos();
+	off64_t end = output.pos();
 	assert(end - start == length_);
 }

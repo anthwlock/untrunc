@@ -274,7 +274,7 @@ void Mp4::analyze(const string& filename) {
 		size_t len_offs = is64? track.offsets64_.size() : track.offsets_.size();
 		uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 		for(unsigned int i = 0; i < len_offs; i++) {
-			off_t offset;
+			off64_t offset;
 			if (is64) offset = track.offsets64_[i] - (mdat->start_ + 8);
 			else offset = track.offsets_[i] - (mdat->start_ + 8);
 
@@ -398,7 +398,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	vector<int> audiotimes;
 	vector<int64_t> audiotimes64;
 	unsigned long cnt_packets = 0;
-	off_t offset = 0;
+	off64_t offset = 0;
 
 	logg(V, "mdat->contentSize = ", mdat->contentSize(), '\n');
 	int loop_cnt = 0;
