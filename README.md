@@ -11,6 +11,7 @@ You need:
 
 ## Building
 
+Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/master).\
 In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
 #### with system libraries
