@@ -20,16 +20,16 @@ else ifeq ($(TARGET), $(_EXE)-41)
 endif
 
 ifeq ($(FF_VER), shared)
-	LDFLAGS += -lavformat -lavcodec -lavutil
-	CXXFLAGS += -O3
+  LDFLAGS += -lavformat -lavcodec -lavutil
+  CXXFLAGS += -O3
 else
-	CXXFLAGS += -I./ffmpeg-$(FF_VER)
-	LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
-	LDFLAGS += -Lffmpeg-$(FF_VER)/libavcodec -lavcodec
-	LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
-	#LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
-	#LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
-	LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
+  CXXFLAGS += -I./ffmpeg-$(FF_VER)
+  LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
+  LDFLAGS += -Lffmpeg-$(FF_VER)/libavcodec -lavcodec
+  LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
+  #LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
+  #LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
+  LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
 endif
 
 CXXFLAGS += -std=c++11 -g
@@ -47,6 +47,9 @@ FFDIR := ffmpeg-$(FF_VER)
 
 NPROC = $(shell nproc)
 NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
+ifeq ($(NJOBS), 0)
+  NJOBS = 1
+endif
 
 .PHONY: all clean force
 
@@ -59,14 +62,15 @@ $(FFDIR)/configure:
 	wget -q --show-progress -O /tmp/$(FFDIR).tar.xz https://www.ffmpeg.org/releases/$(FFDIR).tar.xz
 	tar xf /tmp/$(FFDIR).tar.xz
 
-$(FFDIR)/Makefile: | $(FFDIR)/configure
+$(FFDIR)/config.asm: | $(FFDIR)/configure
 	@echo "(info) please wait ..."
 	cd $(FFDIR); ./configure --disable-doc --disable-programs \
 	--disable-everything --enable-decoders --enable-demuxers --enable-protocol=file \
 	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc
 
-$(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/Makefile
-	make -C $(FFDIR) -j$(NJOBS)
+$(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
+	cat $(FFDIR)/Makefile
+	$(MAKE) -C $(FFDIR) -j$(NJOBS)
 
 $(FFDIR):
 
@@ -98,3 +102,4 @@ $(DIR)/%.o: %.cpp | $(DIR)
 clean:
 	$(RM) -r $(_DIR)*
 	$(RM) $(_EXE)*
+

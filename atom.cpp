@@ -327,7 +327,7 @@ void BufferedAtom::write(FileWrite &output) {
 
 	output.writeInt(length_);
 	output.writeChar(name_, 4);
-	int buf_size = (1<<20)*7;
+	const int buf_size = (1<<20)*7;
 	char buff[buf_size];
 	off64_t offset = file_begin_;
 	file_read_.seek(file_begin_);
