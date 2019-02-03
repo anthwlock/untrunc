@@ -72,7 +72,8 @@ deploy:
     force_update: true
     artifact: $(_UNTR_DEST).zip
     description: |
-      Automatically build by AppVeyor.
+      Automatic windows build by AppVeyor.
+
       **Head:** $(APPVEYOR_REPO_COMMIT)
       **Date:** $(APPVEYOR_REPO_COMMIT_TIMESTAMP)
     auth_token:
