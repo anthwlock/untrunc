@@ -188,7 +188,7 @@ bool Codec::matchSample(const uchar *start) const{
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt)
+inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt, uint maxlength)
 {
 	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
 
@@ -196,7 +196,7 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 	// this is slow because of the internal memory allocation
 	if (is_new_ffmpeg_api && consumed < 0) {
 		avcodec_flush_buffers(avctx);
-		pkt->size = g_max_partsize;
+		pkt->size = maxlength;
 		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
 		if (consumed < 0) {
 			avcodec_flush_buffers(avctx);
@@ -213,7 +213,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 		if(!is_new_ffmpeg_api) packet_->size = maxlength;
 		int got_frame = 0;
 
-		int consumed = untr_decode_audio4(context_, frame_, &got_frame, packet_);
+		int consumed = untr_decode_audio4(context_, frame_, &got_frame, packet_, maxlength);
 //		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet_);
 
 		// simulate state for new API

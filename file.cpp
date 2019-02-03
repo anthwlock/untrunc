@@ -47,7 +47,7 @@ FileWrite::~FileWrite() {
 }
 
 bool FileRead::open(string filename) {
-	file_ = fopen(filename.c_str(), "r");
+	file_ = fopen(filename.c_str(), "rb");
 	if(file_ == NULL) return false;
 
 	fseeko(file_, 0L, SEEK_END);
@@ -92,7 +92,7 @@ size_t FileRead::fillBuffer(off64_t location) {
 		int n = fread(buffer_, 1, buf_size_, file_);
 		return n;
 	}else if (avail > 0) {
-		memcpy(buffer_, buffer_+buf_loc, buf_size_-buf_loc);
+		memmove(buffer_, buffer_+buf_loc, buf_size_-buf_loc);
 	}
 	int n = fread(buffer_+avail, 1, buf_size_-avail, file_);
 	return n;

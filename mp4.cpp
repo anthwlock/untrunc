@@ -412,7 +412,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		uint maxlength = min((int64_t) g_max_partsize, mdat->contentSize() - offset); // maximal 1.6MB
 		const uchar *start = mdat->getFragment(offset, maxlength);
 
-		uint begin = mdat->readInt(offset);
+		uint begin = *(uint*)start;
 
 		if(begin == 0) {
 			offset += 4;
@@ -426,8 +426,8 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			continue;
 		} */
 		if (g_log_mode >= LogMode::V) {
-			uint begin =  swap32(mdat->readInt(offset));
-			uint next =  swap32(mdat->readInt(offset + 4));
+			uint begin = swap32(*(uint*)start);
+			uint next = swap32(*(uint*)start+4);
 //			printBuffer(start, 8);
 //			logg(V, "Offset: ", offset, ": ", hex, begin, " ", next, dec, '\n');
 			logg(V, "Offset: ", offset, ": ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
