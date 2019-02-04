@@ -31,12 +31,13 @@ void Atom::parseHeader(FileRead &file) {
 	logg(VV, "length_ = ", length_, '\n');
 	logg(VV, "name_ = ", name_, '\n');
 	logg(VV, '\n');
-	if (!isprint(name_[0]))
-		throw string("invalid name_: ")+name_;
 }
 
 void Atom::parse(FileRead &file) {
 	parseHeader(file);
+
+	for (auto c: name_)
+		if (!isascii(c)) throw string("invalid name_: ")+name_;
 
 	if(isParent(name_) && name_ != string("udta")) { //user data atom is dangerous... i should actually skip all
 		while(file.pos() < start_ + length_) {
@@ -48,7 +49,7 @@ void Atom::parse(FileRead &file) {
 
 	}
 	else if (name_ == string("mdat")) {
-		int content_size = length_ - 8;
+		int64_t content_size = length_ - 8;
 		file.seek(file.pos() + content_size);
 	}
 	else {
