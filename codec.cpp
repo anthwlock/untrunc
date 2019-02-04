@@ -79,7 +79,8 @@ bool Codec::matchSampleStrict(const uchar *start) const {
 	int s = swap32(*(int *)start);  // big endian
 
 	if (name_ == "avc1") {
-		return s == 0x00000002;
+		int s2 = swap32(((int *)start)[1]);
+		return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 	}
 	else if (name_ == "mp4a") {
 		return (s>>16) == 0x210A;  // this needs to be improved
