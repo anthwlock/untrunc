@@ -157,7 +157,8 @@ void hitEnterToContinue() {
 	if (g_interactive) {
 		cout << " Hit enter to continue." << endl;
 		getchar();
-	} else cout << '\n';
+	}
+//	else cout << '\n';
 }
 
 void outProgress(double now, double all) {

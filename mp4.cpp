@@ -427,10 +427,11 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		} */
 		if (g_log_mode >= LogMode::V) {
 			uint begin = swap32(*(uint*)start);
-			uint next = swap32(*(uint*)start+4);
+			uint next = swap32(*(uint*)(start+4));
+			off64_t real_off = offset + mdat->file_begin_;
 //			printBuffer(start, 8);
 //			logg(V, "Offset: ", offset, ": ", hex, begin, " ", next, dec, '\n');
-			logg(V, "Offset: ", offset, ": ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
+			logg(V, "Offset: ", real_off, ": ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
 //			cout << setfill('0') << setw(8) << hex << begin << " "
 //			            << setw(8) << next << dec << '\n';
 		}
@@ -444,14 +445,15 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		}
 
 		bool found = false;
-//		uint max_length = 1;
-		uint max_length = 4;  // 4 seems to work better
+		uint max_length = 1;
 		for(unsigned int i = 0; i < tracks_.size(); i++) {
 			Track &track = tracks_[i];
 			logg(V, "Track codec: ", track.codec_.name_, '\n');
 			//sometime audio packets are difficult to match, but if they are the only ones....
-			if (tracks_.size() > 1 && !track.codec_.matchSample(start))
-				continue;
+			if (tracks_.size() > 1) {
+				if (unknown_length_ && !track.codec_.matchSampleStrict(start)) continue;
+				else if (!unknown_length_ && !track.codec_.matchSample(start)) continue;
+			}
 
 			int duration = 0;
 			bool is_bad = 0;
@@ -480,7 +482,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 
 			if(unknown_length_){
 				logg(V, "found healthy packet again (", track.codec_.name_, "), length: ", length,
-				    "duration: ", duration, '\n');
+				    " duration: ", duration, '\n');
 			}
 
 //			if(length <= 8) {
