@@ -327,8 +327,6 @@ void BufferedAtom::write(FileWrite &output) {
 
 	output.writeInt(length_);
 	output.writeChar(name_, 4);
-	const int buf_size = (1<<10)*4;
-	char buff[buf_size];
 	off64_t offset = file_begin_;
 	file_read_.seek(file_begin_);
 	int loop_cnt = 0;
@@ -337,12 +335,12 @@ void BufferedAtom::write(FileWrite &output) {
 			outProgress(offset, file_end_);
 			loop_cnt = 0;
 		}
-		int toread = buf_size;
+		int toread = file_read_.buf_size_;
 		if(toread + offset > file_end_)
 			toread = file_end_ - offset;
-		file_read_.readChar(buff, toread);
+		auto buff = file_read_.getPtr(toread);
 		offset += toread;
-		output.writeChar(buff,toread);
+		output.writeChar(buff, toread);
 	}
 	for(unsigned int i = 0; i < children_.size(); i++)
 		children_[i]->write(output);

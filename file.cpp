@@ -191,7 +191,12 @@ int FileWrite::writeInt64(int64_t n) {
 	return 8;
 }
 
-int FileWrite::writeChar(char *source, size_t n) {
+int FileWrite::writeChar(const char *source, size_t n) {
+	fwrite(source, 1, n, file_);
+	return n;
+}
+
+int FileWrite::writeChar(const uchar *source, size_t n) {
 	fwrite(source, 1, n, file_);
 	return n;
 }

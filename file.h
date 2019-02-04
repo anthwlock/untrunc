@@ -51,13 +51,13 @@ public:
 	std::vector<uchar> read(size_t n);
 
 	const uchar* getPtr(int size_requested);
+	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
 protected:
 	size_t fillBuffer(off64_t location);
 	uchar* buffer_;
 	off64_t size_;
 	FILE *file_;
-	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 	off64_t buf_begin_;
 	off64_t buf_off_;
 };
@@ -72,7 +72,8 @@ public:
 
 	int writeInt(int n);
 	int writeInt64(int64_t n);
-	int writeChar(char *source, size_t n);
+	int writeChar(const uchar *source, size_t n);
+	int writeChar(const char *source, size_t n);
 	int write(std::vector<uchar> &v);
 
 protected:
