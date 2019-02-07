@@ -51,6 +51,7 @@ public:
 	std::vector<uchar> read(size_t n);
 
 	const uchar* getPtr(int size_requested);
+	const uchar* getPtr2(int size_requested);  // changes state (buf_off_)
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
 protected:

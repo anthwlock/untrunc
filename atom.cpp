@@ -339,7 +339,7 @@ void BufferedAtom::write(FileWrite &output) {
 		int toread = file_read_.buf_size_;
 		if(toread + offset > file_end_)
 			toread = file_end_ - offset;
-		auto buff = file_read_.getPtr(toread);
+		auto buff = file_read_.getPtr2(toread);
 		offset += toread;
 		output.writeChar(buff, toread);
 	}

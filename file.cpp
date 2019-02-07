@@ -175,6 +175,12 @@ const uchar* FileRead::getPtr(int size_requested) {
 	return buffer_+buf_off_;
 }
 
+const uchar* FileRead::getPtr2(int size_requested) {
+	auto ret = getPtr(size_requested);
+	buf_off_ += size_requested;
+	return ret;
+}
+
 off64_t FileWrite::pos() {
 	return ftell(file_);
 }
