@@ -18,7 +18,6 @@ SpsInfo::SpsInfo(const uchar* pos) {
 }
 
 bool SpsInfo::decode(const uchar* pos) {
-//	const uchar* pos = nal_info.payload_;
 //	cout << "nal_info.type = " << nal_info.nal_type << '\n';
 //	cout << "I am here:\n";
 //	printBuffer(pos, 20);

@@ -17,7 +17,7 @@ public:
 
 	bool is_ok;  // did parsing work
 	bool is_forbidden_set_;
-	std::vector<uchar> payload_;
+	const uchar* data_;
 	bool parseNal(const uchar* start, uint32_t max_size);
 };
 

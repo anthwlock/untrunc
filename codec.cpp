@@ -333,7 +333,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 					return length;
 				}
 				if (!sps_info.is_ok)
-					sps_info.decode(nal_info.payload_.data());
+					sps_info.decode(nal_info.data_);
 				break;
 			case NAL_AUD: // Access unit delimiter
 				if (!previous_slice.is_ok)

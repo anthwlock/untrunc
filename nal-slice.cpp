@@ -64,7 +64,7 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 }
 
 bool SliceInfo::decode(const NalInfo& nal_info, const SpsInfo& sps) {
-	const uchar* start = nal_info.payload_.data();
+	const uchar* start = nal_info.data_;
 	int offset = 0;
 	first_mb = readGolomb(start, offset);
 	//TODO is there a max number (so we could validate?)

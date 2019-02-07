@@ -13,7 +13,7 @@
 
 using namespace std;
 
-NalInfo::NalInfo(const uchar* start, int max_size) : payload_(){
+NalInfo::NalInfo(const uchar* start, int max_size) {
 	is_ok = parseNal(start, max_size);
 }
 
@@ -74,7 +74,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	// remove the emulation prevention 3 byte.
 	// could be done in place to speed up things.
 	// EDIT: only needed for 'annex b' bytestream standard, which
-	//       is currently not support supported anyways. See nal-decoder.
+	//       is currently not supported anyways. See nal-decoder.
 	// FIXIT: citation needed
 
 //	data_.reserve(len);
@@ -87,7 +87,6 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 //		} else
 //			data_.push_back(buffer[i]);
 //	}
-	payload_.reserve(len);
-	memcpy(payload_.data(), buffer, len);
+	data_ = buffer;
 	return true;
 }
