@@ -350,8 +350,8 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		Atom *atom = new Atom;
 		try {
 			atom->parseHeader(file_read);
-		} catch(string) {
-			throw string("Failed to parse atoms in truncated file");
+		} catch(string s) {
+			throw string("Failed to parse atoms in truncated file: "+s);
 		}
 
 		if(atom->name_ != string("mdat")) {
