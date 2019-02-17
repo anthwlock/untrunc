@@ -1,13 +1,8 @@
 #include "nal.h"
 
-//AVC1
-
-#include <cstdint>
 #include <iostream>
-#include <vector>
-
 #include <cassert>
-#include <string.h> // memcpy
+#include <cstdint>
 
 #include "common.h"
 

@@ -1,9 +1,6 @@
 #ifndef NAL_H
 #define NAL_H
 
-#include <cstdint>
-#include <vector>
-
 #include "common.h"
 
 class NalInfo {
