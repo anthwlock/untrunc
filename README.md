@@ -8,20 +8,31 @@ You need:
 * Another video file which isn't broken
 * Basic ability to use a command line
 
+## About this fork
+This fork is an improvement to the [original](https://github.com/ponchio/untrunc) in the following points:
+* more than 10 times faster!
+* low memory usage, fixes [#30](https://github.com/ponchio/untrunc/issues/30#issuecomment-143744821)
+* easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/master)
+* \>2GB file support
+* ability to skip over unknown bytes
+* advanced logging system
+* compatible with new versions of ffmpeg
+* most issues/bugs are fixed
+* actively maintained
 
 ## Building
 
 Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/master).\
 In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
-#### with system libraries
+#### With system libraries
 
 	sudo apt-get install libavformat-dev libavcodec-dev libavutil-dev
 	# get the source code
 	make
 	sudo cp untrunc /usr/local/bin
 
-#### with local libraries
+#### With local libraries
 
 Just use following commands, make will do the rest for you.
 
