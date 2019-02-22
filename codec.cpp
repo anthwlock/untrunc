@@ -83,7 +83,8 @@ bool Codec::matchSampleStrict(const uchar *start) const {
 		return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 	}
 	else if (name_ == "mp4a") {
-		return (s>>16) == 0x210A;  // this needs to be improved
+		return false;
+//		return (s>>16) == 0x210A;  // this needs to be improved
 	}
 	else {
 		return matchSample(start);
