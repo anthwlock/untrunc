@@ -36,7 +36,8 @@ void usage() {
 	     << "-s  - skip/ignore unknown sequences\n"
 	     << "-a  - analyze\n"
 	     << "-i  - info\n"
-		 << "-v  - verbose\n"
+	     << "-f  - find all atoms and check their lenghts\n"
+	     << "-v  - verbose\n"
 		 << "-vv - more verbose\n"
 	     << "-q  - only errors\n"
 	     << "-n  - no interactive\n"; // in Mp4::analyze()
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
 
 	bool info = false;
 	bool analyze = false;
+	bool find_atoms = false;
 	int i = 1;
 	for (; i < argc; i++) {
 		string arg = argv[i];
@@ -65,6 +67,7 @@ int main(int argc, char *argv[]) {
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;
 			else if(arg[1] == 'q') g_log_mode = LogMode::E;
 			else if(arg[1] == 'n') g_interactive = false;
+			else if(arg[1] == 'f') find_atoms = true;
 			else usage();
 		}
 		else if (argc > i+2) usage();  // too many arguments
@@ -77,6 +80,8 @@ int main(int argc, char *argv[]) {
 	i++;
 	if(i < argc)
 		corrupt = argv[i];
+
+	if (find_atoms) { Atom::findAtomNames(ok); return 0;}
 
 	if (g_ignore_unknown && is_new_ffmpeg_api) {
 		cout << "WARNING: Because of internal decoder changes, using ffmpeg '" FFMPEG_VERSION "' with '-s' can be slow!\n"

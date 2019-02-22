@@ -73,6 +73,10 @@ void FileRead::seek(off64_t p) {
 		buf_off_ = p - buf_begin_;
 }
 
+void FileRead::seekSafe(off64_t p) {
+	seek(min(p, size_));
+}
+
 off64_t FileRead::pos() {
 	return buf_begin_ + buf_off_;
 }
@@ -130,7 +134,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 uint FileRead::readInt() {
 	int value;
 	int n = readBuffer((uchar*)&value, sizeof(int), 1);
-//    cout << "n = " << n << '\n';
+//	cout << "n = " << n << '\n';
 	if(n != 1)
 		throw string("Could not read atom length");
 	return swap32(value);
@@ -176,6 +180,13 @@ const uchar* FileRead::getPtr(int size_requested) {
 }
 
 const uchar* FileRead::getPtr2(int size_requested) {
+	auto ret = getPtr(size_requested);
+	buf_off_ += size_requested;
+	return ret;
+}
+
+const uchar* FileRead::getPtrAt(off64_t pos, int size_requested) {
+	seek(pos);
 	auto ret = getPtr(size_requested);
 	buf_off_ += size_requested;
 	return ret;

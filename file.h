@@ -39,6 +39,7 @@ public:
 	bool create(std::string filename);
 
 	void seek(off64_t p);
+	void seekSafe(off64_t p);
 	off64_t pos();
 	bool atEnd();
 	off64_t length() { return size_; }
@@ -52,6 +53,7 @@ public:
 
 	const uchar* getPtr(int size_requested);
 	const uchar* getPtr2(int size_requested);  // changes state (buf_off_)
+	const uchar* getPtrAt(off64_t pos, int size_requested);
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
 protected:

@@ -14,8 +14,8 @@ public:
 	int64_t start_;       //including 8 header bytes
 	int64_t length_;      //including 8 header bytes
 	char name_[5];
-	char head_[4];
-	char version_[4];
+	char head_[4];  // this is not used ?
+	char version_[4];  // neither ?
 	std::vector<uchar> content_;
 	std::vector<Atom *> children_;
 
@@ -50,6 +50,8 @@ public:
 	void readChar(char *str, int64_t offset, int64_t length);
 
 	void writeInt64(int64_t value, uint64_t offset);
+	static void findAtomNames(std::string& filename);
+	static off64_t findNextAtomOff(FileRead& file, Atom* start_atom, bool skip_nested=true);
 };
 
 class BufferedAtom: public Atom {

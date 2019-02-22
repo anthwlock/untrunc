@@ -41,7 +41,6 @@ Mp4::~Mp4() {
 	delete root_atom_;
 }
 
-
 void Mp4::parseOk(string& filename) {
 	FileRead file;
 	bool success = file.open(filename);
@@ -212,7 +211,7 @@ void Mp4::saveVideo(const string& filename) {
 
 	if (unknown_lengths_.size()) {
 		cout << setprecision(4);
-		int bytes_not_matched = 0;
+		int64_t bytes_not_matched = 0;
 		for (auto n : unknown_lengths_) bytes_not_matched += n;
 		double percentage = bytes_not_matched / mdat->contentSize();
 		logg(W, "Unknown sequences: ", unknown_lengths_.size(), '\n');
@@ -355,8 +354,12 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		}
 
 		if(atom->name_ != string("mdat")) {
-			int pos = file_read.pos();
-			file_read.seek(pos - 8 + atom->length_);
+			off64_t new_pos = Atom::findNextAtomOff(file_read, atom);
+			if (new_pos >= file_read.length())
+				throw string("mdat not found\n");
+			file_read.seek(new_pos);
+//			int pos = file_read.pos();
+//			file_read.seek(pos - 8 + atom->length_);
 			delete atom;
 			continue;
 		}
