@@ -11,6 +11,9 @@
 
 using namespace std;
 
+Atom::Atom() {
+	memset(name_, 0, 5);
+}
 
 Atom::~Atom() {
 	for(unsigned int i = 0; i < children_.size(); i++)
@@ -35,7 +38,7 @@ void Atom::parseHeader(FileRead &file) {
 
 	if (length_ < 0) throw string("invalid atom length: ")+to_string(length_);
 	if (start_ < 0) throw string("invalid atom start: ")+to_string(start_);  //  this is impossible?
-	for (auto c: name_) if (!isascii(c)) throw string("invalid atom name: ")+name_;
+	for (int i=0; i < 4; i++) if (!isalnum(name_[i])) throw string("invalid atom name: ")+name_;
 }
 
 void Atom::parse(FileRead &file) {
@@ -63,6 +66,7 @@ void Atom::parse(FileRead &file) {
 }
 
 bool isValidAtomName(const uchar* buff) {
+	if (!isdigit(*buff) && !islower(*buff)) return false;
 	for(int i = 0; i < 174; i++)
 		if (strncmp((char*)buff, knownAtoms[i].known_atom_name, 4) == 0) {
 			return true;
@@ -71,17 +75,23 @@ bool isValidAtomName(const uchar* buff) {
 }
 
 off64_t Atom::findNextAtomOff(FileRead& file, Atom* start_atom, bool skip_nested) {
-	off64_t next_off = skip_nested? start_atom->start_ + start_atom->length_ : -1;
+	static bool did_msg = false;
+	off64_t next_off = skip_nested || string("mdat") == start_atom->name_? start_atom->start_ + start_atom->length_ : -1;
 	if (next_off >= file.length()) return file.length();
-	if (next_off > 0 && string("avcC") != start_atom->name_ && isValidAtomName(file.getPtrAt(next_off+4, 4))) {
+	if (next_off > start_atom->start_ && string("avcC") != start_atom->name_ && isValidAtomName(file.getPtrAt(next_off+4, 4)))
 		return next_off;
-	}
 	else {
+		if (skip_nested && !did_msg) {
+			logg(I, "searching start of mdat ... \n");
+			did_msg = true;
+		}
 		for(off64_t off=start_atom->start_+8; off < file.length();) {
 			const uchar* buff = file.getPtrAt(off, 4);
 			if (off % (1<<16) == 0) outProgress(off, file.length());
-			if (isValidAtomName(buff)) return off-4;
-			else off++;
+			if (!isdigit(*buff) && !islower(*buff)) {off += 4; continue;}
+			for (int i=3; i >= 0; --i)
+				if (isValidAtomName(buff-i)) return off-4-i;
+			off += 7;
 		}
 	}
 	return file.length();
@@ -92,7 +102,6 @@ void Atom::findAtomNames(string& filename) {
 	bool success = file.open(filename);
 	if(!success) throw string("Could not open file: ") + filename;
 	Atom atom;
-	atom.start_ = -8;
 
 	bool ignore_avc1 = 0;
 	off64_t off = findNextAtomOff(file, &atom, false);
@@ -106,7 +115,7 @@ void Atom::findAtomNames(string& filename) {
 
 		if (name == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || name != "avc1") {
-			printf("%zd: %.*s (%d)", off, 4, atom.name_, length);
+			printf("%zd: %.*s (%u)", off, 4, atom.name_, length);
 			off64_t next_off = off + length;
 			if (name == "avcC") printf(" <-- skipped\n");
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))

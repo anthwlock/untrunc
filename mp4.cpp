@@ -344,37 +344,22 @@ void Mp4::parseTracks() {
 
 BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	BufferedAtom *mdat = new BufferedAtom(file_read);
-	while(1) {
-
-		Atom *atom = new Atom;
-		try {
-			atom->parseHeader(file_read);
-		} catch(string s) {
-			throw string("Failed to parse atoms in truncated file: "+s);
+	memcpy(mdat->name_, "mdat", 4);
+	Atom atom;
+	while(atom.name_ != string("mdat")) {
+		off64_t new_pos = Atom::findNextAtomOff(file_read, &atom);
+		if (new_pos >= file_read.length() || new_pos < 0) {
+			logg(W, "start of mdat not found\n");
+			atom.start_ = 0;
+			file_read.seek(0);
+			break;
 		}
-
-		if(atom->name_ != string("mdat")) {
-			off64_t new_pos = Atom::findNextAtomOff(file_read, atom);
-			if (new_pos >= file_read.length())
-				throw string("mdat not found\n");
-			file_read.seek(new_pos);
-//			int pos = file_read.pos();
-//			file_read.seek(pos - 8 + atom->length_);
-			delete atom;
-			continue;
-		}
-
-		mdat->start_ = atom->start_;
-		memcpy(mdat->name_, atom->name_, 4);
-		memcpy(mdat->head_, atom->head_, 4);
-		memcpy(mdat->version_, atom->version_, 4);
-
-		//        cout << "file.pos() = " << file_read.pos() << '\n';
-		//        cout << "file.length() = " << file_read.length() << '\n';
-		mdat->file_begin_ = file_read.pos();
-		mdat->file_end_ = file_read.length();
-		break;
+		file_read.seek(new_pos);
+		atom.parseHeader(file_read);
 	}
+	mdat->start_ = atom.start_;
+	mdat->file_begin_ = file_read.pos();
+	mdat->file_end_ = file_read.length();
 	return mdat;
 }
 
@@ -386,8 +371,9 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	//find mdat. fails with krois and a few other.
 	//TODO check for multiple mdat, or just look for the first one.
 
-	logg(I, "parsing mdat from truncated file ... \n");
+	logg(V, "calling findMdat on truncated file..\n");
 	BufferedAtom* mdat = findMdat(file_read);
+	logg(I, "reading mdat from truncated file ...\n");
 
 	if (file_read.length() > (1LL<<32)) {
 		broken_is_64_ = true;

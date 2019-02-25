@@ -5,25 +5,20 @@ extern "C" {
 }
 #include <vector>
 #include <string>
+#include <string.h> // memset
 
 #include "common.h"
 #include "file.h"
 
 class Atom {
 public:
-	int64_t start_;       //including 8 header bytes
-	int64_t length_;      //including 8 header bytes
+	int64_t start_ = -8;       //including 8 header bytes
+	int64_t length_ = -1;      //including 8 header bytes
 	char name_[5];
-	char head_[4];  // this is not used ?
-	char version_[4];  // neither ?
 	std::vector<uchar> content_;
 	std::vector<Atom *> children_;
 
-	Atom(): start_(0), length_(-1) {
-		name_[0] = name_[1] = name_[2] = name_[3] = name_[4] = 0;
-		length_ = 0;
-		start_ = 0;
-	}
+	Atom();
 	virtual ~Atom();
 
 	void parseHeader(FileRead &file); //read just name and length

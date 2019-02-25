@@ -17,6 +17,7 @@ This fork is an improvement to the [original](https://github.com/ponchio/untrunc
 * ability to skip over unknown bytes
 * advanced logging system
 * compatible with new versions of ffmpeg
+* handles invalid atom lengths
 * most issues/bugs are fixed
 * actively maintained
 
