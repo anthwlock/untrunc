@@ -100,6 +100,6 @@ $(DIR)/%.o: %.cpp | $(DIR)
 -include $(DEP)
 
 clean:
-	$(RM) -r $(_DIR)*
-	$(RM) $(_EXE)*
+	$(RM) -r $(DIR)
+	$(RM) $(EXE)
 
