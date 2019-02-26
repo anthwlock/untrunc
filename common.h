@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <sstream>
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -23,9 +24,6 @@ void logg(Args&&... args){
 	creator{ 0, ( std::cout << (std::forward<Args>(args)), 0) ... };
 }
 
-void mute();
-void unmute();
-
 template<class... Args>
 void logg(LogMode m, Args&&... x){
 	if(g_muted || g_log_mode < m)
@@ -38,6 +36,15 @@ void logg(LogMode m, Args&&... x){
 		std::cout << "Error: ";
 	logg(std::forward<Args>(x)...);
 }
+
+template<class... Args>
+std::string ss(Args&&... args){
+	std::stringstream ss;
+	using creator = int[]; // dummy
+	creator{ 0, ( ss << (std::forward<Args>(args)), 0) ... };
+	return ss.str();
+}
+
 
 /* NAL unit types */
 enum {
@@ -72,6 +79,9 @@ const std::map<std::string, std::string> g_atom_names = {
     {"co64", "chunk to offset 64"},
     {"stco", "chunk to offset"}
 };
+
+void mute();
+void unmute();
 
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);

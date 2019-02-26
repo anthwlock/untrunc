@@ -49,6 +49,7 @@ public:
 	uint readInt();
 	int64_t readInt64();
 	void readChar(char *dest, size_t n);
+	std::string getString(size_t n);
 	std::vector<uchar> read(size_t n);
 
 	const uchar* getPtr(int size_requested);

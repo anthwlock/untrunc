@@ -46,7 +46,7 @@ void Track::parse(Atom *mdat) {
 
 	Atom *mdhd = trak_->atomByName("mdhd");
 	if(!mdhd)
-		throw string("No mdhd atom: unknown duration and timescale");
+		throw "No mdhd atom: unknown duration and timescale";
 
 	timescale_ = mdhd->readInt(12);
 	duration_ = mdhd->readInt(16);
@@ -90,28 +90,24 @@ void Track::parse(Atom *mdat) {
 	}
 	//move this stuff into track!
 	Atom *hdlr = trak_->atomByName("hdlr");
-	char type[5];
-	hdlr->readChar(type, 8, 4);
+	auto type = hdlr->getString(8, 4);
+	cout << "type: " << type << '\n';
+//	char type[5];
+//	hdlr->readChar(type, 8, 4);
 
-	//	bool audio = (type == string("soun"));
-
-	if(type != string("soun") && type != string("vide"))
+	if(type != string("soun") && type != string("vide")) {
+		logg(W, "track found which is neither audio nor video\n");
 		return;
-
-	//	//move this to Codec
+	}
 
 	codec_.parse(trak_, offsets_, offsets64_, mdat, is64);
 	//if audio use next?
-
-//	if(!codec.codec) throw string("No codec found!");
-//	if(avcodec_open2(codec.context, codec.codec, NULL)<0)
-//		throw string("Could not open codec: ") + codec.context->codec_name;
-
+	//	bool audio = (type == string("soun"));
 
 	/*
 	Atom *mdat = root->atomByName("mdat");
 	if(!mdat)
-		throw string("Missing data atom");
+		throw "Missing data atom";
 
 	//print sizes and offsets
 		for(int i = 0; i < 10 && i < sizes.size(); i++) {

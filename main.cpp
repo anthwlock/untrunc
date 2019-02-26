@@ -107,9 +107,8 @@ int main(int argc, char *argv[]) {
 		if(corrupt.size()) {
 			mp4.repair(corrupt, corrupt + "_fixed.mp4");
 		}
-	} catch(string e) {
-		cerr << e << endl;
-		return -1;
 	}
+	catch(const char* e) {return cerr << e << '\n', 1;}
+	catch(string e) {return cerr << e << '\n', 1;}
 	return 0;
 }

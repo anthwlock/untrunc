@@ -28,9 +28,9 @@ Codec::Codec(AVCodecParameters* c) : avc_config_(NULL) {
 	avcodec_parameters_to_context(context_, c);
 
 	if (!codec_)
-		throw string("No codec found!");
+		throw "No codec found!";
 	if (avcodec_open2(context_, codec_, NULL) < 0)
-		throw string("Could not open codec: ?"); //+ context_->codec_name;
+		throw "Could not open codec: ?";
 
 }
 
@@ -38,11 +38,9 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
 	if(entries != 1)
-		throw string("Multiplexed stream! Not supported");
+		throw "Multiplexed stream! Not supported";
 
-	char codec[5];
-	stsd->readChar(codec, 12, 4);
-	name_ = codec;
+	name_ = stsd->getString(12, 4);
 
 	if (name_ == "avc1") {
 		avc_config_ = new AvcConfig(*stsd);
@@ -254,7 +252,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 		/*     THIS DOES NOT SEEM TO WORK FOR SOME UNKNOWN REASON. IT JUST CONSUMES ALL BYTES.
 		*     AVFrame *frame = avcodec_alloc_frame();
 		if(!frame)
-			throw string("Could not create AVFrame");
+			throw "Could not create AVFrame";
 		AVPacket avp;
 		av_init_packet(&avp);
 
@@ -273,7 +271,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 	} else if(name_ == "avc1") {
 		//        AVFrame *frame = av_frame_alloc();
 		//        if(!frame)
-		//            throw string("Could not create AVFrame");
+		//            throw "Could not create AVFrame";
 		//        AVPacket avp;
 		//        av_init_packet(&avp);
 

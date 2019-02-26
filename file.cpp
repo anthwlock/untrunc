@@ -134,9 +134,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 uint FileRead::readInt() {
 	int value;
 	int n = readBuffer((uchar*)&value, sizeof(int), 1);
-//	cout << "n = " << n << '\n';
-	if(n != 1)
-		throw string("Could not read atom length");
+	if(n != 1) throw "Could not read integer";
 	return swap32(value);
 }
 
@@ -144,16 +142,23 @@ int64_t FileRead::readInt64() {
 	int64_t value;
 	int n = readBuffer((uchar*)&value, sizeof(value), 1);
 	if(n != 1)
-		throw string("Could not read atom length");
+		throw "Could not read int64";
 
 	return swap64(value);
+}
+
+string FileRead::getString(size_t n) {
+	string r;
+	r.resize(n);
+	readChar(&r[0], n);
+	return r;
 }
 
 void FileRead::readChar(char *dest, size_t n) {
 	size_t len = readBuffer((uchar*)dest, sizeof(char), n);
 	if(len != n){
 		cout << "expected " << n << " but got " << len << '\n';
-		throw string("Could not read chars");
+		throw "Could not read chars";
 	}
 }
 
@@ -161,7 +166,7 @@ vector<uchar> FileRead::read(size_t n) {
 	vector<uchar> dest(n);
 	size_t len = readBuffer(&*dest.begin(), 1, n);
 	if(len != n)
-		throw string("Could not read at position");
+		throw "Could not read at position";
 	return dest;
 }
 

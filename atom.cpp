@@ -12,7 +12,7 @@
 using namespace std;
 
 Atom::Atom() {
-	memset(name_, 0, 5);
+	name_.resize(4);
 }
 
 Atom::~Atom() {
@@ -23,7 +23,7 @@ Atom::~Atom() {
 void Atom::parseHeader(FileRead &file) {
 	start_ = file.pos();
 	length_ = file.readInt();
-	file.readChar(name_, 4);
+	name_ = file.getString(4);
 	if(length_ == 1) {
 		length_ = file.readInt64() - 8;
 		start_ += 8;
@@ -36,15 +36,15 @@ void Atom::parseHeader(FileRead &file) {
 	logg(VV, "name_ = ", name_, '\n');
 	logg(VV, '\n');
 
-	if (length_ < 0) throw string("invalid atom length: ")+to_string(length_);
-	if (start_ < 0) throw string("invalid atom start: ")+to_string(start_);  //  this is impossible?
-	for (int i=0; i < 4; i++) if (!isalnum(name_[i])) throw string("invalid atom name: ")+name_;
+	if (length_ < 0) throw ss("invalid atom length: ", length_);
+	if (start_ < 0) throw ss("invalid atom start: ", start_);  //  this is impossible?
+	for (int i=0; i < 4; i++) if (!isalnum(name_[i])) throw ss("invalid atom name: '", name_, "'");
 }
 
 void Atom::parse(FileRead &file) {
 	parseHeader(file);
 
-	if(isParent(name_) && name_ != string("udta")) { //user data atom is dangerous... i should actually skip all
+	if(isParent(name_) && name_ != "udta") { //user data atom is dangerous... i should actually skip all
 		while(file.pos() < start_ + length_) {
 			Atom *atom = new Atom;
 			atom->parse(file);
@@ -53,14 +53,14 @@ void Atom::parse(FileRead &file) {
 		assert(file.pos() == start_ + length_);
 
 	}
-	else if (name_ == string("mdat")) {
+	else if (name_ == "mdat") {
 		int64_t content_size = length_ - 8;
 		file.seekSafe(file.pos() + content_size);
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
 		if(content_.size() < to_uint(length_ - 8))
-			throw string("Failed reading atom content: ") + name_;
+			throw ss("Failed reading atom content: ", name_);
 		logg(VV, '\n');  // align verbose buffer read message
 	}
 }
@@ -76,9 +76,9 @@ bool isValidAtomName(const uchar* buff) {
 
 off64_t Atom::findNextAtomOff(FileRead& file, Atom* start_atom, bool skip_nested) {
 	static bool did_msg = false;
-	off64_t next_off = skip_nested || string("mdat") == start_atom->name_? start_atom->start_ + start_atom->length_ : -1;
+	off64_t next_off = skip_nested || "mdat" == start_atom->name_? start_atom->start_ + start_atom->length_ : -1;
 	if (next_off >= file.length()) return file.length();
-	if (next_off > start_atom->start_ && string("avcC") != start_atom->name_ && isValidAtomName(file.getPtrAt(next_off+4, 4)))
+	if (next_off > start_atom->start_ && "avcC" != start_atom->name_ && isValidAtomName(file.getPtrAt(next_off+4, 4)))
 		return next_off;
 	else {
 		if (skip_nested && !did_msg) {
@@ -100,7 +100,7 @@ off64_t Atom::findNextAtomOff(FileRead& file, Atom* start_atom, bool skip_nested
 void Atom::findAtomNames(string& filename) {
 	FileRead file;
 	bool success = file.open(filename);
-	if(!success) throw string("Could not open file: ") + filename;
+	if(!success) throw ss("Could not open file: ", filename);
 	Atom atom;
 
 	bool ignore_avc1 = 0;
@@ -108,16 +108,15 @@ void Atom::findAtomNames(string& filename) {
 	while (off < file.length()) {
 		const uchar* buff = file.getPtrAt(off, 4);
 		uint length = swap32(*(uint*)buff);
-		memcpy(atom.name_, buff+4, 4);
-		string name = string(atom.name_);
+		atom.name_ = string((char*)buff+4, 4);
 		atom.length_ = length;
 		atom.start_ = off;
 
-		if (name == "ftyp") ignore_avc1 = 1;
-		if (!ignore_avc1 || name != "avc1") {
-			printf("%zd: %.*s (%u)", off, 4, atom.name_, length);
+		if (atom.name_ == "ftyp") ignore_avc1 = 1;
+		if (!ignore_avc1 || atom.name_ != "avc1") {
+			printf("%zd: %.*s (%u)", off, 4, atom.name_.c_str(), length);
 			off64_t next_off = off + length;
-			if (name == "avcC") printf(" <-- skipped\n");
+			if (atom.name_ == "avcC") printf(" <-- skipped\n");
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
 				printf(" <-- invalid length\n");
 			else
@@ -132,7 +131,7 @@ void Atom::write(FileWrite &file) {
 	int start = file.pos();
 
 	file.writeInt(length_);
-	file.writeChar(name_, 4);
+	file.writeChar(name_.data(), 4);
 	if(content_.size())
 		file.write(content_);
 	for(unsigned int i = 0; i < children_.size(); i++)
@@ -148,32 +147,30 @@ void Atom::print(int offset) {
 	if (g_atom_names.count(name_))
 		cout << " \"" << g_atom_names.at(name_) << "\"";
 	cout << " [" << start_ << ", " << length_ << "]\n";
-	if(name_ == string("mvhd") || name_ == string("mdhd")) {
+	if(name_ == "mvhd" || name_ == "mdhd") {
 		for(int i = 0; i < offset; i++)
 			cout << " ";
 		//timescale: time units per second
 		//duration: in time units
 		cout << indent << " Timescale: " << readInt(12) << " Duration: " << readInt(16) << endl;
 
-	} else if(name_ == string("tkhd")) {
+	} else if(name_ == "tkhd") {
 		for(int i = 0; i < offset; i++)
 			cout << " ";
 		//track id:
 		//duration
 		cout << indent << " Trak: " << readInt(12) << " Duration: "  << readInt(20) << endl;
 
-	} else if(name_ == string("hdlr")) {
-		char type[5];
-		readChar(type, 8, 4);
+	} else if(name_ == "hdlr") {
+		auto type = getString(8, 4);
 		cout << indent << " Type: " << type << endl;
 
-	} else if(name_ == string("dref")) {
+	} else if(name_ == "dref") {
 		cout << indent << " Entries: " << readInt(4) << endl;
 
-	} else if(name_ == string("stsd")) { //sample description: (which codec...)
+	} else if(name_ == "stsd") { //sample description: (which codec...)
 		//lets just read the first entry
-		char type[5];
-		readChar(type, 12, 4);
+		auto type = getString(12, 4);
 		//4 bytes zero
 		//4 bytes reference index (see stsc)
 		//additional fields
@@ -194,14 +191,14 @@ void Atom::print(int offset) {
 
 		cout << indent << " Entries: " << readInt(4) << " codec: " << type << endl;
 
-	} else if(name_ == string("stts")) { //run length compressed duration of samples
+	} else if(name_ == "stts") { //run length compressed duration of samples
 		//lets just read the first entry
 		int entries = readInt(4);
 		cout << indent << " Entries: " << entries << endl;
 		for(int i = 0; i < entries && i < 30; i++)
 			cout << indent << " samples: " << readInt(8 + 8*i) << " for: " << readInt(12 + 8*i) << endl;
 
-	} else if(name_ == string("stss")) { //sync sample: (keyframes)
+	} else if(name_ == "stss") { //sync sample: (keyframes)
 		//lets just read the first entry
 		int entries = readInt(4);
 		cout << indent << " Entries: " << entries << endl;
@@ -209,14 +206,14 @@ void Atom::print(int offset) {
 			cout << indent << " Keyframe: " << readInt(8 + 4*i) << endl;
 
 
-	} else if(name_ == string("stsc")) { //samples to chucnk:
+	} else if(name_ == "stsc") { //samples to chucnk:
 		//lets just read the first entry
 		int entries = readInt(4);
 		cout << indent << " Entries: " << entries << endl;
 		for(int i = 0; i < entries && i < 10; i++)
 			cout << indent << " chunk: " << readInt(8 + 12*i) << " nsamples: " << readInt(12 + 12*i) << " id: " << readInt(16 + 12*i) << endl;
 
-	} else if(name_ == string("stsz")) { //sample size atoms
+	} else if(name_ == "stsz") { //sample size atoms
 		int entries = readInt(8);
 		int sample_size = readInt(4);
 		cout << indent << " Sample size: " << sample_size << " Entries: " << entries << endl;
@@ -225,13 +222,13 @@ void Atom::print(int offset) {
 				cout << indent << " Size " << readInt(12 + i*4) << endl;
 		}
 
-	} else if(name_ == string("stco")) { //sample chunk offset atoms
+	} else if(name_ == "stco") { //sample chunk offset atoms
 		int entries = readInt(4);
 		cout << indent << " Entries: " << entries << endl;
 		for(int i = 0; i < entries && i < 10; i++)
 			cout << indent << " chunk: " << readInt(8 + i*4) << endl;
 
-	} else if(name_ == string("co64")) {
+	} else if(name_ == "co64") {
 		int entries = readInt(4);
 		cout << indent << " Entries: " << entries << endl;
 		for(int i = 0; i < entries && i < 10; i++)
@@ -243,8 +240,8 @@ void Atom::print(int offset) {
 		children_[i]->print(offset+1);
 }
 
-AtomDefinition definition(char *id) {
-	map<string, AtomDefinition> def;
+AtomDefinition definition(const string& id) {
+	static map<string, AtomDefinition> def;
 	if(def.size() == 0) {
 		for(int i = 0; i < 174; i++)
 			def[knownAtoms[i].known_atom_name] = knownAtoms[i];
@@ -256,22 +253,22 @@ AtomDefinition definition(char *id) {
 	return def[id];
 }
 
-bool Atom::isParent(char *id) {
+bool Atom::isParent(const string& id) {
 	AtomDefinition def = definition(id);
 	return def.container_state == PARENT_ATOM;// || def.container_state == DUAL_STATE_ATOM;
 }
 
-bool Atom::isDual(char *id) {
+bool Atom::isDual(const string& id) {
 	AtomDefinition def = definition(id);
 	return def.container_state == DUAL_STATE_ATOM;
 }
 
-bool Atom::isVersioned(char *id) {
+bool Atom::isVersioned(const string& id) {
 	AtomDefinition def = definition(id);
 	return def.box_type == VERSIONED_ATOM;
 }
 
-vector<Atom *> Atom::atomsByName(string name) {
+vector<Atom *> Atom::atomsByName(const string& name) {
 	vector<Atom *> atoms;
 	for(unsigned int i = 0; i < children_.size(); i++) {
 		if(children_[i]->name_ == name)
@@ -281,7 +278,7 @@ vector<Atom *> Atom::atomsByName(string name) {
 	}
 	return atoms;
 }
-Atom *Atom::atomByName(std::string name) {
+Atom *Atom::atomByName(const string& name) {
 	for(unsigned int i = 0; i < children_.size(); i++) {
 		if(children_[i]->name_ == name)
 			return children_[i];
@@ -301,7 +298,7 @@ void Atom::replace(Atom *original, Atom *replacement) {
 	throw "Atom not found";
 }
 
-void Atom::prune(string name) {
+void Atom::prune(const string& name) {
 	if(!children_.size()) return;
 
 	length_ = 8;
@@ -350,11 +347,8 @@ void Atom::writeInt(int value, uint64_t offset) {
 	*(int *)&(content_[offset]) = swap32(value);
 }
 
-void Atom::readChar(char *str, int64_t offset, int64_t length) {
-	for(int i = 0; i < length; i++)
-		str[i] = content_[offset + i];
-
-	str[length] = 0;
+string Atom::getString(int64_t offset, int64_t length) {
+	return string((char*)&content_[offset], length);
 }
 
 
@@ -395,12 +389,12 @@ void BufferedAtom::write(FileWrite &output) {
 	off64_t start = output.pos();
 
 	output.writeInt(length_);
-	output.writeChar(name_, 4);
+	output.writeChar(name_.data(), 4);
 	off64_t offset = file_begin_;
 	file_read_.seek(file_begin_);
 	int loop_cnt = 0;
 	while(offset < file_end_) {
-		if (name_ == string("mdat") && g_log_mode == I && loop_cnt++ >= 10) {
+		if (name_ == "mdat" && g_log_mode == I && loop_cnt++ >= 10) {
 			outProgress(offset, file_end_);
 			loop_cnt = 0;
 		}

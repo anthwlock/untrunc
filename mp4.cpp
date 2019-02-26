@@ -44,7 +44,7 @@ Mp4::~Mp4() {
 void Mp4::parseOk(string& filename) {
 	FileRead file;
 	bool success = file.open(filename);
-	if(!success) throw string("Could not open file: ") + filename;
+	if(!success) throw ss("Could not open file: ", filename);
 	//    auto x = file.read
 
 	logg(I, "parsing healthy moov atom ... \n");
@@ -64,7 +64,7 @@ void Mp4::parseOk(string& filename) {
 
 	Atom *mvhd = root_atom_->atomByName("mvhd");
 	if(!mvhd)
-		throw string("Missing movie header atom");
+		throw "Missing movie header atom";
 	timescale_ = mvhd->readInt(12);
 	duration_ = mvhd->readInt(16);
 
@@ -82,7 +82,7 @@ void Mp4::parseOk(string& filename) {
 		throw "Could not parse AV file (" + to_string(error) + "): " + filename;
 
 	if(avformat_find_stream_info(context_, NULL) < 0)
-		throw string("Could not find stream info");
+		throw "Could not find stream info";
 
 	av_dump_format(context_, 0, filename.c_str(), 0);
 
@@ -106,7 +106,7 @@ void Mp4::makeStreamable(string& filename, string& output) {
 	{
 		FileRead file;
 		bool success = file.open(filename);
-		if(!success) throw string("Could not open file: ") + filename;
+		if(!success) throw ss("Could not open file: ", filename);
 
 		while(1) {
 			Atom *atom = new Atom;
@@ -182,13 +182,13 @@ void Mp4::saveVideo(const string& filename) {
 		if (broken_is_64_ && stbl->atomByName("stco")){
 			stbl->prune("stco");
 			Atom *new_co64 = new Atom;
-			memcpy(new_co64->name_, "co64", 5);
+			new_co64->name_ = "co64";
 			stbl->children_.push_back(new_co64);
 		}
 		else if (!broken_is_64_ && stbl->atomByName("co64")) {
 			stbl->prune("co64");
 			Atom *new_stco = new Atom;
-			memcpy(new_stco->name_, "stco", 5);
+			new_stco->name_ = "stco";
 			stbl->children_.push_back(new_stco);
 		}
 		track.writeToAtoms();
@@ -261,7 +261,7 @@ void Mp4::saveVideo(const string& filename) {
 void Mp4::analyze(const string& filename) {
 	FileRead file;
 	bool success = file.open(filename);
-	if(!success) throw string("Could not open file: ") + filename;
+	if(!success) throw ss("Could not open file: ", filename);
 
 //	Atom *mdat = root_atom_->atomByName("mdat");
 	BufferedAtom* mdat = findMdat(file);
@@ -344,9 +344,9 @@ void Mp4::parseTracks() {
 
 BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	BufferedAtom *mdat = new BufferedAtom(file_read);
-	memcpy(mdat->name_, "mdat", 4);
+	mdat->name_ = "mdat";
 	Atom atom;
-	while(atom.name_ != string("mdat")) {
+	while(atom.name_ != "mdat") {
 		off64_t new_pos = Atom::findNextAtomOff(file_read, &atom);
 		if (new_pos >= file_read.length() || new_pos < 0) {
 			logg(W, "start of mdat not found\n");
