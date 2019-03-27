@@ -59,13 +59,13 @@ That's it you're done!
 
 ### Help/Support
 
-##### Reporting issues
+#### Reporting issues
 Use the `-v` parameter for a more detailed output. Both the healthy and corrupt file might be needed to help you.
 
-##### Donation
-If you managed to recover the video, help me to find time to keep working on this software and make other people happy.
-If you didn't, I need more corrupted samples to improve the program and I might solve the issue, who knows... so write me.
+#### Donation
+If this software helped you please consider donating [here](https://www.paypal.me/anthwlock)!\
+Donations will encourage me to keep working on this software, leading to more media being supported and better recovered files.
 
-Donations can be made at my page, http://vcg.isti.cnr.it/~ponchio/untrunc.php, and promptly converted into beer.
+You might also want to consider donating to **ponchio**, see his instructions [here](https://github.com/ponchio/untrunc#helpsupport).
 
 Thank you.
