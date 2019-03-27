@@ -91,7 +91,7 @@ void Track::parse(Atom *mdat) {
 	//move this stuff into track!
 	Atom *hdlr = trak_->atomByName("hdlr");
 	auto type = hdlr->getString(8, 4);
-	cout << "type: " << type << '\n';
+//	cout << "type: " << type << '\n';
 //	char type[5];
 //	hdlr->readChar(type, 8, 4);
 
