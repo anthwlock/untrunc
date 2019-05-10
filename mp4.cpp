@@ -385,7 +385,6 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	vector<int> audiotimes;
-	vector<int64_t> audiotimes64;
 	unsigned long cnt_packets = 0;
 	off64_t offset = 0;
 
@@ -545,7 +544,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	}
 
 	for(auto& track : tracks_) {
-		if(audiotimes.size() == track.offsets_.size() || audiotimes.size() == track.offsets64_.size())
+		if(audiotimes.size() && (audiotimes.size() == track.offsets_.size() || audiotimes.size() == track.offsets64_.size()))
 			swap(audiotimes, track.times_);
 		track.fixTimes(broken_is_64_);
 		int track_duration = (int)(double)track.duration_ * ((double)timescale_ / (double)track.timescale_);
