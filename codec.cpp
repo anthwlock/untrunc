@@ -210,8 +210,10 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
 
 	// ffmpeg 3.4+ uses internal buffer which needs to be updated.
-	// this is slow because of the internal memory allocation
+	// this is slow because of the internal memory allocation.
+	// ff34+ decodes till exhaustion, which in turn spams repetitive warnings/errors
 	if (is_new_ffmpeg_api && consumed < 0) {
+		if (g_log_mode < LogMode::V) mute();  // don't spam libav warnings/errors
 		avcodec_flush_buffers(avctx);
 		pkt->size = maxlength;
 		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
