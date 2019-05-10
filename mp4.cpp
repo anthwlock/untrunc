@@ -66,7 +66,7 @@ void Mp4::parseOk(string& filename) {
 	if(!mvhd)
 		throw "Missing movie header atom";
 	timescale_ = mvhd->readInt(12);
-	duration_ = mvhd->readInt(16);
+//	duration_ = mvhd->readInt(16);  // this value is used nowhere
 
 	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
 	#if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
@@ -86,7 +86,7 @@ void Mp4::parseOk(string& filename) {
 
 	av_dump_format(context_, 0, filename.c_str(), 0);
 
-	parseTracks();
+	parseTracksOk();
 	//mp4a matching gives less false positives
 	if(tracks_.size() > 1 && tracks_[1].codec_.name_ == "mp4a")
 		swap(tracks_[0], tracks_[1]);
@@ -166,6 +166,40 @@ void Mp4::makeStreamable(string& filename, string& output) {
 	}
 }
 
+void Mp4::chkStrechFactor() {
+	int video = 0, sound = 0;
+	for(Track& track : tracks_) {
+		int msec = track.getDurationInMs();
+		if (track.type_ == "vide") video = msec;
+		else if (track.type_ == "soun") sound = msec;
+	}
+	if (!sound) return;
+
+	double factor = (double) sound / video;
+	double eps = 0.1;
+	if (fabs(factor - 1) > eps) {
+		if (!g_stretch_video)
+			cout << "Tip: Audio and video seem to have different durations (" << factor << ").\n"
+			     << "     If audio and video are not in sync, give `-sv` a try. See `--help`\n";
+		else
+			for(Track& track : tracks_) {
+				if (track.type_ == "vide") {
+					track.stretch_factor_ = (double)sound / video;
+//					track.stretch_factor_ = 0.5;
+					logg(I, "changing video speed by factor " , 1/factor, "\n");
+					track.duration_ *= factor;
+					break;
+				}
+			}
+	}
+
+}
+
+void Mp4::setDuration() {
+	for(Track& track : tracks_)
+		duration_ = max(duration_, track.getDurationInTimescale());
+}
+
 void Mp4::saveVideo(const string& filename) {
 	/* we save all atom except:
 	  ctts: composition offset ( we use sample to time)
@@ -176,7 +210,10 @@ void Mp4::saveVideo(const string& filename) {
 	  assumes offsets in stco are absolute and so to find the relative just subtrack mdat->start + 8
 */
 
-//	duration_ = 0;
+
+	chkStrechFactor();
+	setDuration();
+
 	for(Track& track : tracks_) {
 		Atom *stbl = track.trak_->atomByName("stbl");
 		if (broken_is_64_ && stbl->atomByName("stco")){
@@ -192,11 +229,10 @@ void Mp4::saveVideo(const string& filename) {
 			stbl->children_.push_back(new_stco);
 		}
 		track.writeToAtoms();
-		Atom *tkhd = track.trak_->atomByName("tkhd");
-		tkhd->writeInt(track.duration_in_timescale_, 20); //in movie timescale, not track timescale
 
 		int hour, min, sec, msec;
 		int bmsec = track.getDurationInMs();
+
 		auto x = div(bmsec, 1000); msec = x.rem; sec = x.quot;
 		x = div(sec, 60); sec = x.rem; min = x.quot;
 		x = div(min, 60); min = x.rem; hour = x.quot;
@@ -237,14 +273,13 @@ void Mp4::saveVideo(const string& filename) {
 	if(ftyp)
 		offset += ftyp->length_; //not all mov have a ftyp.
 
-	for(unsigned int t = 0; t < tracks_.size(); t++) {
-		Track &track = tracks_[t];
+	for (Track& track : tracks_) {
 		uint len_chunk_offs = broken_is_64_? track.offsets64_.size() : track.offsets_.size();
 		for(uint i = 0; i < len_chunk_offs; i++)
 			if(broken_is_64_) track.offsets64_[i] += offset;
 			else track.offsets_[i] += offset;
 
-		track.writeToAtoms();  //need to save the offsets back to the atoms
+		track.saveChunkOffsets(); //need to save the offsets back to the atoms
 	}
 
 	//save to file
@@ -332,11 +367,11 @@ void Mp4::analyze(const string& filename) {
 
 }
 
-void Mp4::parseTracks() {
+void Mp4::parseTracksOk() {
 	Atom *mdat = root_atom_->atomByName("mdat");
 	vector<Atom *> traks = root_atom_->atomsByName("trak");
 	for(unsigned int i = 0; i < traks.size(); i++) {
-		Track track(traks[i], context_->streams[i]->codecpar);
+		Track track(traks[i], context_->streams[i]->codecpar, timescale_);
 		track.parse(mdat);
 		tracks_.push_back(track);
 	}
@@ -547,9 +582,6 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		if(audiotimes.size() && (audiotimes.size() == track.offsets_.size() || audiotimes.size() == track.offsets64_.size()))
 			swap(audiotimes, track.times_);
 		track.fixTimes(broken_is_64_);
-		int track_duration = (int)(double)track.duration_ * ((double)timescale_ / (double)track.timescale_);
-		if(track_duration > duration_) duration_ = track_duration;
-		track.duration_in_timescale_ = track_duration;
 	}
 	Atom *original_mdat = root_atom_->atomByName("mdat");
 	mdat->start_ = original_mdat->start_;

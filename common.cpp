@@ -28,6 +28,7 @@ size_t g_max_partsize = 1600000;
 bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;
+bool g_stretch_video = false;
 
 std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 

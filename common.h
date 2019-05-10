@@ -13,7 +13,7 @@ typedef unsigned char uchar;
 enum LogMode { E, W, I, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
-extern bool g_interactive, g_muted, g_ignore_unknown;
+extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 

@@ -37,9 +37,8 @@ extern "C" {
 
 using namespace std;
 
-Track::Track(Atom *t, AVCodecParameters *c) : trak_(t), codec_(c), n_matched(0) {
-
-}
+Track::Track(Atom *t, AVCodecParameters *c, int ts) : trak_(t), codec_(c),
+        mp4_timescale_(ts), n_matched(0) {}
 
 /* parse healthy trak atom */
 void Track::parse(Atom *mdat) {
@@ -90,19 +89,18 @@ void Track::parse(Atom *mdat) {
 	}
 	//move this stuff into track!
 	Atom *hdlr = trak_->atomByName("hdlr");
-	auto type = hdlr->getString(8, 4);
-//	cout << "type: " << type << '\n';
-//	char type[5];
-//	hdlr->readChar(type, 8, 4);
+	type_ = hdlr->getString(8, 4);
 
-	if(type != string("soun") && type != string("vide")) {
+	if(type_ != "soun" && type_ != "vide") {
 		logg(W, "track found which is neither audio nor video\n");
 		return;
 	}
+	do_stretch_ = g_stretch_video && type_ == "vide";
 
 	codec_.parse(trak_, offsets_, offsets64_, mdat, is64);
+
 	//if audio use next?
-	//	bool audio = (type == string("soun"));
+	//	bool audio = (type_ == "soun");
 
 	/*
 	Atom *mdat = root->atomByName("mdat");
@@ -129,6 +127,9 @@ void Track::writeToAtoms() {
 
 	Atom *mdhd = trak_->atomByName("mdhd");
 	mdhd->writeInt(duration_, 16);
+
+	Atom *tkhd = trak_->atomByName("tkhd");
+	tkhd->writeInt(getDurationInTimescale(), 20);
 
 	//Avc1 codec writes something inside stsd.
 	//In particular the picture parameter set (PPS) in avcC (after the sequence parameter set)
@@ -179,15 +180,19 @@ void Track::fixTimes(const bool is64) {
 		times_.resize(len_offs, 160);
 		return;
 	}
+//	cout << codec_.name_ << '\n';
 //	for(int i=0; i != 100; i++)
 //		cout << "times_[" << i << "] = " << times_[i] << '\n';
-	while(times_.size() < len_offs)
+
+	if (times_.empty()) return;
+	while(times_.size() < len_offs) {
 		times_.insert(times_.end(), times_.begin(), times_.end());
+	}
 	times_.resize(len_offs);
 
-	duration_ = 0;
-	for(auto time : times_)
-		duration_ += time;
+	int sum = 0;
+	for(auto t : times_) sum += t;
+	duration_ = sum;
 }
 
 vector<int> Track::getSampleTimes(Atom *t) {
@@ -293,14 +298,16 @@ vector<int> Track::getSampleToChunk(Atom *t, int nchunks){
 	return sample_to_chunk;
 }
 
-
 void Track::saveSampleTimes() {
 	Atom *stts = trak_->atomByName("stts");
 	assert(stts);
 	vector<pair<int,int>> vp;
 	for (uint i = 0; i < times_.size(); i++){
-		if (vp.empty() || times_[i] != vp.back().second)
-			vp.emplace_back(1, times_[i]);
+		int v = do_stretch_ ? round(times_[i]*stretch_factor_) : times_[i];
+		if (vp.empty() || v != vp.back().second) {  // don't repeat same value
+//			cout << times_[i] << " -> " << v << '\n';
+			vp.emplace_back(1, v);
+		}
 		else
 			vp.back().first++;
 	}
@@ -378,4 +385,10 @@ void Track::saveChunkOffsets() {
 	}
 }
 
+int Track::getDurationInTimescale()  {
+	return (int)(double)duration_ * ((double)mp4_timescale_ / (double)timescale_);
+}
 
+int Track::getDurationInMs() {
+	return duration_ / (timescale_ / 1000);
+}

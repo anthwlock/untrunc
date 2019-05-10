@@ -9,13 +9,14 @@ You need:
 * Basic ability to use a command line
 
 ## About this fork
-This fork is an improvement to the [original](https://github.com/ponchio/untrunc) in the following points:
+This fork improves the [original](https://github.com/ponchio/untrunc) in the following:
 * more than 10 times faster!
 * low memory usage, fixes [#30](https://github.com/ponchio/untrunc/issues/30#issuecomment-143744821)
 * easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/master)
 * \>2GB file support
 * ability to skip over unknown bytes
 * advanced logging system
+* can stretch/shrink video to match audio duration
 * compatible with new versions of ffmpeg
 * handles invalid atom lengths
 * most issues/bugs are fixed

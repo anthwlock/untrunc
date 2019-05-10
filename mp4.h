@@ -34,7 +34,7 @@ class AVFormatContext;
 class Mp4 {
 public:
 	int timescale_;
-	int duration_;
+	int duration_ = 0;
 	Atom *root_atom_;
 
 	Mp4();
@@ -55,7 +55,9 @@ protected:
 	AVFormatContext *context_;
 
 	void saveVideo(const std::string& filename);
-	void parseTracks();
+	void parseTracksOk();
+	void chkStrechFactor();
+	void setDuration();
 	bool broken_is_64_ = false;
 	int unknown_length_ = 0;
 	std::vector<int> unknown_lengths_;

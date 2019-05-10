@@ -37,6 +37,7 @@ void usage() {
 	     << "-a  - analyze\n"
 	     << "-i  - info\n"
 	     << "-f  - find all atoms and check their lenghts\n"
+	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-v  - verbose\n"
 		 << "-vv - more verbose\n"
 	     << "-q  - only errors\n"
@@ -60,6 +61,7 @@ int main(int argc, char *argv[]) {
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
 			if(arg[1] == 'i') info = true;
+			else if(arg[1] == 's' && arg[2] == 'v') g_stretch_video = true;
 			else if(arg[1] == 's') g_ignore_unknown = true;
 			else if(arg[1] == 'a') analyze = true;
 			else if(arg[1] == 'V') printVersion();

@@ -29,26 +29,31 @@ class Codec;
 
 class Track {
 public:
+	Track(Atom* t, AVCodecParameters* c, int mp4_timescale);
+
 	Atom *trak_;
 	Codec codec_;
 	int timescale_;
-	int duration_;
+	int mp4_timescale_;
+	int duration_; // normally sum of sample times
 	int n_matched;
-	int duration_in_timescale_; //in movie timescale, not track timescale
+	double stretch_factor_ = 1; // stretch video by via stts entries
+	bool do_stretch_ = false;
+	std::string type_; // 'soun' OR 'vide'
 
-	std::vector<int> times_;
+	std::vector<int> times_; // sample times
 	std::vector<uint> offsets_;
 	std::vector<int64_t> offsets64_;
 	std::vector<int> sizes_;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
 
-	Track(Atom* t, AVCodecParameters* c);
 	void parse(Atom *mdat);
 	void writeToAtoms();
 	void clear();
 	void fixTimes(bool is64);
 
-	int getDurationInMs() {return duration_ / (timescale_ / 1000);}
+	int getDurationInTimescale(); // in movie timescale, not track timescale
+	int getDurationInMs();
 
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);
@@ -63,7 +68,8 @@ public:
 	void saveSampleToChunk();
 	void saveSampleSizes();
 	void saveChunkOffsets();
-
 };
+
+
 
 #endif // TRACK_H
