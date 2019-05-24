@@ -1,28 +1,37 @@
 # pull base image
-FROM ubuntu
+FROM ubuntu:bionic
+
+ARG FF_VER=shared
 
 # install packaged dependencies
-RUN apt-get update
-RUN apt-get -y install libavformat-dev libavcodec-dev libavutil-dev g++ make
+RUN \
+  apt-get update && \
+  apt-get -y install \
+    libavformat-dev \
+    libavcodec-dev \
+    libavutil-dev \
+    g++ \
+    make \
+    libva-dev \
+    liblzma-dev \
+    libx11-dev \
+    libbz2-dev \
+    zlib1g-dev \
+    yasm \
+    pkg-config \
+    wget \
+   && rm -rf /var/lib/apt/lists/*
 
-# in case we alredy have the src (travis)
+# copy code
 ADD . /untrunc-src
-
-# otherwise download and extract master
-RUN [ -f /untrunc-src/mp4.cpp ] || apt-get -y install wget unzip
-RUN [ -f /untrunc-src/mp4.cpp ] || wget https://github.com/ponchio/untrunc/archive/master.zip
-RUN [ -f /untrunc-src/mp4.cpp ] || unzip master.zip 
-RUN [ -f /untrunc-src/mp4.cpp ] || mv /untrunc-src /abc
-RUN [ -f /untrunc-src/mp4.cpp ] || ln -s untrunc-master /untrunc-src
-
 WORKDIR /untrunc-src
 
 # build untrunc
-#RUN /usr/bin/g++ -o untrunc *.cpp -lavformat -lavcodec -lavutil
-RUN /usr/bin/make
+RUN /usr/bin/make FF_VER=$FF_VER
 
-# package / push the build artifact somewhere (dockerhub, .deb, .rpm, tell me what you want)
-# ... 
+# non-root user
+RUN useradd untrunc
+USER untrunc
 
 # execution
-ENTRYPOINT ["./untrunc"]
+ENTRYPOINT ["/untrunc-src/untrunc"]
