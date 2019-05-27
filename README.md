@@ -12,7 +12,7 @@ You need:
 This fork improves the [original](https://github.com/ponchio/untrunc) in the following:
 * more than 10 times faster!
 * low memory usage, fixes [#30](https://github.com/ponchio/untrunc/issues/30#issuecomment-143744821)
-* easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/master)
+* easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/latest)
 * \>2GB file support
 * ability to skip over unknown bytes
 * advanced logging system
@@ -24,7 +24,7 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 
 ## Building
 
-Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/master).\
+Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).\
 In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
 #### With system libraries

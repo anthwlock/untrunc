@@ -65,8 +65,8 @@ artifacts:
 
 deploy:
   - provider: GitHub
-    tag: master
-    release: Master
+    tag: latest
+    release: Latest
     draft: false
     prerelease: true
     force_update: true
