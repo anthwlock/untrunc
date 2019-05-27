@@ -1,4 +1,6 @@
 Dockerfile
-.build_*
+.dockerignore
 untrunc
+untrunc-*
 ffmpeg-*
+.build_*

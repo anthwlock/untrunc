@@ -42,13 +42,16 @@ Just use following commands, make will do the rest for you.
 	make FF_VER=3.3.9
 	sudo cp untrunc /usr/local/bin
 
-### Docker container
+## Docker container
 
-You can use the included Dockerfile to build and execute the package as a container.
-The optional argument FF_VER will be passed to `make`.
+You can use the included Dockerfile to build and execute the package as a container.\
+The optional argument 'FF_VER' will be passed to `make`.
 
-	docker build [--build-arg FF_VER=3.3.9] -t untrunc .
-	docker run -v ~/Desktop/:/files untrunc /files/filea /files/fileb
+	# docker build --build-arg FF_VER=3.3.9 -t untrunc .
+	docker build -t untrunc .
+	docker image prune --filter label=stage=intermediate -f
+
+	docker run -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
 
 ## Using
 
