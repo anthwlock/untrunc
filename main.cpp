@@ -83,21 +83,22 @@ int main(int argc, char *argv[]) {
 	if(i < argc)
 		corrupt = argv[i];
 
-	if (find_atoms) { Atom::findAtomNames(ok); return 0;}
-
-	if (g_ignore_unknown && is_new_ffmpeg_api) {
-		cout << "WARNING: Because of internal decoder changes, using ffmpeg '" FFMPEG_VERSION "' with '-s' can be slow!\n"
-		     << "         You are advised to compile untrunc against ffmpeg 3.3!\n"
-		     << "         See the README.md on how to do that. Press [ENTER] to continue ... ";
-		if (g_interactive) getchar();
+	bool skip_info = find_atoms;
+	if (!skip_info) {
+		if (g_ignore_unknown && is_new_ffmpeg_api) {
+			cout << "WARNING: Because of internal decoder changes, using ffmpeg '" FFMPEG_VERSION "' with '-s' can be slow!\n"
+			     << "         You are advised to compile untrunc against ffmpeg 3.3!\n"
+			     << "         See the README.md on how to do that. Press [ENTER] to continue ... ";
+			if (g_interactive) getchar();
+		}
+		logg(I, g_version_str, '\n');
 	}
-	logg(I, g_version_str, '\n');
-
-
-	logg(I, "reading ", ok, '\n');
-	Mp4 mp4;
 
 	try {
+		if (find_atoms) { Atom::findAtomNames(ok); return 0;}
+
+		logg(I, "reading ", ok, '\n');
+		Mp4 mp4;
 		mp4.parseOk(ok);
 		if(info) {
 			mp4.printMediaInfo();
