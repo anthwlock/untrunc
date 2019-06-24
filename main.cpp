@@ -38,6 +38,7 @@ void usage() {
 	     << "-i  - info\n"
 	     << "-f  - find all atoms and check their lenghts\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
+	     << "-w  - show hidden warnings\n"
 	     << "-v  - verbose\n"
 		 << "-vv - more verbose\n"
 	     << "-q  - only errors\n"
@@ -67,6 +68,7 @@ int main(int argc, char *argv[]) {
 			else if(arg[1] == 'V') printVersion();
 			else if(arg[1] == 'v' && arg[2] == 'v') g_log_mode = LogMode::VV;
 			else if(arg[1] == 'v') g_log_mode = LogMode::V;
+			else if(arg[1] == 'w') g_log_mode = LogMode::W2;
 			else if(arg[1] == 'q') g_log_mode = LogMode::E;
 			else if(arg[1] == 'n') g_interactive = false;
 			else if(arg[1] == 'f') find_atoms = true;
@@ -113,5 +115,7 @@ int main(int argc, char *argv[]) {
 	}
 	catch(const char* e) {return cerr << e << '\n', 1;}
 	catch(string e) {return cerr << e << '\n', 1;}
+
+	chkHiddenWarnings();
 	return 0;
 }

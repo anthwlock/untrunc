@@ -10,12 +10,13 @@
 typedef unsigned int uint;
 typedef unsigned char uchar;
 
-enum LogMode { E, W, I, V, VV };
+enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
 extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
+extern uint g_num_w2;  // hidden warnings
 
 template<class... Args>
 void logg(Args&&... args){
@@ -26,11 +27,13 @@ void logg(Args&&... args){
 
 template<class... Args>
 void logg(LogMode m, Args&&... x){
-	if(g_muted || g_log_mode < m)
+	if(g_muted || g_log_mode < m) {
+		if (m == W2) g_num_w2++;
 		return;
+	}
 	if(m == I)
 		std::cout << "Info: ";
-	else if(m == W)
+	else if(m == W || m == W2)
 		std::cout << "Warning: ";
 	else if(m == E)
 		std::cout << "Error: ";
@@ -99,6 +102,8 @@ void hitEnterToContinue();
 
 std::string pretty_bytes(uint bytes);
 void printVersion();
+
+void chkHiddenWarnings();
 
 #define to_uint(a) static_cast<unsigned int>(a)
 

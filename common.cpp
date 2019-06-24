@@ -29,6 +29,7 @@ bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;
 bool g_stretch_video = false;
+uint g_num_w2 = 0;
 
 std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 
@@ -190,4 +191,11 @@ string pretty_bytes(uint num)
 	stringstream s;
 	s << setprecision(3) << num << units[idx] << "B";
 	return s.str();
+}
+
+void chkHiddenWarnings() {
+	if (g_num_w2) {
+		cout << string(10, ' ') << '\n';
+		logg(W, g_num_w2, " warnings were hidden!\n");
+	}
 }

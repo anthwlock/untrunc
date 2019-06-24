@@ -330,7 +330,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 			switch(nal_info.nal_type_) {
 			case NAL_SPS:
 				if(previous_slice.is_ok){
-					logg(E, "searching end, found new 'SPS'\n");
+					logg(W2, "searching end, found new 'SPS'\n");
 					return length;
 				}
 				if (!sps_info.is_ok)

@@ -30,7 +30,7 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 
 	// different nal type
 	if(previous_slice.idr_pic_flag != idr_pic_flag) {
-		logg(W, "Different nal type (5, 1)\n");
+		logg(W2, "Different nal type (5, 1)\n");
 		return true;
 	}
 
@@ -38,19 +38,19 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 	//it creates invalid packets if respected. Puzzling.
 
 	if(previous_slice.field_pic_flag != field_pic_flag) {
-		logg(W, "Different field pic flag\n");
+		logg(W2, "Different field pic flag\n");
 		return true;
 	}
 
 	if(previous_slice.bottom_pic_flag != bottom_pic_flag &&
 	   previous_slice.bottom_pic_flag != -1 && previous_slice.bottom_pic_flag != -1) {
-		logg(W, "Different bottom pic flag\n");
+		logg(W2, "Different bottom pic flag\n");
 		return true;
 	}
 
 	// TODO: 'poc_lsb' differs OR 'delta_poc_bottom' differs
 	if(previous_slice.poc_type == 0  && poc_type == 0 && previous_slice.poc_lsb != poc_lsb) {
-		logg(W, "Different poc lsb\n");
+		logg(W2, "Different poc lsb\n");
 		return true;
 	}
 	// TODO: both 'poc_type' == 1 AND either 'delta_pic_order_cnt[0]' or 'delta_pic_order_cnt[1]' differs
