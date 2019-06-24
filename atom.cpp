@@ -125,13 +125,14 @@ void Atom::findAtomNames(string& filename) {
 
 		if (atom.name_ == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || atom.name_ != "avc1") {
-			printf("%zd: %.*s (%u)", off, 4, atom.name_.c_str(), length);
+//			printf("%zd: %s (%u)", off, atom.name_.c_str(), length);
+			cout << ss(off, ": ", atom.name_, " (", length, ")");
 			off64_t next_off = off + length;
-			if (atom.name_ == "avcC") printf(" <-- skipped\n");
+			if (atom.name_ == "avcC") cout << " <-- skipped\n";
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
-				printf(" <-- invalid length\n");
+				cout << " <-- invalid length\n";
 			else
-				printf("\n");
+				cout << "\n";
 		}
 		off = findNextAtomOff(file, &atom, false);
 	}
