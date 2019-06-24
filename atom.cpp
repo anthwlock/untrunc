@@ -20,6 +20,8 @@ Atom::~Atom() {
 		delete children_[i];
 }
 
+
+
 void Atom::parseHeader(FileRead &file) {
 	start_ = file.pos();
 	length_ = file.readInt();
@@ -36,12 +38,28 @@ void Atom::parseHeader(FileRead &file) {
 	logg(VV, "name_ = ", name_, '\n');
 	logg(VV, '\n');
 
-	if (length_ < 0) throw ss("invalid atom length: ", length_);
-	if (start_ < 0) throw ss("invalid atom start: ", start_);  //  this is impossible?
+	if (length_ < 0) {
+		logg(W, "negative atom length: ", length_, "\n");
+		length_ = 8;
+	}
+	if (start_ < 0) throw ss("atom start: ", start_);  //  this is impossible?
 	for (int i=0; i < 4; i++) if (!isalnum(name_[i])) throw ss("invalid atom name: '", name_, "'");
 }
 
-void Atom::parse(FileRead &file) {
+bool isValidAtomName(const uchar* buff) {
+	if (!isdigit(*buff) && !islower(*buff)) return false;
+	for(int i = 0; i < 174; i++)
+		if (strncmp((char*)buff, knownAtoms[i].known_atom_name, 4) == 0) {
+			return true;
+		}
+	return false;
+}
+
+bool isPointingAtAtom(FileRead& file) {
+	return file.atEnd() || isValidAtomName(file.getPtr(8)+4);
+}
+
+void Atom::parse(FileRead& file) {
 	parseHeader(file);
 
 	if(isParent(name_) && name_ != "udta") { //user data atom is dangerous... i should actually skip all
@@ -56,6 +74,8 @@ void Atom::parse(FileRead &file) {
 	else if (name_ == "mdat") {
 		int64_t content_size = length_ - 8;
 		file.seekSafe(file.pos() + content_size);
+		if (!isPointingAtAtom(file))
+			throw "bad 'mdat' length";
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
@@ -65,16 +85,7 @@ void Atom::parse(FileRead &file) {
 	}
 }
 
-bool isValidAtomName(const uchar* buff) {
-	if (!isdigit(*buff) && !islower(*buff)) return false;
-	for(int i = 0; i < 174; i++)
-		if (strncmp((char*)buff, knownAtoms[i].known_atom_name, 4) == 0) {
-			return true;
-		}
-	return false;
-}
-
-off64_t Atom::findNextAtomOff(FileRead& file, Atom* start_atom, bool skip_nested) {
+off64_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool skip_nested) {
 	static bool did_msg = false;
 	off64_t next_off = skip_nested || "mdat" == start_atom->name_? start_atom->start_ + start_atom->length_ : -1;
 	if (next_off >= file.length()) return file.length();
