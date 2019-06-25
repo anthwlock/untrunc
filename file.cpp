@@ -51,7 +51,7 @@ bool FileRead::open(string filename) {
 	if(file_ == NULL) return false;
 
 	fseeko(file_, 0L, SEEK_END);
-	size_ = ftello(file_);
+	size_ = ftello64(file_);
 	fseeko(file_, 0L, SEEK_SET);
 
 	buffer_ = (uchar*) malloc(buf_size_);
@@ -116,7 +116,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 		if (total >= to_uint(buf_size_)){
 			size_t x = fread(dest+nread, 1, total, file_);
 			nread += x;
-			fillBuffer(ftello(file_));
+			fillBuffer(ftello64(file_));
 		} else {
 			size_t x = min(fillBuffer(buf_begin_+buf_off_), total);
 			memcpy(dest+nread, buffer_, x);
@@ -198,7 +198,7 @@ const uchar* FileRead::getPtrAt(off64_t pos, int size_requested) {
 }
 
 off64_t FileWrite::pos() {
-	return ftell(file_);
+	return ftello64(file_);
 }
 
 int FileWrite::writeInt(int n) {
