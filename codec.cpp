@@ -317,7 +317,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 
 		SliceInfo previous_slice;
 		NalInfo previous_nal;
-		was_keyframe = false;
+		was_keyframe_ = false;
 
 		while(1) {
 			logg(V, "---\n");
@@ -341,7 +341,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 					break;
 				return length;
 			case NAL_IDR_SLICE:
-				was_keyframe = true; // keyframe
+				was_keyframe_ = true; // keyframe
 			case NAL_SLICE:
 			{
 				SliceInfo slice_info(nal_info, sps_info);

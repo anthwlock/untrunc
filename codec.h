@@ -28,7 +28,7 @@ public:
 	AVCodec *codec_;
 	AvcConfig* avc_config_;
 
-	bool was_keyframe;
+	bool was_keyframe_;
 	void parse(Atom* trak, const std::vector<uint>& offsets, const std::vector<int64_t>& offsets_64, Atom* mdat, bool is64);
 	bool matchSampleStrict(const uchar* start) const;
 private:

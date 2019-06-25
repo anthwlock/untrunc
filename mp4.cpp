@@ -353,8 +353,8 @@ void Mp4::analyze(const string& filename) {
 			}
 
 			if (k == i){
-				cout << "detected keyframe: " << track.codec_.was_keyframe  << " true: 1\n";
-				if (!track.codec_.was_keyframe){
+				cout << "detected keyframe: " << track.codec_.was_keyframe_  << " true: 1\n";
+				if (!track.codec_.was_keyframe_){
 					cout << "keyframe not detected!";
 					hitEnterToContinue();
 				}
@@ -515,7 +515,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 
 			logg(V, "- found as ", track.codec_.name_, '\n');
 
-			bool keyframe = track.codec_.was_keyframe;
+			bool keyframe = track.codec_.was_keyframe_;
 			if(keyframe) {
 				if(broken_is_64_) track.keyframes_.push_back(track.offsets64_.size());
 				else track.keyframes_.push_back(track.offsets_.size()); }
