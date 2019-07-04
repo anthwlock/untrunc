@@ -29,7 +29,7 @@ else
   LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
   #LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
   #LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
-  LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
+  LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma -lvdpau
 endif
 
 CXXFLAGS += -std=c++11 -g
