@@ -342,6 +342,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 				return length;
 			case NAL_IDR_SLICE:
 				was_keyframe_ = true; // keyframe
+				[[fallthrough]];
 			case NAL_SLICE:
 			{
 				SliceInfo slice_info(nal_info, sps_info);
