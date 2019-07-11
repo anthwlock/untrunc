@@ -77,8 +77,12 @@ bool Codec::matchSampleStrict(const uchar *start) const {
 	int s = swap32(*(int *)start);  // big endian
 
 	if (name_ == "avc1") {
-		int s2 = swap32(((int *)start)[1]);
-		return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
+//		int s1 = s & 0x00ffffff;
+		int s1 = s;
+		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
+
+//		int s2 = swap32(((int *)start)[1]);
+//		return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 	}
 	else if (name_ == "mp4a") {
 		return false;
@@ -213,7 +217,7 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 	// this is slow because of the internal memory allocation.
 	// ff34+ decodes till exhaustion, which in turn spams repetitive warnings/errors
 	if (is_new_ffmpeg_api && consumed < 0) {
-		if (g_log_mode < LogMode::V) mute();  // don't spam libav warnings/errors
+		if (g_log_mode < LogMode::V && !g_muted) mute();  // don't spam libav warnings/errors
 		avcodec_flush_buffers(avctx);
 		pkt->size = maxlength;
 		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);

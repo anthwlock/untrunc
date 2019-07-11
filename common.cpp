@@ -179,8 +179,7 @@ void unmute() {
 	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
 }
 
-string pretty_bytes(uint num)
-{
+string pretty_bytes(double num) {
 	uint idx = 0;
 	vector<string> units = {"","Ki","Mi","Gi","Ti","Pi","Ei","Zi"};
 	while (idx+1 < units.size()) {

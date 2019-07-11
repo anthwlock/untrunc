@@ -249,7 +249,7 @@ void Mp4::saveVideo(const string& filename) {
 		cout << setprecision(4);
 		int64_t bytes_not_matched = 0;
 		for (auto n : unknown_lengths_) bytes_not_matched += n;
-		double percentage = bytes_not_matched / mdat->contentSize();
+		double percentage = (double)100 * bytes_not_matched / mdat->contentSize();
 		logg(W, "Unknown sequences: ", unknown_lengths_.size(), '\n');
 		logg(W, "Bytes not matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
 	}
@@ -533,7 +533,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 
 		if(!found && offset < mdat->contentSize()) {
 			if (g_ignore_unknown) {
-				if (!g_muted && g_log_mode < LogMode::V) {
+				if (!g_muted && g_log_mode < LogMode::V && !g_muted) {
 					logg(I, "unknown sequence -> muting ffmpeg and warnings ..\n");
 					mute();
 				}

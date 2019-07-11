@@ -100,7 +100,7 @@ std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
 
 void hitEnterToContinue();
 
-std::string pretty_bytes(uint bytes);
+std::string pretty_bytes(double bytes);
 void printVersion();
 
 void chkHiddenWarnings();
