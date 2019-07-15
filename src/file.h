@@ -33,10 +33,10 @@ extern "C" {
 
 class FileRead {
 public:
-	FileRead();
+	FileRead() = default;
+	FileRead(const std::string& filename);
 	~FileRead();
-	bool open(std::string filename);
-	bool create(std::string filename);
+	void open(const std::string& filename);
 
 	void seek(off64_t p);
 	void seekSafe(off64_t p);
@@ -57,13 +57,15 @@ public:
 	const uchar* getPtrAt(off64_t pos, int size_requested);
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
+	std::string filename_;
+
 protected:
 	size_t fillBuffer(off64_t location);
 	uchar* buffer_;
 	off64_t size_;
-	FILE *file_;
-	off64_t buf_begin_;
-	off64_t buf_off_;
+	FILE* file_ = nullptr;
+	off64_t buf_begin_ = 0;
+	off64_t buf_off_ = 0;
 };
 
 class FileWrite {

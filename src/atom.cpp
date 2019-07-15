@@ -16,7 +16,7 @@ Atom::Atom() {
 }
 
 Atom::~Atom() {
-	for(unsigned int i = 0; i < children_.size(); i++)
+	for (uint i=0; i < children_.size(); i++)
 		delete children_[i];
 }
 
@@ -85,37 +85,36 @@ void Atom::parse(FileRead& file) {
 	}
 }
 
-off64_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool skip_nested) {
-	static bool did_msg = false;
-	off64_t next_off = skip_nested || "mdat" == start_atom->name_? start_atom->start_ + start_atom->length_ : -1;
-	if (next_off >= file.length()) return file.length();
-	if (next_off > start_atom->start_ && "avcC" != start_atom->name_ && isValidAtomName(file.getPtrAt(next_off+4, 4)))
-		return next_off;
-	else {
-		if (skip_nested && !did_msg) {
-			logg(I, "searching start of mdat ... \n");
-			did_msg = true;
-		}
-		for(off64_t off=start_atom->start_+8; off < file.length();) {
-			const uchar* buff = file.getPtrAt(off, 4);
-			if (off % (1<<16) == 0) outProgress(off, file.length());
-			if (!isdigit(*buff) && !islower(*buff)) {off += 4; continue;}
-			for (int i=3; i >= 0; --i)
-				if (isValidAtomName(buff-i)) return off-4-i;
-			off += 7;
-		}
+off64_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat) {
+	static int show_mdat_msg_in = 2;  // first start_atom is not initialized
+	off64_t next_off = start_atom->start_ + start_atom->length_;
+	bool skip_nested = ((searching_mdat && start_atom->name_ != "avcC" ) || start_atom->name_ == "mdat") &&
+	                   next_off > start_atom->start_;
+
+	if (skip_nested) {
+		if (next_off >= file.length()) return file.length();
+		if (isValidAtomName(file.getPtrAt(next_off+4, 4))) return next_off;
+	}
+
+	if (searching_mdat && !--show_mdat_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
+
+	for(off64_t off=start_atom->start_+8; off < file.length();) {
+		auto buff = file.getPtrAt(off, 4);
+		if (g_log_mode == LogMode::I && off % (1<<16) == 0) outProgress(off, file.length());
+		if (!isdigit(*buff) && !islower(*buff)) {off += 4; continue;}
+		for (int i=3; i >= 0; --i)
+			if (isValidAtomName(buff-i)) return off-4-i;
+		off += 7;
 	}
 	return file.length();
 }
 
 void Atom::findAtomNames(string& filename) {
-	FileRead file;
-	bool success = file.open(filename);
-	if(!success) throw ss("Could not open file: ", filename);
+	FileRead file(filename);
 	Atom atom;
 
 	bool ignore_avc1 = 0;
-	off64_t off = findNextAtomOff(file, &atom, false);
+	off64_t off = findNextAtomOff(file, &atom);
 	while (off < file.length()) {
 		const uchar* buff = file.getPtrAt(off, 4);
 		uint length = swap32(*(uint*)buff);
@@ -125,7 +124,6 @@ void Atom::findAtomNames(string& filename) {
 
 		if (atom.name_ == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || atom.name_ != "avc1") {
-//			printf("%zd: %s (%u)", off, atom.name_.c_str(), length);
 			cout << ss(off, ": ", atom.name_, " (", length, ")");
 			off64_t next_off = off + length;
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
@@ -134,7 +132,7 @@ void Atom::findAtomNames(string& filename) {
 			else
 				cout << "\n";
 		}
-		off = findNextAtomOff(file, &atom, false);
+		off = findNextAtomOff(file, &atom);
 	}
 }
 
@@ -146,7 +144,7 @@ void Atom::write(FileWrite &file) {
 	file.writeChar(name_.data(), 4);
 	if(content_.size())
 		file.write(content_);
-	for(unsigned int i = 0; i < children_.size(); i++)
+	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(file);
 	int end = file.pos();
 	assert(end - start == length_);
@@ -248,7 +246,7 @@ void Atom::print(int offset) {
 
 	}
 
-	for(unsigned int i = 0; i < children_.size(); i++)
+	for (uint i=0; i < children_.size(); i++)
 		children_[i]->print(offset+1);
 }
 
@@ -282,7 +280,7 @@ bool Atom::isVersioned(const string& id) {
 
 vector<Atom *> Atom::atomsByName(const string& name) {
 	vector<Atom *> atoms;
-	for(unsigned int i = 0; i < children_.size(); i++) {
+	for (uint i=0; i < children_.size(); i++) {
 		if(children_[i]->name_ == name)
 			atoms.push_back(children_[i]);
 		vector<Atom *> a = children_[i]->atomsByName(name);
@@ -291,7 +289,7 @@ vector<Atom *> Atom::atomsByName(const string& name) {
 	return atoms;
 }
 Atom *Atom::atomByName(const string& name) {
-	for(unsigned int i = 0; i < children_.size(); i++) {
+	for (uint i=0; i < children_.size(); i++) {
 		if(children_[i]->name_ == name)
 			return children_[i];
 		Atom *a = children_[i]->atomByName(name);
@@ -301,7 +299,7 @@ Atom *Atom::atomByName(const string& name) {
 }
 
 void Atom::replace(Atom *original, Atom *replacement) {
-	for(unsigned int i = 0; i < children_.size(); i++) {
+	for (uint i=0; i < children_.size(); i++) {
 		if(children_[i] == original) {
 			children_[i] = replacement;
 			return;
@@ -334,7 +332,7 @@ void Atom::updateLength() {
 	length_ += content_.size();
 //	assert(name_ != string("mdat"));
 
-	for(unsigned int i = 0; i < children_.size(); i++) {
+	for (uint i=0; i < children_.size(); i++) {
 		Atom *child = children_[i];
 		child->updateLength();
 		length_ += child->length_;
@@ -364,19 +362,14 @@ string Atom::getString(int64_t offset, int64_t length) {
 }
 
 
-//WriteAtom::WriteAtom(FileRead& file): buffer_(NULL), buffer_begin_(0), file_read_(file) {
-BufferedAtom::BufferedAtom(FileRead& file): file_read_(file) {
-}
-
-BufferedAtom::~BufferedAtom() {
-}
+BufferedAtom::BufferedAtom(FileRead& file): file_read_(file) {}
 
 const uchar *BufferedAtom::getFragment(int64_t offset, int64_t size) {
 	if(offset < 0)
 		throw "Offset set before beginning of file";
 	if(offset + size > file_end_ - file_begin_)
 		throw "Out of Range";
-	file_read_.seek(file_begin_ + offset);
+	file_read_.seek(file_begin_ + offset);  // cheap seek
 	return file_read_.getPtr(size);
 }
 
@@ -384,7 +377,7 @@ void BufferedAtom::updateLength() {
 	length_ = 8;
 	length_ += file_end_ - file_begin_;
 
-	for(unsigned int i = 0; i < children_.size(); i++) {
+	for (uint i=0; i < children_.size(); i++) {
 		Atom *child = children_[i];
 		child->updateLength();
 		length_ += child->length_;
@@ -417,7 +410,7 @@ void BufferedAtom::write(FileWrite &output) {
 		offset += toread;
 		output.writeChar(buff, toread);
 	}
-	for(unsigned int i = 0; i < children_.size(); i++)
+	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(output);
 	off64_t end = output.pos();
 	assert(end - start == length_);

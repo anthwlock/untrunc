@@ -22,10 +22,8 @@
 #define TRACK_H
 
 #include <vector>
-#include <iosfwd>
 
 #include "codec.h"
-class Codec;
 
 class Track {
 public:
@@ -39,18 +37,19 @@ public:
 	int n_matched;
 	double stretch_factor_ = 1; // stretch video by via stts entries
 	bool do_stretch_ = false;
-	std::string type_; // 'soun' OR 'vide'
+	std::string handler_type_; // 'soun' OR 'vide'
+	std::string handler_name_;  // encoder used when created
 
 	std::vector<int> times_; // sample times
-	std::vector<uint> offsets_;
-	std::vector<int64_t> offsets64_;
+	std::vector<uint64_t> offsets_;
 	std::vector<int> sizes_;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
+	int getOrigSize(uint idx);
 
 	void parse(Atom *mdat);
 	void writeToAtoms();
 	void clear();
-	void fixTimes(bool is64);
+	void fixTimes();
 
 	int getDurationInTimescale(); // in movie timescale, not track timescale
 	int getDurationInMs();
@@ -58,16 +57,20 @@ public:
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);
 	std::vector<int> getSampleSizes(Atom *t);
-	std::vector<uint> getChunkOffsets(Atom* t);
+	std::vector<uint64_t> getChunkOffsets(Atom* t);
 	std::vector<int> getSampleToChunk(Atom *t, int nchunks);
 
-	std::vector<int64_t> getChunkOffsets64(Atom* t);
+	std::vector<uint64_t> getChunkOffsets64(Atom* t);
 
 	void saveSampleTimes();
 	void saveKeyframes();
 	void saveSampleToChunk();
 	void saveSampleSizes();
 	void saveChunkOffsets();
+
+private:
+	std::vector<int> orig_sizes_;  // from healthy file
+
 };
 
 

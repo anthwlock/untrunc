@@ -48,7 +48,7 @@ build_script:
   - unzip -q ffmpeg-shared.zip
   - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-shared\bin %_BIN%
 
-  #- g++ -o untrunc -O3 *.cpp -lavformat -lavcodec -lavutil -std=c++11
+  #- g++ -o untrunc -O3 src/*.cpp -lavformat -lavcodec -lavutil -std=c++11
   - mingw32-make
 
   - depends /c /oc:deps.txt /f:1 untrunc.exe

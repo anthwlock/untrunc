@@ -18,23 +18,29 @@ extern "C" {
 #include "sps-info.h"
 #include "nal-slice.h"
 #include "avc-config.h"
+#include "mp4.h"
 
 using namespace std;
 
-Codec::Codec(AVCodecParameters* c) : avc_config_(NULL) {
-	codec_ = avcodec_find_decoder(c->codec_id);
+Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {
+	av_codec_ = avcodec_find_decoder(c->codec_id);
 
-	context_ = avcodec_alloc_context3(codec_);
-	avcodec_parameters_to_context(context_, c);
+	if (!av_codec_) {
+		auto codec_type = av_get_media_type_string(c->codec_type);
+		auto codec_name = avcodec_get_name(c->codec_id);
+		logg(V, "FFmpeg does not support codec: <", codec_type, ", ", codec_name, ">\n");
+		return;
+	}
 
-	if (!codec_)
-		throw "No codec found!";
-	if (avcodec_open2(context_, codec_, NULL) < 0)
+	av_codec_context_ = avcodec_alloc_context3(av_codec_);
+	avcodec_parameters_to_context(av_codec_context_, c);
+
+	if (avcodec_open2(av_codec_context_, av_codec_, NULL) < 0)
 		throw "Could not open codec: ?";
 
 }
 
-void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>& offsets_64, Atom *mdat, const bool is64) {
+void Codec::parse(Atom *trak, const vector<uint64_t>& offsets, Atom *mdat) {
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
 	if(entries != 1)
@@ -47,7 +53,7 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 		if (!avc_config_->is_ok)
 			logg(W, "avcC was not decoded correctly\n");
 		else
-			logg(I, "avcC got decoded\n");
+			logg(V, "avcC got decoded\n");
 	}
 
 	else if (name_ == "mp4a") {
@@ -56,10 +62,9 @@ void Codec::parse(Atom *trak, const vector<uint>& offsets, const vector<int64_t>
 		packet_->size = g_max_partsize;
 	}
 
-	size_t len_offs = is64? offsets_64.size() : offsets.size();
-	for(uint i = 0; i < len_offs; i++) {
-		int64_t offset = is64? offsets_64[i] : offsets[i];
-		if(offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
+	for (uint i = 0; i < offsets.size(); i++) {
+		int64_t offset = offsets[i];
+		if (offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
 			cout << "i = " << i;
 			cout << "\noffset = " << offset
 			     << "\nmdat->start = " << mdat->start_
@@ -77,16 +82,19 @@ bool Codec::matchSampleStrict(const uchar *start) const {
 	int s = swap32(*(int *)start);  // big endian
 
 	if (name_ == "avc1") {
-//		int s1 = s & 0x00ffffff;
+		if (strictness_level_ > 0) {
+			int s2 = swap32(((int *)start)[1]);
+			return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
+		}
 		int s1 = s;
 		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
-
-//		int s2 = swap32(((int *)start)[1]);
-//		return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 	}
 	else if (name_ == "mp4a") {
 		return false;
 //		return (s>>16) == 0x210A;  // this needs to be improved
+	}
+	else if (name_ == "tmcd") {
+		return false;
 	}
 	else {
 		return matchSample(start);
@@ -96,13 +104,13 @@ bool Codec::matchSampleStrict(const uchar *start) const {
 
 bool Codec::matchSample(const uchar *start) const{
 	int s = swap32(*(int *)start);  // big endian
-	if(name_ == "avc1") {
+	if (name_ == "avc1") {
 
 		//this works only for a very specific kind of video
 		//#define SPECIAL_VIDEO
 #ifdef SPECIAL_VIDEO
 		int s2 = swap32(((int *)start)[1]);
-		if(s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
+		return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
 		return true;
 #endif
 
@@ -126,7 +134,7 @@ bool Codec::matchSample(const uchar *start) const{
 		logg(V, "avc1: failed for no particular reason\n");
 		return false;
 
-	} else if(name_ == "mp4a") {
+	} else if (name_ == "mp4a") {
 		if(s > 1000000) {
 			logg(V, "mp4a: Success because of large s value\n");
 			return true;
@@ -168,12 +176,12 @@ bool Codec::matchSample(const uchar *start) const{
 			return false;
 		return true; */
 
-	} else if(name_ == "mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
+	} else if (name_ == "mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
 		if(s == 0x1b3 || s == 0x1b6)
 			return true;
 		return false;
 
-	} else if(name_ == "alac") {
+	} else if (name_ == "alac") {
 		int t = swap32(*(int *)(start + 4));
 		t &= 0xffff0000;
 
@@ -181,27 +189,39 @@ bool Codec::matchSample(const uchar *start) const{
 		if(s == 0x1000 && t == 0x001a0000) return true;
 		return false;
 
-	} else if(name_ == "samr") {
+	} else if (name_ == "samr") {
 		return start[0] == 0x3c;
-	} else if(name_ == "twos") {
+	} else if (name_ == "twos") {
 		//weird audio codec: each packet is 2 signed 16b integers.
 		cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
 		exit(0);
 		return true;
-	} else if(name_ == "apcn") {
+	} else if (name_ == "apcn") {
 		return memcmp(start, "icpf", 4) == 0;
-	} else if(name_ == "lpcm") {
+	} else if (name_ == "lpcm") {
 		// This is not trivial to detect because it is just
 		// the audio waveform encoded as signed 16-bit integers.
 		// For now, just test that it is not "apcn" video:
 		return memcmp(start, "icpf", 4) != 0;
-	} else if(name_ == "in24") { //it's a codec id, in a case I found a pcm_s24le (little endian 24 bit) No way to know it's length.
+	} else if (name_ == "in24") { //it's a codec id, in a case I found a pcm_s24le (little endian 24 bit) No way to know it's length.
 		return true;
-	} else if(name_ == "sowt") {
+	} else if (name_ == "sowt") {
 		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
 		return false;
-	} else if(name_ == "sawb") {
+	} else if (name_ == "sawb") {
 		return start[0] == 0x44;
+	}
+	if (name_ == "tmcd") {  // GoPro timecode .. hardcoded in Mp4::GetMatches
+		return false;
+//		return !tmcd_seen_ && start[0] == 0 && g_mp4->wouldMatch(start+4, "tmcd");
+	}
+	if (name_ == "gpmd") {  // GoPro timecode, 4 bytes (?)
+		vector<string> fourcc = {"DEVC", "DVID", "DVNM", "STRM", "STNM", "RMRK",  "SCAL",
+		                         "SIUN", "UNIT", "TYPE", "TSMP", "TIMO", "EMPT"};
+		return contains(fourcc, string((char*)start, 4));
+	}
+	if (name_ == "fdsc") {  // GoPro recovery, anyone knows more?
+		return string((char*)start, 2) == "GP";
 	}
 
 	return false;
@@ -233,13 +253,13 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 #pragma GCC diagnostic pop
 
 
-int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_bad) {
-	if(name_ == "mp4a" || name_ == "sawb") {
+int Codec::getSize(const uchar *start, uint maxlength) {
+	if (name_ == "mp4a" || name_ == "sawb") {
 		packet_->data = const_cast<uchar*>(start);
 		if(!is_new_ffmpeg_api) packet_->size = maxlength;
 		int got_frame = 0;
 
-		int consumed = untr_decode_audio4(context_, frame_, &got_frame, packet_, maxlength);
+		int consumed = untr_decode_audio4(av_codec_context_, frame_, &got_frame, packet_, maxlength);
 //		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet_);
 
 		// simulate state for new API
@@ -248,15 +268,15 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 			if (packet_->size <= 0) packet_->size = maxlength;
 		}
 
-		duration = frame_->nb_samples;
-		logg(V, "nb_samples: ", duration, '\n');
+		audio_duration_ = frame_->nb_samples;
+		logg(V, "nb_samples: ", audio_duration_, '\n');
 
 		if (!n_channels_) n_channels_ = frame_->channels;
-		is_bad = (!got_frame || frame_->channels != n_channels_);
+		was_bad_ = (!got_frame || frame_->channels != n_channels_);
 
 		return consumed;
 
-	} else if(name_ == "mp4v") {
+	} else if (name_ == "mp4v") {
 
 		/*     THIS DOES NOT SEEM TO WORK FOR SOME UNKNOWN REASON. IT JUST CONSUMES ALL BYTES.
 		*     AVFrame *frame = avcodec_alloc_frame();
@@ -277,7 +297,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 		cout << "Unfortunately I found no way to guess size of mp4v packets. Sorry\n";
 		return -1;
 
-	} else if(name_ == "avc1") {
+	} else if (name_ == "avc1") {
 		//        AVFrame *frame = av_frame_alloc();
 		//        if(!frame)
 		//            throw "Could not create AVFrame";
@@ -377,7 +397,7 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 			default:
 				if(previous_slice.is_ok) {
 					if(!nal_info.is_forbidden_set_) {
-						logg(W, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
+						logg(W2, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
 						return length;
 					} // otherwise it's malformed, don't produce an isolated malformed unit
 				}
@@ -392,20 +412,39 @@ int Codec::getSize(const uchar *start, uint maxlength, int &duration, bool &is_b
 		}
 		return length;
 
-	} else if(name_ == "samr") { //lenght is multiple of 32, we split packets.
+	} else if (name_ == "samr") { //lenght is multiple of 32, we split packets.
 		return 32;
-	} else if(name_ == "twos") { //lenght is multiple of 32, we split packets.
+	} else if (name_ == "twos") { //lenght is multiple of 32, we split packets.
 		return 4;
-	} else if(name_ == "apcn") {
+	} else if (name_ == "apcn") {
 		return swap32(*(int *)start);
-	} else if(name_ == "lpcm") {
+	} else if (name_ == "lpcm") {
 		// Use hard-coded values for now....
 		const int num_samples      = 4096; // Empirical
 		const int num_channels     =    2; // Stereo
 		const int bytes_per_sample =    2; // 16-bit
 		return num_samples * num_channels * bytes_per_sample;
-	} else if(name_ == "in24") {
+	} else if (name_ == "in24") {
 		return -1;
-	} else
-		return -1;
+	} else if (name_ == "tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
+//		tmcd_seen_ = true;
+		return 4;
+	} else if (name_ == "gpmd") {  // GoPro meta data, see 'gopro/gpmf-parser'
+		int s2 = swap32(((int *)start)[1]);
+		int num = (s2 & 0x0000ffff);
+		return num + 8;
+	} else if (name_ == "fdsc") {  // GoPro recovery
+		// TODO: How is this track used for recovery?
+
+		fdsc_idx_++;
+		if (fdsc_idx_ == 0) {
+			for(auto pos=start+4; maxlength; pos+=4, maxlength-=4) {
+				if (string((char*)pos, 2) == "GP") return pos-start;
+			}
+		}
+		else if (fdsc_idx_ == 1) return g_mp4->getTrack("fdsc").getOrigSize(1);  // probably 152 ?
+		return 16;
+
+	}
+	else return -1;
 }

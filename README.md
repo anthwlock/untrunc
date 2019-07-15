@@ -19,8 +19,8 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 * can stretch/shrink video to match audio duration
 * compatible with new versions of ffmpeg
 * handles invalid atom lengths
-* most issues/bugs are fixed
-* actively maintained
+* supports GoPro videos
+* many bugs got fixed, actively maintained
 
 ## Building
 

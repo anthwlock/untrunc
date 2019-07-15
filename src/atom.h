@@ -46,7 +46,7 @@ public:
 
 	void writeInt64(int64_t value, uint64_t offset);
 	static void findAtomNames(std::string& filename);
-	static off64_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool skip_nested=true);
+	static off64_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
 };
 
 class BufferedAtom: public Atom {
@@ -56,7 +56,6 @@ public:
 	int64_t file_end_;
 
 	explicit BufferedAtom(FileRead&);
-	~BufferedAtom();
 	const uchar *getFragment(int64_t offset, int64_t size);
 	int64_t contentSize() { return file_end_ - file_begin_; }
 	void updateLength();

@@ -6,6 +6,9 @@
 #include <map>
 #include <vector>
 #include <sstream>
+#include <algorithm>
+
+class Mp4;
 
 typedef unsigned int uint;
 typedef unsigned char uchar;
@@ -13,10 +16,11 @@ typedef unsigned char uchar;
 enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
-extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video;
+extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks, g_dont_write;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings
+extern Mp4* g_mp4;
 
 template<class... Args>
 void logg(Args&&... args){
@@ -27,15 +31,15 @@ void logg(Args&&... args){
 
 template<class... Args>
 void logg(LogMode m, Args&&... x){
-	if(g_muted || g_log_mode < m) {
+	if (g_log_mode < m) {
 		if (m == W2) g_num_w2++;
 		return;
 	}
-	if(m == I)
+	if (m == I)
 		std::cout << "Info: ";
-	else if(m == W || m == W2)
+	else if (m == W || m == W2)
 		std::cout << "Warning: ";
-	else if(m == E)
+	else if (m == E)
 		std::cout << "Error: ";
 	logg(std::forward<Args>(x)...);
 }
@@ -48,6 +52,10 @@ std::string ss(Args&&... args){
 	return ss.str();
 }
 
+template <typename Container>
+bool contains(Container const& c, typename Container::const_reference v) {
+  return std::find(c.begin(), c.end(), v) != c.end();
+}
 
 /* NAL unit types */
 enum {
@@ -98,12 +106,14 @@ uint readBits(int n, const uchar *&buffer, int &offset);
 void printBuffer(const uchar* pos, int n);
 std::string mkHexStr(const uchar* pos, int n, bool bytes_seperated=false);
 
-void hitEnterToContinue();
+void hitEnterToContinue(bool new_line=true);
 
 std::string pretty_bytes(double bytes);
 void printVersion();
 
 void chkHiddenWarnings();
+
+std::string trim_right(std::string& in);
 
 #define to_uint(a) static_cast<unsigned int>(a)
 

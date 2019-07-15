@@ -27,7 +27,8 @@
 
 using namespace std;
 
-FileRead::FileRead(): file_(NULL), buf_begin_(0), buf_off_(0) {
+FileRead::FileRead(const string& filename) {
+	open(filename);
 }
 
 FileRead::~FileRead() {
@@ -46,9 +47,10 @@ FileWrite::~FileWrite() {
 	}
 }
 
-bool FileRead::open(string filename) {
+void FileRead::open(const string& filename) {
+	filename_ = filename;
 	file_ = fopen64(filename.c_str(), "rb");
-	if(file_ == NULL) return false;
+	if (!file_) throw("Could not open file: " + filename);
 
 	fseeko64(file_, 0L, SEEK_END);
 	size_ = ftello64(file_);
@@ -56,8 +58,6 @@ bool FileRead::open(string filename) {
 
 	buffer_ = (uchar*) malloc(buf_size_);
 	fread(buffer_, 1, buf_size_, file_);
-
-	return true;
 }
 
 bool FileWrite::create(string filename) {
@@ -174,12 +174,7 @@ const uchar* FileRead::getPtr(int size_requested) {
 	// check if requested size exceeds buffer
 	if (buf_off_ + size_requested > buf_size_){
 		logg(VV, "size_requested: ", size_requested, '\n');
-//		cout << "buffer_:\n";
-//		printBuffer(buffer_, 30);
 		fillBuffer(buf_begin_+buf_off_);
-//		cout << "buffer_:\n";
-//		printBuffer(buffer_, 30);
-//		return buffer_tmp_;
 	}
 	return buffer_+buf_off_;
 }

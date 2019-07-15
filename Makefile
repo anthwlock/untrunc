@@ -40,7 +40,7 @@ CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
 EXE ?= $(_EXE)
 DIR := $(_DIR)_$(FF_VER)
-SRC := $(wildcard *.cpp)
+SRC := $(wildcard src/*.cpp)
 OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
 FFDIR := ffmpeg-$(FF_VER)
@@ -50,6 +50,9 @@ NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
 ifeq ($(NJOBS), 0)
   NJOBS = 1
 endif
+
+#$(info $$OBJ is [${OBJ}])
+$(shell mkdir -p $(dir $(OBJ)) >/dev/null)
 
 .PHONY: all clean force
 

@@ -17,28 +17,7 @@ DEFINES += UNTR_VERSION=\\\"$$GIT_VERSION\\\"
 
 TEMPLATE = app
 
-SOURCES += main.cpp \
-	atom.cpp \
-	mp4.cpp \
-	file.cpp \
-	track.cpp \
-	codec.cpp \
-	common.cpp \
-	nal.cpp \
-	sps-info.cpp \
-	nal-slice.cpp \
-	avc-config.cpp
-
-HEADERS += \
-	atom.h \
-	mp4.h \
-	file.h \
-	track.h \
-	codec.h \
-	common.h \
-	nal.h \
-	sps-info.h \
-	nal-slice.h \
-	avc-config.h
+SOURCES += $$files(src/*.cpp, true)
+HEADERS += $$files(src/*.h, true)
 
 LIBS += -lavformat -lavcodec -lavutil

@@ -29,7 +29,10 @@ bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;
 bool g_stretch_video = false;
+bool g_show_tracks = false;
+bool g_dont_write = false;
 uint g_num_w2 = 0;
+Mp4* g_mp4 = nullptr;
 
 std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 
@@ -155,9 +158,9 @@ uint readBits(int n, const uchar *&buffer, int &offset) {
 //}
 
 
-void hitEnterToContinue() {
+void hitEnterToContinue(bool new_line) {
 	if (g_interactive) {
-		cout << " Hit enter to continue." << endl;
+		cout << "  [[Hit enter to continue]]" << (new_line? "\n" : "") << flush;
 		getchar();
 	}
 //	else cout << '\n';
@@ -175,7 +178,8 @@ void mute() {
 
 void unmute() {
 	g_muted = false;
-	if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
+	if(g_log_mode <= E) av_log_set_level(AV_LOG_QUIET);
+	else if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
 	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
 }
 
@@ -198,3 +202,10 @@ void chkHiddenWarnings() {
 		logg(W, g_num_w2, " warnings were hidden!\n");
 	}
 }
+
+string trim_right(string& in) {
+	int idx = in.size()-1;
+	for (; in[idx] == ' '; idx--);
+	return in.substr(0, idx+1);
+}
+

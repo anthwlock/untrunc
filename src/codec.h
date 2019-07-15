@@ -19,25 +19,31 @@ class Codec {
 public:
 	Codec(AVCodecParameters* c);
 	std::string name_;
-	void parse(Atom *trak, std::vector<int> &offsets, Atom *mdat);
+
+	void parse(Atom* trak, const std::vector<uint64_t>& offsets, Atom* mdat);
 	bool matchSample(const uchar *start) const;
-	int getSize(const uchar *start, uint maxlength, int &duration, bool &is_bad);
+	int getSize(const uchar *start, uint maxlength);
 
 	// specific to codec:
-	AVCodecContext *context_;
-	AVCodec *codec_;
-	AvcConfig* avc_config_;
+	AVCodecParameters* av_codec_params_;
+	AVCodec* av_codec_;
+	AVCodecContext* av_codec_context_ = nullptr;
+	AvcConfig* avc_config_ = nullptr;
 
-	bool was_keyframe_;
-	void parse(Atom* trak, const std::vector<uint>& offsets, const std::vector<int64_t>& offsets_64, Atom* mdat, bool is64);
+	// info about last frame, codec specific
+	bool was_keyframe_ = false;
+	bool was_bad_ = false;
+	int audio_duration_ = 0;
+
 	bool matchSampleStrict(const uchar* start) const;
+	uint strictness_level_ = 0;
+
 private:
 	int n_channels_ = 0;
+	uint fdsc_idx_ = -1;  // GoPro specific
+//	int tmcd_seen_ = 0;  // GoPro specific
 	AVPacket* packet_;
 	AVFrame* frame_;
-
-//	struct BufEntry{int size, nb_samples;};
-//	std::queue<BufEntry> buffer_;
 };
 
 #endif // CODEC_HPP

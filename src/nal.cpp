@@ -60,7 +60,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 	//check size is reasonable:
 	if(len < 8) {
-		cout << "Too short!\n";
+		logg(W2, "Too short!\n");
 		return false;
 	}
 
