@@ -68,7 +68,7 @@ $(FFDIR)/configure:
 $(FFDIR)/config.asm: | $(FFDIR)/configure
 	@echo "(info) please wait ..."
 	cd $(FFDIR); ./configure --disable-doc --disable-programs \
-	--disable-everything --enable-decoders --enable-demuxers --enable-protocol=file \
+	--disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
 	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc
 
 $(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
