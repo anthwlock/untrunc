@@ -209,3 +209,7 @@ string trim_right(string& in) {
 	return in.substr(0, idx+1);
 }
 
+
+bool contains(const std::initializer_list<string>& c, const std::string& v) {
+  return std::find(c.begin(), c.end(), v) != c.end();
+}

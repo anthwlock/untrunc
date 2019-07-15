@@ -52,6 +52,8 @@ std::string ss(Args&&... args){
 	return ss.str();
 }
 
+bool contains(const std::initializer_list<std::string>& c, const std::string& v);
+
 template <typename Container>
 bool contains(Container const& c, typename Container::const_reference v) {
   return std::find(c.begin(), c.end(), v) != c.end();

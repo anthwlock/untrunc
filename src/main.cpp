@@ -79,7 +79,8 @@ int main(int argc, char *argv[]) {
 		if (arg_step == kExpectArg) {arg_step = stoi(arg); continue;}
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
-			auto a1 = arg[1];
+			if (arg.size() > 2 && !contains({"sv", "st", "vv", "dw"}, argv[i]+1)) usage();
+			char a1 = arg[1];
 			auto a2 = arg.substr(1, 2);
 			if(arg[1] == 'i') show_info = true;
 			else if(a1 == 't') show_tracks = true;
