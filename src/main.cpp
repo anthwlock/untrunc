@@ -31,19 +31,24 @@ using namespace std;
 
 void usage() {
 	cerr << "Usage: untrunc [options] <ok.mp4> [corrupt.mp4]\n"
-	     << "\noptions:\n"
+	     << "\ngeneral options:\n"
 	     << "-V  - version\n"
-	     << "-s  - skip/ignore unknown sequences\n"
+	     << "-n  - no interactive\n" // in Mp4::analyze()
+	     << "\n"
+	     << "repair options:\n"
+	     << "-s  - step through unknown sequences\n"
+	     << "-st <step_size> - used with '-s'\n"
+	     << "-sv - stretches video to match audio duration (beta)\n"
+	     << "-dw - don't write _fixed.mp4\n"
+	     << "\n"
+	     << "analyze options:\n"
 	     << "-a  - analyze\n"
 	     << "-i  - info\n"
 	     << "-d  - dump samples\n"
 	     << "-f  - find all atoms and check their lenghts\n"
-	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-t  - show tracks\n"
-	     << "-dw - don't write\n"
-	     << "-n  - no interactive\n" // in Mp4::analyze()
 	     << "-m <offset> - match/analyze file offset\n"
-	     << "-st <step_size> - used with '-s'\n"
+	     << "untrunc <ok.mp4> <ok.mp4> - report wrong values\n"
 	     << "\n"
 	     << "logging options:\n"
 	     << "-q  - quiet, only errors\n"
@@ -79,31 +84,30 @@ int main(int argc, char *argv[]) {
 		if (arg_step == kExpectArg) {arg_step = stoi(arg); continue;}
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
-			if (arg.size() > 2 && !contains({"sv", "st", "vv", "dw"}, argv[i]+1)) usage();
-			char a1 = arg[1];
-			auto a2 = arg.substr(1, 2);
-			if(arg[1] == 'i') show_info = true;
-			else if(a1 == 't') show_tracks = true;
-			else if(a2 == "sv") g_stretch_video = true;
-			else if(a2 == "st") arg_step = kExpectArg;
-			else if(a1 == 's') g_ignore_unknown = true;
-			else if(a1 == 'a') analyze = true;
-			else if(a1 == 'V') printVersion();
-			else if(a2 == "vv") g_log_mode = LogMode::VV;
-			else if(a1 == 'v') g_log_mode = LogMode::V;
-			else if(a1 == 'w') g_log_mode = LogMode::W2;
-			else if(a1 == 'q') g_log_mode = LogMode::E;
-			else if(a1 == 'n') g_interactive = false;
-			else if(a1 == 'f') find_atoms = true;
-			else if(a2 == "dw") {g_dont_write = true;}
-			else if(a1 == 'd') {dump_samples = true; g_log_mode = LogMode::E;}
-			else if(a1 == 'm') {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
+			auto a = arg.substr(1);
+			if      (a == "i") show_info = true;
+			else if (a == "t") show_tracks = true;
+			else if (a == "sv") g_stretch_video = true;
+			else if (a == "st") arg_step = kExpectArg;
+			else if (a == "s") g_ignore_unknown = true;
+			else if (a == "a") analyze = true;
+			else if (a == "V") printVersion();
+			else if (a == "vv") g_log_mode = LogMode::VV;
+			else if (a == "v") g_log_mode = LogMode::V;
+			else if (a == "w") g_log_mode = LogMode::W2;
+			else if (a == "q") g_log_mode = LogMode::E;
+			else if (a == "n") g_interactive = false;
+			else if (a == "f") find_atoms = true;
+			else if (a == "dw") {g_dont_write = true;}
+			else if (a == "d") {dump_samples = true; g_log_mode = LogMode::E;}
+			else if (a == "m") {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
+			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}
 		else if (argc > i+2) usage();  // too many arguments
 		else break;
 	}
-	if(argc == i) usage();  // no filename given
+	if (argc == i) usage();  // no filename given
 
 	string ok = argv[i++], corrupt;
 	if (i < argc) corrupt = argv[i++];
