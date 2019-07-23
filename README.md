@@ -6,7 +6,7 @@ Restore a damaged (truncated) mp4, m4v, mov, 3gp video. Provided you have a simi
 You need:
 
 * Another video file which isn't broken
-* Basic ability to use a command line
+* ~~Basic ability to use a command line~~ ([GUI](#GUI) exists)
 
 ## About this fork
 This fork improves the [original](https://github.com/ponchio/untrunc) in the following:
@@ -41,6 +41,12 @@ Just use following commands, make will do the rest for you.
 	sudo apt-get install libva-dev liblzma-dev libx11-dev libbz2-dev zlib1g-dev yasm pkg-config wget
 	make FF_VER=3.3.9
 	sudo cp untrunc /usr/local/bin
+
+#### GUI
+
+The GUI is optional. You will need [libui](https://github.com/andlabs/libui). After that, just do
+
+	make untrunc-gui
 
 ## Docker container
 

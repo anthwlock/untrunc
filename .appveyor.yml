@@ -10,12 +10,14 @@ environment:
       _MINGW: C:\mingw-w64\x86_64-7.3.0-posix-seh-rt_v5-rev0\mingw64
       _MINGW_TOOLCHAIN: x86_64-w64-mingw32
       _ARCH: win64
+      _ARCH_UI: amd64
 
     - JOB: "32"
       _UNTR_DEST: untrunc_x32
       _MINGW: C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32
       _MINGW_TOOLCHAIN: i686-w64-mingw32
       _ARCH: win32
+      _ARCH_UI: 386
 
 build: Script
 
@@ -48,16 +50,24 @@ build_script:
   - unzip -q ffmpeg-shared.zip
   - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-shared\bin %_BIN%
 
+  - curl -s -L https://github.com/andlabs/libui/releases/download/alpha4.1/libui-alpha4.1-windows-%_ARCH_UI%-shared.zip -o libui-shared.zip
+  - unzip -d libui-shared -q libui-shared.zip
+  - xcopy /s /q libui-shared\ui.h %_INCLUDE%
+  - xcopy /s /q libui-shared\libui.lib %_LIB%\ui.lib*
+  - xcopy /s /q libui-shared\libui.dll %_BIN%
+
   #- g++ -o untrunc -O3 src/*.cpp -lavformat -lavcodec -lavutil -std=c++11
   - mingw32-make
+  - mingw32-make untrunc-gui
 
-  - depends /c /oc:deps.txt /f:1 untrunc.exe
+  - depends /c /oc:deps.txt /f:1 untrunc-gui.exe
 
   - set PATH=%_BASH_PATH%;%PATH%
   - mkdir %_UNTR_DEST%
 
   - bash -c 'while read -r line; do path=$(cut -d\" -f2 <<<$line); cp -v $path %_UNTR_DEST%; done <<<$(grep "mingw.*mingw.*bin" deps.txt); exit 0'
-  - mv untrunc %_UNTR_DEST%
+  - strip untrunc.exe -o %_UNTR_DEST%\untrunc.exe
+  - strip untrunc-gui.exe -o %_UNTR_DEST%\untrunc-gui.exe
   - zip -r %_UNTR_DEST%.zip %_UNTR_DEST%
 
 artifacts:

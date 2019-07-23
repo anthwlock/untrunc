@@ -17,11 +17,17 @@ else ifeq ($(TARGET), $(_EXE)-340)
 else ifeq ($(TARGET), $(_EXE)-41)
   FF_VER := 4.1
   EXE := $(TARGET)
+else ifeq ($(TARGET), $(_EXE)-gui)
+  machine = $(shell $(CXX) -dumpmachine)
+  ifneq (,$(findstring mingw,$(machine)))
+	LDFLAGS += -Wl,--subsystem,windows
+  endif
+  LDFLAGS += -lui -lpthread
 endif
 
 ifeq ($(FF_VER), shared)
   LDFLAGS += -lavformat -lavcodec -lavutil
-  CXXFLAGS += -O3
+  #CXXFLAGS += -O3
 else
   CXXFLAGS += -I./ffmpeg-$(FF_VER)
   LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
@@ -45,14 +51,19 @@ OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
 FFDIR := ffmpeg-$(FF_VER)
 
-NPROC = $(shell nproc)
+SRC_GUI := $(wildcard src/gui/*.cpp)
+OBJ_GUI := $(SRC_GUI:%.cpp=$(DIR)/%.o)
+DEP_GUI := $(OBJ_GUI:.o=.d)
+
+NPROC = $(shell which nproc >/dev/null 2>&1 && nproc || echo 1)
 NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
 ifeq ($(NJOBS), 0)
   NJOBS = 1
 endif
 
 #$(info $$OBJ is [${OBJ}])
-$(shell mkdir -p $(dir $(OBJ)) >/dev/null)
+#$(info $$OBJ_GUI is [${OBJ_GUI}])
+$(shell mkdir -p $(dir $(OBJ_GUI)) >/dev/null)
 
 .PHONY: all clean force
 
@@ -76,7 +87,6 @@ $(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
 	$(MAKE) -C $(FFDIR) -j$(NJOBS)
 
 $(FFDIR):
-
 ifneq ($(FF_VER), shared)
 $(FFDIR): | $(FFDIR)/libavcodec/libavcodec.a
 endif
@@ -89,20 +99,22 @@ print_info: | $(FFDIR)
 $(EXE): print_info $(OBJ)
 	$(CXX) $(filter-out $<,$^) $(LDFLAGS) -o $@
 
+$(EXE)-gui: print_info $(filter-out $(DIR)/src/main.o, $(OBJ)) $(OBJ_GUI)
+	$(CXX) $(filter-out $<,$^) $(LDFLAGS) -o $@
+
 # rebuild common.o if new version/CPPFLAGS
 $(DIR)/cpp_flags: force
 	@echo '$(CPPFLAGS)' | cmp -s - $@ || echo '$(CPPFLAGS)' > $@
 common.o: $(DIR)/cpp_flags
 
-$(DIR):
-	mkdir $@
-
-$(DIR)/%.o: %.cpp | $(DIR)
+$(DIR)/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $<
 
 -include $(DEP)
+-include $(DEP_GUI)
 
 clean:
 	$(RM) -r $(DIR)
 	$(RM) $(EXE)
+	$(RM) $(EXE)-gui
 

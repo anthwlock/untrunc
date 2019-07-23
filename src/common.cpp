@@ -33,6 +33,8 @@ bool g_show_tracks = false;
 bool g_dont_write = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
+void (*g_onProgress)(int) = nullptr;
+void (*g_onStatus)(const string&) = nullptr;
 
 std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 
@@ -168,7 +170,8 @@ void hitEnterToContinue(bool new_line) {
 
 void outProgress(double now, double all) {
 	double x = round(1000*(now/all));
-	cout << x/10 << "%  \r" << flush;
+	if (g_onProgress) g_onProgress(x/10);
+	else cout << x/10 << "%  \r" << flush;
 }
 
 void mute() {
