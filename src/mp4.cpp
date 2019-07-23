@@ -36,6 +36,8 @@ extern "C" {
 
 using namespace std;
 
+uint Mp4::step_ = 1;
+
 Mp4::Mp4(): root_atom_(NULL) { }
 
 Mp4::~Mp4() {
@@ -277,7 +279,7 @@ void Mp4::saveVideo(const string& filename) {
 		for (auto n : unknown_lengths_) bytes_not_matched += n;
 		double percentage = (double)100 * bytes_not_matched / mdat->contentSize();
 		logg(W, "Unknown sequences: ", unknown_lengths_.size(), '\n');
-		logg(W, "Bytes not matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
+		logg(W, "Bytes NOT matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
 	}
 
 	logg(I, "saving ", filename, '\n');

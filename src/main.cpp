@@ -138,10 +138,10 @@ int main(int argc, char *argv[]) {
 		g_mp4 = &mp4;  // singleton is overkill, this is good enough
 		if (arg_step > 0) {
 			logg(I, "using step_size=", arg_step, "\n");
-			mp4.step_ = arg_step;
+			Mp4::step_ = arg_step;
 		}
 
-		if (g_ignore_unknown) output_suffix = ss("-s", mp4.step_);
+		if (g_ignore_unknown) output_suffix = ss("-s", Mp4::step_);
 
 
 		logg(I, "reading ", ok, '\n');

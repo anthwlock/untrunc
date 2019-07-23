@@ -61,7 +61,7 @@ public:
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
 
-	uint step_ = 1;  // step_size in unknown sequence
+	static uint step_;  // step_size in unknown sequence
 
 private:
 	BufferedAtom* findMdat(FileRead& file_read);
