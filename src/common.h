@@ -21,6 +21,8 @@ extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings
 extern Mp4* g_mp4;
+extern void (*g_onProgress)(int);
+extern void (*g_onStatus)(const std::string&);
 
 template<class... Args>
 void logg(Args&&... args){
