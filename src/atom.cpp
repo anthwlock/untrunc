@@ -157,6 +157,7 @@ void Atom::print(int offset) {
 	if (g_atom_names.count(name_))
 		cout << " \"" << g_atom_names.at(name_) << "\"";
 	cout << " [" << start_ << ", " << length_ << "]\n";
+
 	if(name_ == "mvhd" || name_ == "mdhd") {
 		for(int i = 0; i < offset; i++)
 			cout << " ";
@@ -246,8 +247,8 @@ void Atom::print(int offset) {
 
 	}
 
-	for (uint i=0; i < children_.size(); i++)
-		children_[i]->print(offset+1);
+	for (auto& c : children_)
+		c->print(offset+1);
 }
 
 AtomDefinition definition(const string& id) {

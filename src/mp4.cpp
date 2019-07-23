@@ -118,8 +118,9 @@ void Mp4::printMediaInfo() {
 }
 
 void Mp4::printAtoms() {
-	if(root_atom_)
-		root_atom_->print(0);
+	if (!root_atom_) return;
+	for (auto& c : root_atom_->children_)
+		c->print(0);
 }
 
 void Mp4::makeStreamable(string& filename, string& output) {
