@@ -149,10 +149,10 @@ int main(int argc, char *argv[]) {
 
 		if (show_tracks) mp4.printMediaInfo();
 		else if (analyze_offset) mp4.analyzeOffset(corrupt.empty() ? ok : corrupt, arg_offset);
-		else if (dump_samples) mp4.dumpSamples(ok);
-		else if (show_info) {mp4.printMediaInfo(); mp4.printAtoms();}
-		else if (analyze) mp4.analyze(ok);
-		else if (corrupt.size()) mp4.repair(corrupt, corrupt + ss("_fixed", output_suffix, ".mp4"));
+		else if (dump_samples) mp4.dumpSamples();
+		else if (show_info) {mp4.printMediaInfo(); cout << "\n\n"; mp4.printAtoms();}
+		else if (analyze) mp4.analyze();
+		else if (corrupt.size()) mp4.repair(corrupt, corrupt + "_fixed" + output_suffix + ".mp4");
 	}
 	catch (const char* e) {return cerr << e << '\n', 1;}
 	catch (string e) {return cerr << e << '\n', 1;}

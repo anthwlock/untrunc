@@ -372,10 +372,10 @@ void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 
 }
 
-void Mp4::analyze(const string& filename, bool gen_off_map) {
+void Mp4::analyze(bool gen_off_map) {
 	FileRead file;
 	if (!current_mdat_) {
-		file.open(filename);
+		file.open(filename_ok_);
 		findMdat(file);
 	}
 	auto& mdat = current_mdat_;
@@ -419,9 +419,9 @@ void Mp4::dumpMatch(off64_t off, const FrameInfo& fi, int idx) {
 	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ") << setw(8) << real_off << " : " << fi << '\n';
 }
 
-void Mp4::dumpSamples(const string& filename) {
-	analyze(filename, true);
-	cout << filename << '\n';
+void Mp4::dumpSamples() {
+	analyze(true);
+	cout << filename_ok_ << '\n';
 
 	int i = 0;
 	for (auto const& x : off_to_info_)
@@ -652,7 +652,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	}
 
 	use_offset_map_ = filename == filename_ok_;
-	if (use_offset_map_) analyze(filename, true);
+	if (use_offset_map_) analyze(true);
 
 	for(uint i=0; i < tracks_.size(); i++)
 		tracks_[i].clear();

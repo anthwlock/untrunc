@@ -48,8 +48,8 @@ public:
 	void printAtoms();
 	void makeStreamable(std::string& filename, std::string& output);
 
-	void dumpSamples(const std::string& filename);
-	void analyze(const std::string& filename, bool gen_off_map=false);
+	void dumpSamples();
+	void analyze(bool gen_off_map=false);
 	void repair(std::string& filename, const std::string& filname_fixed);
 
 	bool wouldMatch(off64_t offset, const std::string& skip = "", bool strict=false);
