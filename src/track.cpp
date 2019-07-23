@@ -98,7 +98,7 @@ void Track::parse(Atom *mdat) {
 	handler_name_ = hdlr->getString(24, name_size);
 	if (handler_name_[0] == name_size-1)  // special case: pascal string
 		handler_name_.erase(0, 1);
-	handler_name_ = trim_right(handler_name_);
+	trim_right(handler_name_);
 
 	if(handler_type_ != "soun" && handler_type_ != "vide" && !g_show_tracks ) {
 		logg(I, "special track found (", handler_type_, ", '", handler_name_, "')\n");

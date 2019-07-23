@@ -203,10 +203,9 @@ void chkHiddenWarnings() {
 	}
 }
 
-string trim_right(string& in) {
-	int idx = in.size()-1;
-	for (; in[idx] == ' '; idx--);
-	return in.substr(0, idx+1);
+void trim_right(string& in) {
+	while (in.size() && (isspace(in.back()) || !in.back()))
+		in.pop_back();
 }
 
 

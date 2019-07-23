@@ -115,7 +115,7 @@ void printVersion();
 
 void chkHiddenWarnings();
 
-std::string trim_right(std::string& in);
+void trim_right(std::string& in);
 
 #define to_uint(a) static_cast<unsigned int>(a)
 
