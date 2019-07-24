@@ -2,6 +2,7 @@ _DIR   := .build
 FF_VER := shared
 _EXE   := untrunc
 IS_RELEASE := 0
+LIBUI_STATIC := 0
 
 # make switching between ffmpeg versions easy
 TARGET := $(firstword $(MAKECMDGOALS))
@@ -17,17 +18,10 @@ else ifeq ($(TARGET), $(_EXE)-340)
 else ifeq ($(TARGET), $(_EXE)-41)
   FF_VER := 4.1
   EXE := $(TARGET)
-else ifeq ($(TARGET), $(_EXE)-gui)
-  machine = $(shell $(CXX) -dumpmachine)
-  ifneq (,$(findstring mingw,$(machine)))
-	LDFLAGS += -Wl,--subsystem,windows
-  endif
-  LDFLAGS += -lui -lpthread
 endif
 
 ifeq ($(FF_VER), shared)
   LDFLAGS += -lavformat -lavcodec -lavutil
-  #CXXFLAGS += -O3
 else
   CXXFLAGS += -I./ffmpeg-$(FF_VER)
   LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
@@ -38,7 +32,14 @@ else
   LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
 endif
 
-CXXFLAGS += -std=c++11 -g
+CXXFLAGS += -std=c++11
+
+ifeq ($(IS_RELEASE), 1)
+  CXXFLAGS += -O3
+  LDFLAGS += -s
+else
+  CXXFLAGS += -g
+endif
 
 VER = $(shell test -d .git && which git >/dev/null 2>&1 && git describe --always --dirty --abbrev=7)
 CPPFLAGS += -MMD -MP
@@ -54,6 +55,19 @@ FFDIR := ffmpeg-$(FF_VER)
 SRC_GUI := $(wildcard src/gui/*.cpp)
 OBJ_GUI := $(SRC_GUI:%.cpp=$(DIR)/%.o)
 DEP_GUI := $(OBJ_GUI:.o=.d)
+
+ifeq ($(TARGET), $(_EXE)-gui)
+  LDFLAGS += -lui -lpthread
+
+  machine = $(shell $(CXX) -dumpmachine)
+  ifneq (,$(findstring mingw,$(machine)))
+	LDFLAGS += -Wl,--subsystem,windows
+	ifeq ($(LIBUI_STATIC), 1)
+	  OBJ_GUI += $(DIR)/src/gui/win_resources.o
+	  LDFLAGS += -lpthread -luser32 -lkernel32 -lusp10 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc
+	endif
+  endif
+endif
 
 NPROC = $(shell which nproc >/dev/null 2>&1 && nproc || echo 1)
 NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
@@ -101,6 +115,9 @@ $(EXE): print_info $(OBJ)
 
 $(EXE)-gui: print_info $(filter-out $(DIR)/src/main.o, $(OBJ)) $(OBJ_GUI)
 	$(CXX) $(filter-out $<,$^) $(LDFLAGS) -o $@
+
+$(DIR)/%/win_resources.o: %/win_resources.rc
+	windres.EXE $< $@
 
 # rebuild common.o if new version/CPPFLAGS
 $(DIR)/cpp_flags: force
