@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 	bool find_atoms = false;
 	bool dump_samples = false;
 	bool analyze_offset = false;
-	off64_t arg_offset = -1;
+	off_t arg_offset = -1;
 	int arg_step = -1;
 	string output_suffix;
 

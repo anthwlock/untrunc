@@ -38,11 +38,11 @@ public:
 	~FileRead();
 	void open(const std::string& filename);
 
-	void seek(off64_t p);
-	void seekSafe(off64_t p);
-	off64_t pos();
+	void seek(off_t p);
+	void seekSafe(off_t p);
+	off_t pos();
 	bool atEnd();
-	off64_t length() { return size_; }
+	off_t length() { return size_; }
 
 	size_t readBuffer(uchar* target, size_t size, size_t n);
 
@@ -54,18 +54,18 @@ public:
 
 	const uchar* getPtr(int size_requested);
 	const uchar* getPtr2(int size_requested);  // changes state (buf_off_)
-	const uchar* getPtrAt(off64_t pos, int size_requested);
+	const uchar* getPtrAt(off_t pos, int size_requested);
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
 	std::string filename_;
 
 protected:
-	size_t fillBuffer(off64_t location);
+	size_t fillBuffer(off_t location);
 	uchar* buffer_;
-	off64_t size_;
+	off_t size_;
 	FILE* file_ = nullptr;
-	off64_t buf_begin_ = 0;
-	off64_t buf_off_ = 0;
+	off_t buf_begin_ = 0;
+	off_t buf_off_ = 0;
 };
 
 class FileWrite {
@@ -74,7 +74,7 @@ public:
 	~FileWrite();
 	bool create(std::string filename);
 
-	off64_t pos();
+	off_t pos();
 
 	int writeInt(int n);
 	int writeInt64(int64_t n);

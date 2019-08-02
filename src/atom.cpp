@@ -85,9 +85,9 @@ void Atom::parse(FileRead& file) {
 	}
 }
 
-off64_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat) {
+off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat) {
 	static int show_mdat_msg_in = 2;  // first start_atom is not initialized
-	off64_t next_off = start_atom->start_ + start_atom->length_;
+	off_t next_off = start_atom->start_ + start_atom->length_;
 	bool skip_nested = ((searching_mdat && start_atom->name_ != "avcC" ) || start_atom->name_ == "mdat") &&
 	                   next_off > start_atom->start_;
 
@@ -98,7 +98,7 @@ off64_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searc
 
 	if (searching_mdat && !--show_mdat_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
 
-	for(off64_t off=start_atom->start_+8; off < file.length();) {
+	for(off_t off=start_atom->start_+8; off < file.length();) {
 		auto buff = file.getPtrAt(off, 4);
 		if (g_log_mode == LogMode::I && off % (1<<16) == 0) outProgress(off, file.length());
 		if (!isdigit(*buff) && !islower(*buff)) {off += 4; continue;}
@@ -114,7 +114,7 @@ void Atom::findAtomNames(string& filename) {
 	Atom atom;
 
 	bool ignore_avc1 = 0;
-	off64_t off = findNextAtomOff(file, &atom);
+	off_t off = findNextAtomOff(file, &atom);
 	while (off < file.length()) {
 		const uchar* buff = file.getPtrAt(off, 4);
 		uint length = swap32(*(uint*)buff);
@@ -125,7 +125,7 @@ void Atom::findAtomNames(string& filename) {
 		if (atom.name_ == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || atom.name_ != "avc1") {
 			cout << ss(off, ": ", atom.name_, " (", length, ")");
-			off64_t next_off = off + length;
+			off_t next_off = off + length;
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
 				cout << " <-- invalid length\n";
@@ -392,11 +392,11 @@ uint BufferedAtom::readInt(int64_t offset) {
 
 void BufferedAtom::write(FileWrite &output) {
 	//1 write length
-	off64_t start = output.pos();
+	off_t start = output.pos();
 
 	output.writeInt(length_);
 	output.writeChar(name_.data(), 4);
-	off64_t offset = file_begin_;
+	off_t offset = file_begin_;
 	file_read_.seek(file_begin_);
 	int loop_cnt = 0;
 	while(offset < file_end_) {
@@ -413,6 +413,6 @@ void BufferedAtom::write(FileWrite &output) {
 	}
 	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(output);
-	off64_t end = output.pos();
+	off_t end = output.pos();
 	assert(end - start == length_);
 }

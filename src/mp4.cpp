@@ -322,7 +322,7 @@ void Mp4::saveVideo(const string& filename) {
 void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 	auto offset = fi.offset_;
 	auto& mdat = current_mdat_;
-	off64_t real_off = offset + mdat->file_begin_;
+	off_t real_off = offset + mdat->file_begin_;
 
 	auto start = loadFragment(offset);
 
@@ -392,7 +392,7 @@ void Mp4::analyze(bool gen_off_map) {
 			if (is_keyframe && ++ik < track.keyframes_.size())
 				k = track.keyframes_[ik];
 
-			off64_t off = track.offsets_[i] - (mdat->start_ + 8);
+			off_t off = track.offsets_[i] - (mdat->start_ + 8);
 			auto fi = FrameInfo(idx, is_keyframe, track.times_[i], off, track.sizes_[i]);
 
 			if (gen_off_map) off_to_info_[off] = fi;
@@ -413,7 +413,7 @@ void Mp4::parseTracksOk() {
 		getTrack("avc1").codec_.strictness_level_ = 1;
 }
 
-void Mp4::dumpMatch(off64_t off, const FrameInfo& fi, int idx) {
+void Mp4::dumpMatch(off_t off, const FrameInfo& fi, int idx) {
 	auto real_off = off + current_mdat_->file_begin_;
 //	cout << setw(15) << ss("(", idx++, ") ", mdat_off, "+") << setw(10) << off << " : "  << fi << '\n';
 	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ") << setw(8) << real_off << " : " << fi << '\n';
@@ -433,7 +433,7 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	mdat->name_ = "mdat";
 	Atom atom;
 	while(atom.name_ != "mdat") {
-		off64_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
+		off_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
 		if (new_pos >= file_read.length() || new_pos < 0) {
 			logg(W, "start of mdat not found\n");
 			atom.start_ = 0;
@@ -464,7 +464,7 @@ void Mp4::addFrame(FrameInfo& fi) {
 	track.n_matched++;
 }
 
-const uchar* Mp4::loadFragment(off64_t offset, bool be_quiet) {
+const uchar* Mp4::loadFragment(off_t offset, bool be_quiet) {
 	if (!be_quiet) logg(V, "\n(reading element from mdat)\n");
 	current_maxlength_ = min((int64_t) g_max_partsize, current_mdat_->contentSize() - offset); // max 1.6MB
 	auto s = current_fragment_ = current_mdat_->getFragment(offset, current_maxlength_);
@@ -472,14 +472,14 @@ const uchar* Mp4::loadFragment(off64_t offset, bool be_quiet) {
 	if (g_log_mode >= LogMode::V && !be_quiet) {
 		uint begin = swap32(*(uint*)s);
 		uint next = swap32(*(uint*)(s+4));
-		off64_t real_off = offset + current_mdat_->file_begin_;
+		off_t real_off = offset + current_mdat_->file_begin_;
 		logg(V, "Offset: ", offset, " / ", real_off, " : ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
 	}
 
 	return s;
 }
 
-void Mp4::chkDetectionAt(FrameInfo& detected, off64_t off) {
+void Mp4::chkDetectionAt(FrameInfo& detected, off_t off) {
 //	if (g_log_mode < LogMode::V) return;
 
 	auto& correct = off_to_info_[off];
@@ -513,7 +513,7 @@ Track& Mp4::getTrack(const string& codec_name) {
 	return tracks_[idx];
 }
 
-bool Mp4::wouldMatch(off64_t offset, const string& skip, bool strict) {
+bool Mp4::wouldMatch(off_t offset, const string& skip, bool strict) {
 	auto start = loadFragment(offset, true);
 	for (Track& track : tracks_) {
 		auto& c = track.codec_;
@@ -528,7 +528,7 @@ bool Mp4::wouldMatch(off64_t offset, const string& skip, bool strict) {
 	return false;
 }
 
-FrameInfo Mp4::getMatch(off64_t offset, bool strict) {
+FrameInfo Mp4::getMatch(off_t offset, bool strict) {
 	auto start = loadFragment(offset);
 
 	// hardcoded match
@@ -567,7 +567,7 @@ FrameInfo Mp4::getMatch(off64_t offset, bool strict) {
 	return FrameInfo();
 }
 
-void Mp4::analyzeOffset(const string& filename, off64_t real_offset) {
+void Mp4::analyzeOffset(const string& filename, off_t real_offset) {
 	FileRead file(filename);
 	auto mdat = findMdat(file);
 	if (real_offset < mdat->file_begin_ || real_offset >= mdat->file_end_)
@@ -605,7 +605,7 @@ ostream& operator<<(ostream& out, const FrameInfo& fi) {
 	return out << ss("'", cn, "', ", fi.length_, ", ", fi.keyframe_, ", ", fi.audio_duration_);
 }
 
-bool Mp4::chkOffset(off64_t& offset) {
+bool Mp4::chkOffset(off_t& offset) {
 start:
 	if (offset >= current_mdat_->contentSize()) {  // at end?
 		if(unknown_length_){
@@ -661,7 +661,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	auto& audiotimes = audiotimes_stts_rebuild_;
 
-	off64_t offset = 0;
+	off_t offset = 0;
 
 	while (chkOffset(offset)) {
 		auto match = getMatch(offset, unknown_length_);

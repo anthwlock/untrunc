@@ -52,9 +52,9 @@ public:
 	void analyze(bool gen_off_map=false);
 	void repair(std::string& filename, const std::string& filname_fixed);
 
-	bool wouldMatch(off64_t offset, const std::string& skip = "", bool strict=false);
-	FrameInfo getMatch(off64_t offset, bool strict);
-	void analyzeOffset(const std::string& filename, off64_t offset);
+	bool wouldMatch(off_t offset, const std::string& skip = "", bool strict=false);
+	FrameInfo getMatch(off_t offset, bool strict);
+	void analyzeOffset(const std::string& filename, off_t offset);
 
 	bool hasCodec(const std::string& codec_name);
 	uint getTrackIdx(const std::string& codec_name);
@@ -74,8 +74,8 @@ private:
 	void setDuration();
 	void chkUntrunc(FrameInfo& fi, Codec& c, int i);
 	void addFrame(FrameInfo& frame_info);
-	bool chkOffset(off64_t& offset);  // updates offset
-	const uchar* loadFragment(off64_t offset, bool be_quiet=false);
+	bool chkOffset(off_t& offset);  // updates offset
+	const uchar* loadFragment(off_t offset, bool be_quiet=false);
 	bool broken_is_64_ = false;
 	int unknown_length_ = 0;
 	uint64_t pkt_idx_ = 0;
@@ -84,9 +84,9 @@ private:
 
 	std::string filename_ok_;
 	bool use_offset_map_ = false;
-	std::map<off64_t, FrameInfo> off_to_info_;
-	void chkDetectionAt(FrameInfo& detected, off64_t off);
-	void dumpMatch(off64_t off, const FrameInfo& fi, int idx);
+	std::map<off_t, FrameInfo> off_to_info_;
+	void chkDetectionAt(FrameInfo& detected, off_t off);
+	void dumpMatch(off_t off, const FrameInfo& fi, int idx);
 
 	const std::vector<std::string> ignore_duration_ = {"tmcd", "fdsc"};
 
@@ -106,7 +106,7 @@ public:
 
 	bool keyframe_;
 	uint audio_duration_;
-	off64_t offset_;
+	off_t offset_;
 	uint length_ = 0;
 };
 bool operator==(const FrameInfo& lhs, const FrameInfo& rhs);

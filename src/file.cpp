@@ -49,35 +49,35 @@ FileWrite::~FileWrite() {
 
 void FileRead::open(const string& filename) {
 	filename_ = filename;
-	file_ = fopen64(filename.c_str(), "rb");
+	file_ = fopen(filename.c_str(), "rb");
 	if (!file_) throw("Could not open file: " + filename);
 
-	fseeko64(file_, 0L, SEEK_END);
-	size_ = ftello64(file_);
-	fseeko64(file_, 0L, SEEK_SET);
+	fseeko(file_, 0L, SEEK_END);
+	size_ = ftello(file_);
+	fseeko(file_, 0L, SEEK_SET);
 
 	buffer_ = (uchar*) malloc(buf_size_);
 	fread(buffer_, 1, buf_size_, file_);
 }
 
 bool FileWrite::create(string filename) {
-	file_ = fopen64(filename.c_str(), "wb");
+	file_ = fopen(filename.c_str(), "wb");
 	if(file_ == NULL) return false;
 	return true;
 }
 
-void FileRead::seek(off64_t p) {
+void FileRead::seek(off_t p) {
 	if (p < buf_begin_ || p >= buf_begin_ + buf_size_){
 		fillBuffer(p);
 	} else
 		buf_off_ = p - buf_begin_;
 }
 
-void FileRead::seekSafe(off64_t p) {
+void FileRead::seekSafe(off_t p) {
 	seek(min(p, size_));
 }
 
-off64_t FileRead::pos() {
+off_t FileRead::pos() {
 	return buf_begin_ + buf_off_;
 }
 
@@ -85,14 +85,14 @@ bool FileRead::atEnd() {
 	return pos() == size_;
 }
 
-size_t FileRead::fillBuffer(off64_t location) {
-	off64_t avail = (buf_begin_+buf_size_) - location;
-	off64_t buf_loc = location - buf_begin_;
+size_t FileRead::fillBuffer(off_t location) {
+	off_t avail = (buf_begin_+buf_size_) - location;
+	off_t buf_loc = location - buf_begin_;
 
 	buf_begin_ = location;
 	buf_off_ = 0;
 	if (avail < 0 || avail >= buf_size_) {
-		fseeko64(file_, location, SEEK_SET);
+		fseeko(file_, location, SEEK_SET);
 		int n = fread(buffer_, 1, buf_size_, file_);
 		return n;
 	}else if (avail > 0) {
@@ -116,7 +116,7 @@ size_t FileRead::readBuffer(uchar* dest, size_t size, size_t n) {
 		if (total >= to_uint(buf_size_)){
 			size_t x = fread(dest+nread, 1, total, file_);
 			nread += x;
-			fillBuffer(ftello64(file_));
+			fillBuffer(ftello(file_));
 		} else {
 			size_t x = min(fillBuffer(buf_begin_+buf_off_), total);
 			memcpy(dest+nread, buffer_, x);
@@ -185,15 +185,15 @@ const uchar* FileRead::getPtr2(int size_requested) {
 	return ret;
 }
 
-const uchar* FileRead::getPtrAt(off64_t pos, int size_requested) {
+const uchar* FileRead::getPtrAt(off_t pos, int size_requested) {
 	seek(pos);
 	auto ret = getPtr(size_requested);
 	buf_off_ += size_requested;
 	return ret;
 }
 
-off64_t FileWrite::pos() {
-	return ftello64(file_);
+off_t FileWrite::pos() {
+	return ftello(file_);
 }
 
 int FileWrite::writeInt(int n) {

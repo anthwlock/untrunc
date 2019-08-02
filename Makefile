@@ -32,7 +32,7 @@ else
   LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
 endif
 
-CXXFLAGS += -std=c++11
+CXXFLAGS += -std=c++11 -D_FILE_OFFSET_BITS=64
 
 ifeq ($(IS_RELEASE), 1)
   CXXFLAGS += -O3

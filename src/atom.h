@@ -46,7 +46,7 @@ public:
 
 	void writeInt64(int64_t value, uint64_t offset);
 	static void findAtomNames(std::string& filename);
-	static off64_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
+	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
 };
 
 class BufferedAtom: public Atom {
