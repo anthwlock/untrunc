@@ -24,11 +24,18 @@ extern Mp4* g_mp4;
 extern void (*g_onProgress)(int);
 extern void (*g_onStatus)(const std::string&);
 
+#define UNFOLD_PARAM_PACK(pack, os) \
+	_Pragma("GCC diagnostic push"); \
+	_Pragma("GCC diagnostic ignored \"-Wunused-value\""); \
+	using creator = int[]; \
+	creator{ 0, ( os << (std::forward<decltype(pack)>(pack)), 0) ... }; \
+	_Pragma("GCC diagnostic pop"); \
+
+
 template<class... Args>
 void logg(Args&&... args){
 //	(std::cout << ... << args); // Binary left fold (c++17)
-	using creator = int[]; // dummy
-	creator{ 0, ( std::cout << (std::forward<Args>(args)), 0) ... };
+	UNFOLD_PARAM_PACK(args, std::cout)
 }
 
 template<class... Args>
@@ -49,8 +56,7 @@ void logg(LogMode m, Args&&... x){
 template<class... Args>
 std::string ss(Args&&... args){
 	std::stringstream ss;
-	using creator = int[]; // dummy
-	creator{ 0, ( ss << (std::forward<Args>(args)), 0) ... };
+	UNFOLD_PARAM_PACK(args, ss)
 	return ss.str();
 }
 
