@@ -1,6 +1,7 @@
-#include "AP_AtomDefinitions.h"
 #include "atom.h"
+
 #include "file.h"
+#include "mp4.h"
 
 #include <string>
 #include <map>
@@ -8,6 +9,9 @@
 #include <string.h>
 
 #include <assert.h>
+
+#include "AP_AtomDefinitions.h"
+
 
 using namespace std;
 
@@ -330,7 +334,7 @@ void Atom::prune(const string& name) {
 
 void Atom::updateLength() {
 	length_ = 8;
-	length_ += content_.size();
+	length_ += contentSize();
 //	assert(name_ != string("mdat"));
 
 	for (uint i=0; i < children_.size(); i++) {
@@ -368,21 +372,10 @@ BufferedAtom::BufferedAtom(FileRead& file): file_read_(file) {}
 const uchar *BufferedAtom::getFragment(int64_t offset, int64_t size) {
 	if(offset < 0)
 		throw "Offset set before beginning of file";
-	if(offset + size > file_end_ - file_begin_)
-		throw "Out of Range";
+	if(offset + size > contentSize())
+		throw ss("Out of Range: ", offset+size, " / ", contentSize(), " (+", offset+size - contentSize(), ")");
 	file_read_.seek(file_begin_ + offset);  // cheap seek
 	return file_read_.getPtr(size);
-}
-
-void BufferedAtom::updateLength() {
-	length_ = 8;
-	length_ += file_end_ - file_begin_;
-
-	for (uint i=0; i < children_.size(); i++) {
-		Atom *child = children_[i];
-		child->updateLength();
-		length_ += child->length_;
-	}
 }
 
 uint BufferedAtom::readInt(int64_t offset) {
@@ -391,28 +384,38 @@ uint BufferedAtom::readInt(int64_t offset) {
 }
 
 void BufferedAtom::write(FileWrite &output) {
-	//1 write length
 	off_t start = output.pos();
 
-	output.writeInt(length_);
+	auto to_skip_it = sequences_to_exclude_.begin();
+	auto at_end = [this](decltype(to_skip_it) it) -> bool {return it == sequences_to_exclude_.end();};
+
+	auto new_length = length_ - total_excluded_yet_;
+
+	output.writeInt(new_length);
 	output.writeChar(name_.data(), 4);
-	off_t offset = file_begin_;
-	file_read_.seek(file_begin_);
+	off_t offset = 0;
 	int loop_cnt = 0;
-	while(offset < file_end_) {
+	while(offset < contentSize()) {
 		if (name_ == "mdat" && g_log_mode == I && loop_cnt++ >= 10) {
-			outProgress(offset, file_end_);
+			outProgress(offset, contentSize());
 			loop_cnt = 0;
 		}
 		int toread = file_read_.buf_size_;
-		if(toread + offset > file_end_)
-			toread = file_end_ - offset;
-		auto buff = file_read_.getPtr2(toread);
+		if (offset + toread > contentSize()) toread = contentSize() - offset;
+		if (!at_end(to_skip_it) && offset + toread > to_skip_it->first) toread = to_skip_it->first - offset;
+
+		auto buff = getFragment(offset, toread);
 		offset += toread;
 		output.writeChar(buff, toread);
+
+		if (!at_end(to_skip_it) && offset == to_skip_it->first) {
+			logg(V, "skipped ", to_skip_it->first, " ", to_skip_it->second, '\n');
+			offset += to_skip_it->second;
+			to_skip_it++;
+		}
 	}
 	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(output);
 	off_t end = output.pos();
-	assert(end - start == length_);
+	assert(end - start == new_length);
 }

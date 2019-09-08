@@ -16,7 +16,8 @@ typedef unsigned char uchar;
 enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
-extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks, g_dont_write;
+extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
+    g_show_tracks, g_dont_write, g_dont_exclude;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings

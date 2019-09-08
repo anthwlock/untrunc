@@ -40,6 +40,7 @@ void usage() {
 	     << "-st <step_size> - used with '-s'\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-dw - don't write _fixed.mp4\n"
+	     << "-k  - keep unknown sequences\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -90,6 +91,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "sv") g_stretch_video = true;
 			else if (a == "st") arg_step = kExpectArg;
 			else if (a == "s") g_ignore_unknown = true;
+			else if (a == "k") g_dont_exclude = true;
 			else if (a == "a") analyze = true;
 			else if (a == "V") printVersion();
 			else if (a == "vv") g_log_mode = LogMode::VV;

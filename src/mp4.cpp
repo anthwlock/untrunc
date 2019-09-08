@@ -402,6 +402,18 @@ void Mp4::analyze(bool gen_off_map) {
 
 }
 
+void Mp4::noteUnknownSequence(off_t offset) {
+	addToExclude(offset-unknown_length_, unknown_length_);
+	unknown_lengths_.emplace_back(unknown_length_);
+	unknown_length_ = 0;
+}
+
+void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
+	if (g_dont_exclude && !force) return;
+	current_mdat_->sequences_to_exclude_.emplace_back(make_pair(start, length));
+	current_mdat_->total_excluded_yet_ += length;
+}
+
 void Mp4::parseTracksOk() {
 	Atom *mdat = root_atom_->atomByName("mdat");
 	vector<Atom *> traks = root_atom_->atomsByName("trak");
@@ -457,7 +469,7 @@ void Mp4::addFrame(FrameInfo& fi) {
 	if(fi.keyframe_) {
 		track.keyframes_.push_back(track.offsets_.size());
 	}
-	track.offsets_.push_back(fi.offset_);
+	track.offsets_.push_back(fi.offset_ - current_mdat_->total_excluded_yet_);
 	if (fi.audio_duration_) audiotimes_stts_rebuild_.push_back(fi.audio_duration_);
 
 	track.sizes_.push_back(fi.length_);
@@ -608,10 +620,7 @@ ostream& operator<<(ostream& out, const FrameInfo& fi) {
 bool Mp4::chkOffset(off_t& offset) {
 start:
 	if (offset >= current_mdat_->contentSize()) {  // at end?
-		if(unknown_length_){
-			unknown_lengths_.emplace_back(unknown_length_);
-			unknown_length_ = 0;
-		}
+		if(unknown_length_) noteUnknownSequence(offset);
 		return false;
 	}
 
@@ -627,10 +636,12 @@ start:
 		goto start;
 	}
 
-	//skip fake moov
-	if(start[4] == 'm' && start[5] == 'o' && start[6] == 'o' && start[7] == 'v') {
-		logg(V, "Skipping moov atom: ", swap32(begin), '\n');
-		offset += swap32(begin);
+	// skip fake moov
+	if (string(start+4, start+8) == "moov") {
+		uint moov_len = swap32(begin);
+		addToExclude(offset, moov_len, true);
+		logg(V, "Skipping moov atom: ", moov_len, '\n');
+		offset += moov_len;
 		goto start;
 	}
 
@@ -673,9 +684,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 			pkt_idx_++;
 
 			if (unknown_length_) {
-				unknown_lengths_.emplace_back(unknown_length_);
-				unknown_length_ = 0;
-
+				noteUnknownSequence(offset);
 				logg(V, "found healthy packet again (", getCodecName(match.track_idx_), "), length: ", match.length_,
 				    " duration: ", match.audio_duration_, '\n');
 			}

@@ -88,6 +88,9 @@ private:
 	void chkDetectionAt(FrameInfo& detected, off_t off);
 	void dumpMatch(off_t off, const FrameInfo& fi, int idx);
 
+	void noteUnknownSequence(off_t offset);
+	void addToExclude(off_t start, uint64_t length, bool force=false);
+
 	const std::vector<std::string> ignore_duration_ = {"tmcd", "fdsc"};
 
 	const uchar* current_fragment_;

@@ -30,7 +30,7 @@ public:
 	void replace(Atom *original, Atom *replacement);
 
 	void prune(const std::string& name);
-	virtual void updateLength();
+	void updateLength();
 
 	virtual int64_t contentSize() { return content_.size(); }
 
@@ -56,11 +56,14 @@ public:
 	int64_t file_end_;
 
 	explicit BufferedAtom(FileRead&);
-	const uchar *getFragment(int64_t offset, int64_t size);
-	int64_t contentSize() { return file_end_ - file_begin_; }
-	void updateLength();
 
+	int64_t contentSize() { return file_end_ - file_begin_; }
+	const uchar *getFragment(int64_t offset, int64_t size);
 	uint readInt(int64_t offset);
+
+	std::vector<std::pair<off_t, uint64_t>> sequences_to_exclude_;  // from resulting mdat
+	int64_t total_excluded_yet_ = 0;
+
 	void write(FileWrite &file);
 
 };

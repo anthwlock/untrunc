@@ -31,6 +31,7 @@ bool g_ignore_unknown = false;
 bool g_stretch_video = false;
 bool g_show_tracks = false;
 bool g_dont_write = false;
+bool g_dont_exclude = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
@@ -103,7 +104,7 @@ string mkHexStr(const uchar* pos, int n, bool bytes_seperated){
 	for (int i=0; i != n; ++i) {
 		int x = (int) *(pos+i);
 		if (x < 16) out << '0';
-		out << x << (bytes_seperated?" ":"");
+		out << x << (bytes_seperated? " " : "");
 	}
 	return out.str();
 }
