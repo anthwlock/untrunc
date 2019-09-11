@@ -40,7 +40,7 @@ Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {
 
 }
 
-void Codec::parse(Atom *trak, const vector<uint64_t>& offsets, Atom *mdat) {
+void Codec::parse(Atom *trak, const vector<off_t>& offsets, Atom *mdat) {
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
 	if(entries != 1)

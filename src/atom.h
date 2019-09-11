@@ -32,7 +32,8 @@ public:
 	void prune(const std::string& name);
 	void updateLength();
 
-	virtual int64_t contentSize() { return content_.size(); }
+	virtual int64_t contentSize() const { return content_.size(); }
+	int64_t contentStart() const { return start_ + 8; }
 
 	static bool isParent(const std::string& id);
 	static bool isDual(const std::string& id);  // not used
@@ -40,11 +41,10 @@ public:
 
 	virtual uint readInt(int64_t offset);
 	int64_t readInt64(int64_t offset);
-	void writeInt(int value, uint64_t offset);
-	void readChar(char *str, int64_t offset, int64_t length);
+	void writeInt(int value, off_t offset);
 	std::string getString(int64_t offset, int64_t length);
 
-	void writeInt64(int64_t value, uint64_t offset);
+	void writeInt64(int64_t value, off_t offset);
 	static void findAtomNames(std::string& filename);
 	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
 };
@@ -52,12 +52,11 @@ public:
 class BufferedAtom: public Atom {
 public:
 	FileRead& file_read_;
-	int64_t file_begin_;
 	int64_t file_end_;
 
 	explicit BufferedAtom(FileRead&);
 
-	int64_t contentSize() { return file_end_ - file_begin_; }
+	int64_t contentSize() const { return file_end_ - contentStart(); }
 	const uchar *getFragment(int64_t offset, int64_t size);
 	uint readInt(int64_t offset);
 

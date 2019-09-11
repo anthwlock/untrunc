@@ -80,7 +80,6 @@ private:
 	int unknown_length_ = 0;
 	uint64_t pkt_idx_ = 0;
 	std::vector<int> unknown_lengths_;
-	std::vector<int> audiotimes_stts_rebuild_;
 
 	std::string filename_ok_;
 	bool use_offset_map_ = false;

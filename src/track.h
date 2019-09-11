@@ -40,14 +40,17 @@ public:
 	std::string handler_type_; // 'soun' OR 'vide'
 	std::string handler_name_;  // encoder used when created
 
+	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
+	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	std::vector<int> times_; // sample times
-	std::vector<uint64_t> offsets_;
+
+	std::vector<off_t> offsets_;
 	std::vector<int> sizes_;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
 	int getOrigSize(uint idx);
 
 	void parse(Atom *mdat);
-	void writeToAtoms();
+	void writeToAtoms(bool broken_is_64);
 	void clear();
 	void fixTimes();
 
@@ -57,10 +60,10 @@ public:
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);
 	std::vector<int> getSampleSizes(Atom *t);
-	std::vector<uint64_t> getChunkOffsets(Atom* t);
+	std::vector<off_t> getChunkOffsets(Atom* t);
 	std::vector<int> getSampleToChunk(Atom *t, int nchunks);
 
-	std::vector<uint64_t> getChunkOffsets64(Atom* t);
+	std::vector<off_t> getChunkOffsets64(Atom* t);
 
 	void saveSampleTimes();
 	void saveKeyframes();

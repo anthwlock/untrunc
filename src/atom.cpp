@@ -102,7 +102,7 @@ off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searchi
 
 	if (searching_mdat && !--show_mdat_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
 
-	for(off_t off=start_atom->start_+8; off < file.length();) {
+	for (off_t off=start_atom->contentStart(); off < file.length();) {
 		auto buff = file.getPtrAt(off, 4);
 		if (g_log_mode == LogMode::I && off % (1<<16) == 0) outProgress(off, file.length());
 		if (!isdigit(*buff) && !islower(*buff)) {off += 4; continue;}
@@ -133,6 +133,8 @@ void Atom::findAtomNames(string& filename) {
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
 				cout << " <-- invalid length\n";
+			else if (next_off > file.length())
+				cout << " <-- out of range\n";
 			else
 				cout << "\n";
 		}
@@ -333,9 +335,7 @@ void Atom::prune(const string& name) {
 }
 
 void Atom::updateLength() {
-	length_ = 8;
-	length_ += contentSize();
-//	assert(name_ != string("mdat"));
+	length_ = 8 + contentSize();
 
 	for (uint i=0; i < children_.size(); i++) {
 		Atom *child = children_[i];
@@ -352,13 +352,13 @@ uint Atom::readInt(int64_t offset) {
 	return swap32(*(uint *)&(content_[offset]));
 }
 
-void Atom::writeInt64(int64_t value, uint64_t offset) {
-	assert(content_.size() >= offset + 8);
+void Atom::writeInt64(int64_t value, off_t offset) {
+	assert(content_.size() >= to_size_t(offset + 8));
 	*(int64_t *)&(content_[offset]) = swap64(value);
 }
 
-void Atom::writeInt(int value, uint64_t offset) {
-	assert(content_.size() >= offset + 4);
+void Atom::writeInt(int value, off_t offset) {
+	assert(content_.size() >= to_size_t(offset + 4));
 	*(int *)&(content_[offset]) = swap32(value);
 }
 
@@ -374,12 +374,12 @@ const uchar *BufferedAtom::getFragment(int64_t offset, int64_t size) {
 		throw "Offset set before beginning of file";
 	if(offset + size > contentSize())
 		throw ss("Out of Range: ", offset+size, " / ", contentSize(), " (+", offset+size - contentSize(), ")");
-	file_read_.seek(file_begin_ + offset);  // cheap seek
+	file_read_.seek(contentStart() + offset);  // cheap seek
 	return file_read_.getPtr(size);
 }
 
 uint BufferedAtom::readInt(int64_t offset) {
-	file_read_.seek(file_begin_ + offset); // not needed in currently
+	file_read_.seek(contentStart() + offset);
 	return *(uint*) file_read_.getPtr(sizeof(int));
 }
 
@@ -395,7 +395,7 @@ void BufferedAtom::write(FileWrite &output) {
 	output.writeChar(name_.data(), 4);
 	off_t offset = 0;
 	int loop_cnt = 0;
-	while(offset < contentSize()) {
+	while (offset < contentSize()) {
 		if (name_ == "mdat" && g_log_mode == I && loop_cnt++ >= 10) {
 			outProgress(offset, contentSize());
 			loop_cnt = 0;

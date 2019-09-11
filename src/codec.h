@@ -20,7 +20,7 @@ public:
 	Codec(AVCodecParameters* c);
 	std::string name_;
 
-	void parse(Atom* trak, const std::vector<uint64_t>& offsets, Atom* mdat);
+	void parse(Atom* trak, const std::vector<off_t>& offsets, Atom* mdat);
 	bool matchSample(const uchar *start) const;
 	int getSize(const uchar *start, uint maxlength);
 

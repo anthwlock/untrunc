@@ -146,9 +146,9 @@ void Mp4::makeStreamable(string& filename, string& output) {
 		cout << "File is already streamable" << endl;
 		return;
 	}
-	int old_start = (mdat->start_ + 8);
+	int old_start = mdat->start_ + 8;
 
-	int new_start = moov->length_+8;
+	int new_start = moov->length_ + 8;
 	if(ftyp)
 		new_start += ftyp->length_ + 8;
 
@@ -235,25 +235,11 @@ void Mp4::saveVideo(const string& filename) {
 	  assumes offsets in stco are absolute and so to find the relative just subtrack mdat->start + 8
 */
 
-
 	chkStrechFactor();
 	setDuration();
 
 	for(Track& track : tracks_) {
-		Atom *stbl = track.trak_->atomByName("stbl");
-		if (broken_is_64_ && stbl->atomByName("stco")){
-			stbl->prune("stco");
-			Atom *new_co64 = new Atom;
-			new_co64->name_ = "co64";
-			stbl->children_.push_back(new_co64);
-		}
-		else if (!broken_is_64_ && stbl->atomByName("co64")) {
-			stbl->prune("co64");
-			Atom *new_stco = new Atom;
-			new_stco->name_ = "stco";
-			stbl->children_.push_back(new_stco);
-		}
-		track.writeToAtoms();
+		track.writeToAtoms(broken_is_64_);
 
 		auto& cn = track.codec_.name_;
 		if (contains(ignore_duration_, cn)) continue;
@@ -322,7 +308,7 @@ void Mp4::saveVideo(const string& filename) {
 void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 	auto offset = fi.offset_;
 	auto& mdat = current_mdat_;
-	off_t real_off = offset + mdat->file_begin_;
+	off_t real_off = mdat->contentStart() + offset;
 
 	auto start = loadFragment(offset);
 
@@ -426,7 +412,7 @@ void Mp4::parseTracksOk() {
 }
 
 void Mp4::dumpMatch(off_t off, const FrameInfo& fi, int idx) {
-	auto real_off = off + current_mdat_->file_begin_;
+	auto real_off = current_mdat_->contentStart() + off;
 //	cout << setw(15) << ss("(", idx++, ") ", mdat_off, "+") << setw(10) << off << " : "  << fi << '\n';
 	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ") << setw(8) << real_off << " : " << fi << '\n';
 }
@@ -456,7 +442,6 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		atom.parseHeader(file_read);
 	}
 	mdat->start_ = atom.start_;
-	mdat->file_begin_ = file_read.pos();
 	mdat->file_end_ = file_read.length();
 
 	if (!current_mdat_) current_mdat_ = mdat;
@@ -470,7 +455,7 @@ void Mp4::addFrame(FrameInfo& fi) {
 		track.keyframes_.push_back(track.offsets_.size());
 	}
 	track.offsets_.push_back(fi.offset_ - current_mdat_->total_excluded_yet_);
-	if (fi.audio_duration_) audiotimes_stts_rebuild_.push_back(fi.audio_duration_);
+	if (fi.audio_duration_) track.times_.push_back(fi.audio_duration_);
 
 	track.sizes_.push_back(fi.length_);
 	track.n_matched++;
@@ -484,7 +469,7 @@ const uchar* Mp4::loadFragment(off_t offset, bool be_quiet) {
 	if (g_log_mode >= LogMode::V && !be_quiet) {
 		uint begin = swap32(*(uint*)s);
 		uint next = swap32(*(uint*)(s+4));
-		off_t real_off = offset + current_mdat_->file_begin_;
+		off_t real_off = current_mdat_->contentStart() + offset;
 		logg(V, "Offset: ", offset, " / ", real_off, " : ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
 	}
 
@@ -496,7 +481,7 @@ void Mp4::chkDetectionAt(FrameInfo& detected, off_t off) {
 
 	auto& correct = off_to_info_[off];
 	if (correct != detected) {
-		cout << "bad detection (at " << off << " / " << off + current_mdat_->file_begin_ << ", pkt " << pkt_idx_ << "):\n"
+		cout << "bad detection (at " << off << " / " << current_mdat_->contentStart() + off << ", pkt " << pkt_idx_ << "):\n"
 		     << "detected: " << detected << '\n'
 		     << "correct : " << correct << '\n';
 		hitEnterToContinue();
@@ -582,13 +567,13 @@ FrameInfo Mp4::getMatch(off_t offset, bool strict) {
 void Mp4::analyzeOffset(const string& filename, off_t real_offset) {
 	FileRead file(filename);
 	auto mdat = findMdat(file);
-	if (real_offset < mdat->file_begin_ || real_offset >= mdat->file_end_)
+	if (real_offset < mdat->contentStart() || real_offset >= mdat->file_end_)
 		throw "given offset is not in 'mdat'";
 
 	auto buff = file.getPtrAt(real_offset, 16);
 	printBuffer(buff, 16);
 
-	auto off = real_offset - mdat->file_begin_;
+	auto off = real_offset - mdat->contentStart();
 	auto match = getMatch(off, false);
 	dumpMatch(off, match, 0);
 }
@@ -668,10 +653,6 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	for(uint i=0; i < tracks_.size(); i++)
 		tracks_[i].clear();
 
-	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
-	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
-	auto& audiotimes = audiotimes_stts_rebuild_;
-
 	off_t offset = 0;
 
 	while (chkOffset(offset)) {
@@ -700,8 +681,8 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		else {
 			if (g_muted) unmute();
 			double percentage = (double)100 * offset / mdat->contentSize();
-			mdat->file_end_ = mdat->file_begin_ + offset;
-			mdat->length_ = mdat->file_end_ - mdat->file_begin_;
+			mdat->file_end_ = mdat->contentStart() + offset;
+			mdat->length_ = offset + 8;
 
 			logg(E, "unable to find correct codec -> premature end", " (~", setprecision(4), percentage, "%)\n",
 			"       try '-s' to skip unknown sequences\n\n");
@@ -722,13 +703,9 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 		cout << ")\n";
 	}
 
-	for (auto& track : tracks_) {
-		if(audiotimes.size() && audiotimes.size() == track.offsets_.size())
-			swap(audiotimes, track.times_);
-		track.fixTimes();
-	}
+	for (auto& track : tracks_) track.fixTimes();
+
 	Atom *original_mdat = root_atom_->atomByName("mdat");
-	mdat->start_ = original_mdat->start_;
 	root_atom_->replace(original_mdat, mdat);
 
 	saveVideo(filename_fixed);

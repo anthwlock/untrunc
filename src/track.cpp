@@ -62,7 +62,7 @@ void Track::parse(Atom *mdat) {
 	keyframes_ = getKeyframes(trak_);
 	sizes_ = getSampleSizes(trak_);
 
-	vector<uint64_t> chunk_offsets;
+	vector<off_t> chunk_offsets;
 	if(is64) chunk_offsets = getChunkOffsets64(trak_);
 	else chunk_offsets = getChunkOffsets(trak_);
 	vector<int> sample_to_chunk = getSampleToChunk(trak_, chunk_offsets.size());
@@ -122,7 +122,20 @@ void Track::parse(Atom *mdat) {
 	} */
 }
 
-void Track::writeToAtoms() {
+void Track::writeToAtoms(bool broken_is_64) {
+	Atom *stbl = trak_->atomByName("stbl");
+	if (broken_is_64 && stbl->atomByName("stco")){
+		stbl->prune("stco");
+		Atom *new_co64 = new Atom;
+		new_co64->name_ = "co64";
+		stbl->children_.push_back(new_co64);
+	}
+	else if (!broken_is_64 && stbl->atomByName("co64")) {
+		stbl->prune("co64");
+		Atom *new_stco = new Atom;
+		new_stco->name_ = "stco";
+		stbl->children_.push_back(new_stco);
+	}
 
 	if (!keyframes_.size())
 		trak_->prune("stss");
@@ -253,8 +266,8 @@ vector<int> Track::getSampleSizes(Atom *t) {
 
 
 
-vector<uint64_t> Track::getChunkOffsets64(Atom *trak) {
-	vector<uint64_t> chunk_offsets;
+vector<off_t> Track::getChunkOffsets64(Atom *trak) {
+	vector<off_t> chunk_offsets;
 	Atom *co64 = trak->atomByName("co64");
 	if(!co64)
 		throw string("Missing chunk offset atom 'co64'");
@@ -267,8 +280,8 @@ vector<uint64_t> Track::getChunkOffsets64(Atom *trak) {
 	return chunk_offsets;
 }
 
-vector<uint64_t> Track::getChunkOffsets(Atom *trak) {
-	vector<uint64_t> chunk_offsets;
+vector<off_t> Track::getChunkOffsets(Atom *trak) {
+	vector<off_t> chunk_offsets;
 	//chunk offsets
 	Atom *stco = trak->atomByName("stco");
 	if(!stco)
