@@ -101,8 +101,8 @@ private:
 class FrameInfo {
 public:
 	FrameInfo() = default;
-	FrameInfo(uint track_idx, Codec& c, uint offset, uint length);
-	FrameInfo(uint track_idx, bool was_keyframe, uint audio_duration, uint offset, uint length);
+	FrameInfo(uint track_idx, Codec& c, off_t offset, uint length);
+	FrameInfo(uint track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length);
 	operator bool();
 	uint track_idx_;
 

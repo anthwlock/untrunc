@@ -578,10 +578,10 @@ void Mp4::analyzeOffset(const string& filename, off_t real_offset) {
 	dumpMatch(off, match, 0);
 }
 
-FrameInfo::FrameInfo(uint track_idx, Codec& c, uint offset, uint length)
+FrameInfo::FrameInfo(uint track_idx, Codec& c, off_t offset, uint length)
     : track_idx_(track_idx), keyframe_(c.was_keyframe_), audio_duration_(c.audio_duration_), offset_(offset), length_(length) {}
 
-FrameInfo::FrameInfo(uint track_idx, bool was_keyframe, uint audio_duration, uint offset, uint length)
+FrameInfo::FrameInfo(uint track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length)
     : track_idx_(track_idx), keyframe_(was_keyframe), audio_duration_(audio_duration), offset_(offset), length_(length) {}
 
 FrameInfo::operator bool() {
