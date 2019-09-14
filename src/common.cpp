@@ -10,6 +10,8 @@ extern "C" {
 }
 #include "libavutil/ffversion.h"
 
+#include "atom.h"
+
 #ifndef UNTR_VERSION
 #define UNTR_VERSION "?"
 #endif
@@ -32,6 +34,7 @@ bool g_stretch_video = false;
 bool g_show_tracks = false;
 bool g_dont_write = false;
 bool g_dont_exclude = false;
+bool g_dump_repaired = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
@@ -215,4 +218,46 @@ void trim_right(string& in) {
 
 bool contains(const std::initializer_list<string>& c, const std::string& v) {
   return std::find(c.begin(), c.end(), v) != c.end();
+}
+
+
+void HasHeaderAtom::editHeaderAtom(Atom* header_atom, int64_t duration, bool is_tkhd) {
+	auto& data = header_atom->content_;
+	uint version = data[0];  // version=1 => 64 bit (2x date + 1x duration)
+
+	int bonus = is_tkhd ? 4 : 0;
+
+	if (version == 0 && duration > (1LL << 32)) {
+		logg(V, "converting to 64bit version of '", header_atom->name_, "'\n");
+		data[0] = 1;
+		data.insert(data.begin()+16+bonus, 4, 0x00);
+		data.insert(data.begin()+8, 4, 0x00);
+		data.insert(data.begin()+4, 4, 0x00);
+	}
+
+	if (data[0] == 1)
+		header_atom->writeInt64(duration, 24+bonus);
+	else
+		header_atom->writeInt(duration, 16+bonus);
+}
+
+void HasHeaderAtom::editHeaderAtom() {
+	editHeaderAtom(header_atom_, duration_);
+}
+
+void HasHeaderAtom::readHeaderAtom() {
+	auto& data = header_atom_->content_;
+	uint version = data[0];  // version=1 => 64 bit (2x date + 1x duration)
+
+	if (version == 1) {
+		timescale_ = header_atom_->readInt(20);
+		duration_ = header_atom_->readInt64(24);
+	} else {
+		timescale_ = header_atom_->readInt(12);
+		duration_ = header_atom_->readInt(16);
+	}
+}
+
+int HasHeaderAtom::getDurationInMs() {
+	return duration_ / (timescale_ / 1000);
 }

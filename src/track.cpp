@@ -50,12 +50,11 @@ int Track::getOrigSize(uint idx) {
 /* parse healthy trak atom */
 void Track::parse(Atom *mdat) {
 
-	Atom *mdhd = trak_->atomByName("mdhd");
-	if(!mdhd)
+	header_atom_ = trak_->atomByName("mdhd");
+	if(!header_atom_)
 		throw "No mdhd atom: unknown duration and timescale";
+	readHeaderAtom();
 
-	timescale_ = mdhd->readInt(12);
-	duration_ = mdhd->readInt(16);
 	const bool is64 = trak_->atomByName("co64");
 
 	times_ = getSampleTimes(trak_);
@@ -146,11 +145,10 @@ void Track::writeToAtoms(bool broken_is_64) {
 	saveSampleToChunk();
 	saveChunkOffsets();
 
-	Atom *mdhd = trak_->atomByName("mdhd");
-	mdhd->writeInt(duration_, 16);
+	editHeaderAtom();
 
 	Atom *tkhd = trak_->atomByName("tkhd");
-	tkhd->writeInt(getDurationInTimescale(), 20);
+	HasHeaderAtom::editHeaderAtom(tkhd, getDurationInTimescale(), true);
 
 	//Avc1 codec writes something inside stsd.
 	//In particular the picture parameter set (PPS) in avcC (after the sequence parameter set)
@@ -187,33 +185,52 @@ void Track::writeToAtoms(bool broken_is_64) {
 }
 
 void Track::clear() {
-//	times_.clear();
 	offsets_.clear();
 	if (orig_sizes_.empty()) swap(sizes_, orig_sizes_);
+	if (orig_times_.empty()) swap(times_, orig_times_);
 	else sizes_.clear();
 	keyframes_.clear();
 }
 
 void Track::fixTimes() {
 	const size_t len_offs = offsets_.size();
-	if(codec_.name_ == "samr") {
+	if (codec_.name_ == "samr") {
 		times_.clear();
 		times_.resize(len_offs, 160);
 		return;
 	}
+
+	if (times_.empty()) times_ = orig_times_;
+	else if (times_.size() < len_offs)
+		logg(W, "only found decode times partially!");
+
+	if (times_.empty()) return;
+
 //	cout << codec_.name_ << '\n';
 //	for(int i=0; i != 100; i++)
 //		cout << "times_[" << i << "] = " << times_[i] << '\n';
 
-	if (times_.empty()) return;
-	while(times_.size() < len_offs) {
-		times_.insert(times_.end(), times_.begin(), times_.end());
-	}
-	times_.resize(len_offs);
+	if (times_.size() != len_offs) {
+		bool are_different = false; // just a heuristic, which ignores last value
+		for (uint i=1; i < min(times_.size(), to_size_t(100)); i++) {
+			if (times_[i] != times_[i-1] || times_[times_.size() - (i+1)] != times_[i]) {
+				are_different = true;
+				break;
+			}
+		}
 
-	int sum = 0;
-	for(auto t : times_) sum += t;
-	duration_ = sum;
+		if (are_different) {
+			logg(W, "guessed frame durations of '", codec_.name_, "' will probably be wrong!\n");
+		}
+
+		while(times_.size() < len_offs) {
+			times_.insert(times_.end(), times_.begin(), times_.end());
+		}
+		times_.resize(len_offs);
+	}
+
+	duration_ = 0;
+	for (auto t : times_) duration_ += t;
 }
 
 vector<int> Track::getSampleTimes(Atom *t) {
@@ -406,10 +423,6 @@ void Track::saveChunkOffsets() {
 	}
 }
 
-int Track::getDurationInTimescale()  {
-	return (int)(double)duration_ * ((double)mp4_timescale_ / (double)timescale_);
-}
-
-int Track::getDurationInMs() {
-	return duration_ / (timescale_ / 1000);
+int64_t Track::getDurationInTimescale()  {
+	return (int64_t)(double)duration_ * ((double)mp4_timescale_ / (double)timescale_);
 }

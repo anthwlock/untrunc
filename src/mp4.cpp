@@ -23,6 +23,7 @@
 #include <iostream>
 #include <iomanip>  // setprecision
 #include <algorithm>
+#include <fstream>
 
 extern "C" {
 #include <stdint.h>
@@ -63,11 +64,10 @@ void Mp4::parseOk(string& filename) {
 	if(root_atom_->atomByName("sdtp"))
 		cerr << "Sample dependency flag atom found. I and P frames might need to recover that info." << endl;
 
-	Atom *mvhd = root_atom_->atomByName("mvhd");
-	if(!mvhd)
-		throw "Missing movie header atom";
-	timescale_ = mvhd->readInt(12);
-//	duration_ = mvhd->readInt(16);  // this value is used nowhere
+	header_atom_ = root_atom_->atomByName("mvhd");
+	if (!header_atom_)
+		throw "Missing movie header atom (mvhd)";
+	readHeaderAtom();
 
 	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
     #if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
@@ -225,7 +225,6 @@ void Mp4::setDuration() {
 }
 
 void Mp4::saveVideo(const string& filename) {
-	if (g_dont_write) return;
 	/* we save all atom except:
 	  ctts: composition offset ( we use sample to time)
 	  cslg: because it is used only when ctts is present
@@ -268,10 +267,9 @@ void Mp4::saveVideo(const string& filename) {
 		logg(W, "Bytes NOT matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
 	}
 
-	logg(I, "saving ", filename, '\n');
-	Atom *mvhd = root_atom_->atomByName("mvhd");
-	mvhd->writeInt(duration_, 16);
+	if (g_dont_write) return;
 
+	editHeaderAtom();
 
 	Atom *ftyp = root_atom_->atomByName("ftyp");
 	Atom *moov = root_atom_->atomByName("moov");
@@ -294,7 +292,20 @@ void Mp4::saveVideo(const string& filename) {
 		track.saveChunkOffsets(); //need to save the offsets back to the atoms
 	}
 
+	if (g_dump_repaired) {
+		auto dst = filename + ".dump";
+		logg(I, "dumping to: '", dst, "'\n");
+		ofstream f_out(dst);
+		cout.rdbuf(f_out.rdbuf());
+
+		filename_ok_ = filename;
+		current_mdat_ = (BufferedAtom*) mdat;
+		dumpSamples();
+		exit(0);
+	}
+
 	//save to file
+	logg(I, "saving ", filename, '\n');
 	FileWrite file;
 	if(!file.create(filename))
 		throw "Could not create file for writing: " + filename;
@@ -650,6 +661,7 @@ void Mp4::repair(string& filename, const string& filename_fixed) {
 	use_offset_map_ = filename == filename_ok_;
 	if (use_offset_map_) analyze(true);
 
+	duration_ = 0;
 	for(uint i=0; i < tracks_.size(); i++)
 		tracks_[i].clear();
 

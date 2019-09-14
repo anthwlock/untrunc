@@ -17,7 +17,7 @@ enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
 extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
-    g_show_tracks, g_dont_write, g_dont_exclude;
+    g_show_tracks, g_dont_write, g_dont_exclude, g_dump_repaired;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings
@@ -128,5 +128,21 @@ void trim_right(std::string& in);
 
 #define to_uint(a) static_cast<unsigned int>(a)
 #define to_size_t(a) static_cast<size_t>(a)
+
+class Atom;
+// this class is meant for reading/writing mvhd and mdhd
+class HasHeaderAtom {
+public:
+	int timescale_;
+	int64_t duration_;
+
+	static void editHeaderAtom(Atom* header_atom, int64_t duration, bool is_tkhd=false);
+	void editHeaderAtom();
+	void readHeaderAtom();
+	int getDurationInMs();
+
+protected:
+	Atom* header_atom_;
+};
 
 #endif // HELPER_H

@@ -40,6 +40,7 @@ void usage() {
 	     << "-st <step_size> - used with '-s'\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-dw - don't write _fixed.mp4\n"
+	     << "-dr  - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
 	     << "\n"
 	     << "analyze options:\n"
@@ -101,6 +102,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "n") g_interactive = false;
 			else if (a == "f") find_atoms = true;
 			else if (a == "dw") {g_dont_write = true;}
+			else if (a == "dr") {g_dump_repaired = true;}
 			else if (a == "d") {dump_samples = true; g_log_mode = LogMode::E;}
 			else if (a == "m") {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}

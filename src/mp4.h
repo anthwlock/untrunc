@@ -33,10 +33,8 @@ class FileRead;
 class AVFormatContext;
 class FrameInfo;
 
-class Mp4 {
+class Mp4 : public HasHeaderAtom {
 public:
-	int timescale_;
-	int duration_ = 0;
 	Atom *root_atom_;
 
 	Mp4();

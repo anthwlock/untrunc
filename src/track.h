@@ -25,15 +25,13 @@
 
 #include "codec.h"
 
-class Track {
+class Track : public HasHeaderAtom {
 public:
 	Track(Atom* t, AVCodecParameters* c, int mp4_timescale);
 
 	Atom *trak_;
 	Codec codec_;
-	int timescale_;
 	int mp4_timescale_;
-	int duration_; // normally sum of sample times
 	int n_matched;
 	double stretch_factor_ = 1; // stretch video by via stts entries
 	bool do_stretch_ = false;
@@ -54,8 +52,7 @@ public:
 	void clear();
 	void fixTimes();
 
-	int getDurationInTimescale(); // in movie timescale, not track timescale
-	int getDurationInMs();
+	int64_t getDurationInTimescale(); // in movie timescale, not track timescale
 
 	std::vector<int> getSampleTimes(Atom *t);
 	std::vector<int> getKeyframes(Atom *t);
@@ -72,7 +69,9 @@ public:
 	void saveChunkOffsets();
 
 private:
-	std::vector<int> orig_sizes_;  // from healthy file
+	// from healthy file
+	std::vector<int> orig_sizes_;
+	std::vector<int> orig_times_;
 
 };
 
