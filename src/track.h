@@ -47,20 +47,20 @@ public:
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
 	int getOrigSize(uint idx);
 
-	void parse(Atom *mdat);
+	void parseOk();
 	void writeToAtoms(bool broken_is_64);
 	void clear();
 	void fixTimes();
 
 	int64_t getDurationInTimescale(); // in movie timescale, not track timescale
 
-	std::vector<int> getSampleTimes(Atom *t);
-	std::vector<int> getKeyframes(Atom *t);
-	std::vector<int> getSampleSizes(Atom *t);
-	std::vector<off_t> getChunkOffsets(Atom* t);
-	std::vector<int> getSampleToChunk(Atom *t, int nchunks);
+	std::vector<int> getSampleTimes();
+	std::vector<int> getKeyframes();
+	std::vector<int> getSampleSizes();
+	std::vector<off_t> getChunkOffsets();
+	std::vector<int> getSampleToChunk(int nchunks);
 
-	std::vector<off_t> getChunkOffsets64(Atom* t);
+	std::vector<off_t> getChunkOffsets64();
 
 	void saveSampleTimes();
 	void saveKeyframes();

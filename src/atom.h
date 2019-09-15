@@ -27,6 +27,7 @@ public:
 
 	std::vector<Atom *> atomsByName(const std::string& name);
 	Atom *atomByName(const std::string& name);
+	Atom *atomByNameSafe(const std::string& name);
 	void replace(Atom *original, Atom *replacement);
 
 	void prune(const std::string& name);
@@ -40,13 +41,17 @@ public:
 	static bool isVersioned(const std::string& id);  // neither
 
 	virtual uint readInt(int64_t offset);
+	uint readInt();
 	int64_t readInt64(int64_t offset);
-	void writeInt(int value, off_t offset);
 	std::string getString(int64_t offset, int64_t length);
 
+	void writeInt(int value, off_t offset);
 	void writeInt64(int64_t value, off_t offset);
+
 	static void findAtomNames(std::string& filename);
 	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
+
+	size_t cursor_off_ = 0;  // for "stream like" read/write methods
 };
 
 class BufferedAtom: public Atom {

@@ -40,7 +40,7 @@ Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {
 
 }
 
-void Codec::parse(Atom *trak, const vector<off_t>& offsets, Atom *mdat) {
+void Codec::parseOk(Atom *trak) {
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
 	if(entries != 1)
@@ -60,19 +60,6 @@ void Codec::parse(Atom *trak, const vector<off_t>& offsets, Atom *mdat) {
 		frame_ = av_frame_alloc();
 		packet_ = av_packet_alloc();
 		packet_->size = g_max_partsize;
-	}
-
-	for (uint i = 0; i < offsets.size(); i++) {
-		int64_t offset = offsets[i];
-		if (offset < mdat->start_ || offset - mdat->start_ > mdat->length_) {
-			cout << "i = " << i;
-			cout << "\noffset = " << offset
-			     << "\nmdat->start = " << mdat->start_
-			     << "\nmdat->length = " << mdat->length_
-			     << "\noffset - mdat->start = " << offset - mdat->start_;
-			cout << "\nInvalid offset in track!\n";
-			exit(0);
-		}
 	}
 }
 

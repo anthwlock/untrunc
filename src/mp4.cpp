@@ -64,9 +64,7 @@ void Mp4::parseOk(string& filename) {
 	if(root_atom_->atomByName("sdtp"))
 		cerr << "Sample dependency flag atom found. I and P frames might need to recover that info." << endl;
 
-	header_atom_ = root_atom_->atomByName("mvhd");
-	if (!header_atom_)
-		throw "Missing movie header atom (mvhd)";
+	header_atom_ = root_atom_->atomByNameSafe("mvhd");
 	readHeaderAtom();
 
 	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
@@ -413,10 +411,15 @@ void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 
 void Mp4::parseTracksOk() {
 	Atom *mdat = root_atom_->atomByName("mdat");
-	vector<Atom *> traks = root_atom_->atomsByName("trak");
+	auto traks = root_atom_->atomsByName("trak");
 	for (uint i=0; i < traks.size(); i++) {
 		tracks_.emplace_back(traks[i], context_->streams[i]->codecpar, timescale_);
-		tracks_.back().parse(mdat);
+		auto& track = tracks_.back();
+		track.parseOk();
+
+		assert(track.offsets_.front() >= mdat->contentStart());
+		assert(track.offsets_.back() < mdat->start_ + mdat->length_);
+
 	}
 	if (hasCodec("fdsc") &&  hasCodec("avc1"))
 		getTrack("avc1").codec_.strictness_level_ = 1;

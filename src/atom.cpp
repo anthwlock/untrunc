@@ -305,6 +305,17 @@ Atom *Atom::atomByName(const string& name) {
 	return NULL;
 }
 
+string getAtomNameFromCode(const string& code) {
+	return g_atom_names.count(code) ? g_atom_names.at(code) : "?";
+}
+
+Atom* Atom::atomByNameSafe(const string& name) {
+	Atom *atom = atomByName(name);
+	if (!atom)
+		throw ss("Missing atom: '", name, "'" " (= ", getAtomNameFromCode(name), ")");
+	return atom;
+}
+
 void Atom::replace(Atom *original, Atom *replacement) {
 	for (uint i=0; i < children_.size(); i++) {
 		if(children_[i] == original) {
@@ -350,6 +361,11 @@ int64_t Atom::readInt64(int64_t offset) {
 
 uint Atom::readInt(int64_t offset) {
 	return swap32(*(uint *)&(content_[offset]));
+}
+
+uint Atom::readInt() {
+	cursor_off_ += 4;
+	return readInt(cursor_off_ - 4);
 }
 
 void Atom::writeInt64(int64_t value, off_t offset) {

@@ -99,7 +99,9 @@ const std::map<std::string, std::string> g_atom_names = {
     {"stsc", "sample to chunk"},
     {"stts", "sample to decode time"},
     {"co64", "chunk to offset 64"},
-    {"stco", "chunk to offset"}
+    {"stco", "chunk to offset"},
+    {"mvhd", "movie header"},
+    {"mdhd", "media header"}
 };
 
 void mute();
