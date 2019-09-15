@@ -52,7 +52,7 @@ void Atom::parseHeader(FileRead &file) {
 
 bool isValidAtomName(const uchar* buff) {
 	if (!isdigit(*buff) && !islower(*buff)) return false;
-	for(int i = 0; i < 174; i++)
+	for(int i = 0; i < numKnownAtoms; i++)
 		if (strncmp((char*)buff, knownAtoms[i].known_atom_name, 4) == 0) {
 			return true;
 		}
@@ -79,7 +79,7 @@ void Atom::parse(FileRead& file) {
 		int64_t content_size = length_ - 8;
 		file.seekSafe(file.pos() + content_size);
 		if (!isPointingAtAtom(file))
-			throw "bad 'mdat' length";
+			throw ss("bad 'mdat' length = ", content_size, " new_pos = ", file.pos());
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
@@ -260,7 +260,7 @@ void Atom::print(int offset) {
 AtomDefinition definition(const string& id) {
 	static map<string, AtomDefinition> def;
 	if(def.size() == 0) {
-		for(int i = 0; i < 174; i++)
+		for(int i = 0; i < numKnownAtoms; i++)
 			def[knownAtoms[i].known_atom_name] = knownAtoms[i];
 	}
 	if(!def.count(id)) {

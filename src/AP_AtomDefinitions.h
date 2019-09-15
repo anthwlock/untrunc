@@ -15,7 +15,7 @@
     cannot, write to the Free Software Foundation, 59 Temple Place
     Suite 330, Boston, MA 02111-1307, USA.  Or www.fsf.org
 
-    Copyright ©2006 puck_lock
+    Copyright 2006 puck_lock
                                                                                                                                         */
 //==================================================================//
 
@@ -62,6 +62,7 @@ AtomDefinition knownAtoms[] = {
     //name		parent atom(s)			container					number								box_type
     {"<()>",	{"_ANY_LEVEL"},	    UNKNOWN_ATOM_TYPE, UKNOWN_REQUIREMENTS,	UNKNOWN_ATOM },      //our unknown atom (self-defined)
     {"ftyp",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },
+    {"wide",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },
     {"moov",	{"FILE_LEVEL"},			PARENT_ATOM,			REQUIRED_ONCE,				SIMPLE_ATOM },
     {"mdat",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_MANY,				SIMPLE_ATOM },
     {"pdin",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_ONCE,				VERSIONED_ATOM },
@@ -237,5 +238,7 @@ AtomDefinition knownAtoms[] = {
     {"(..)",	{"ilst"},						PARENT_ATOM,		  OPTIONAL_ONE,			    SIMPLE_ATOM },         //multiple parents; keep 2nd from end; manual return
     {"data",	{"ITUNES_METADATA"},	CHILD_ATOM,			PARENT_SPECIFIC,			VERSIONED_ATOM }       //multiple parents
 };
+
+constexpr int numKnownAtoms = sizeof(knownAtoms) / sizeof (knownAtoms[0]);
 
 #endif
