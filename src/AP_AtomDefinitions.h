@@ -63,6 +63,7 @@ AtomDefinition knownAtoms[] = {
     {"<()>",	{"_ANY_LEVEL"},	    UNKNOWN_ATOM_TYPE, UKNOWN_REQUIREMENTS,	UNKNOWN_ATOM },      //our unknown atom (self-defined)
     {"ftyp",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },
     {"wide",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },
+    {"frea",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },  // gps
     {"moov",	{"FILE_LEVEL"},			PARENT_ATOM,			REQUIRED_ONCE,				SIMPLE_ATOM },
     {"mdat",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_MANY,				SIMPLE_ATOM },
     {"pdin",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_ONCE,				VERSIONED_ATOM },
