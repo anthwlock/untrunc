@@ -170,9 +170,13 @@ uiControl* Gui::settingsTab() {
 	uiBoxAppend(h_box_step_size, uiControl(label_step_size), 0);
 	uiBoxAppend(h_box_step_size, uiControl(num_step_size), 0);
 	auto chk_stretch = uiNewCheckbox("stretch video to match audio (-sv)");
+	auto chk_keep_unknown = uiNewCheckbox("keep unknown sequences (-k)");
+	auto chk_use_dyn = uiNewCheckbox("use dynamic stats (--dyn)");
 	uiBoxAppend(v_box_repair, uiControl(chk_skip), 0);
 	uiBoxAppend(v_box_repair, uiControl(h_box_step_size), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_stretch), 0);
+	uiBoxAppend(v_box_repair, uiControl(chk_keep_unknown), 0);
+	uiBoxAppend(v_box_repair, uiControl(chk_use_dyn), 0);
 	uiGroupSetChild(group_repair, uiControl(v_box_repair));
 	uiBoxAppend(v_box, uiControl(group_repair), 0);
 
@@ -204,6 +208,20 @@ uiControl* Gui::settingsTab() {
 		auto v = uiCheckboxChecked(chk_box);
 		if (v) msgBox("This feature is in beta, so it might not work!");
 		g_stretch_video = v;
+
+	}, nullptr);
+
+	uiCheckboxSetChecked(chk_keep_unknown, g_dont_exclude);
+	uiCheckboxOnToggled(chk_keep_unknown, [](uiCheckbox* chk_box, void* data){
+		auto v = uiCheckboxChecked(chk_box);
+		g_dont_exclude = v;
+
+	}, nullptr);
+
+	uiCheckboxSetChecked(chk_use_dyn, g_use_chunk_stats);
+	uiCheckboxOnToggled(chk_use_dyn, [](uiCheckbox* chk_box, void* data){
+		auto v = uiCheckboxChecked(chk_box);
+		g_use_chunk_stats = v;
 
 	}, nullptr);
 
@@ -343,7 +361,9 @@ void Gui::startRepair(uiButton* b, void* data) {
 			g_mp4 = &mp4;  // singleton is overkill, this is good enough
 			g_onProgress = Gui::Repair::onProgress;
 			mp4.parseOk(file_ok);
-			mp4.repair(file_bad, file_bad + "_fixed" + output_suffix + ".mp4");
+
+			mp4.repair(file_bad);
+			chkHiddenWarnings();
 			uiQueueMain((void (*)(void*))setDisabled, (void*)false);
 			Repair::onProgress(100);
 			cout << "\ndone!";

@@ -40,17 +40,20 @@ void usage() {
 	     << "-st <step_size> - used with '-s'\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-dw - don't write _fixed.mp4\n"
-	     << "-dr  - dump repaired tracks, implies '-dw'\n"
+	     << "-dr - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
+	     << "--dyn  - use dynamic stats\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
-	     << "-i  - info\n"
+	     << "-i[t|a|s] - info [tracks|atoms|stats]\n"
 	     << "-d  - dump samples\n"
 	     << "-f  - find all atoms and check their lenghts\n"
-	     << "-t  - show tracks\n"
 	     << "-m <offset> - match/analyze file offset\n"
 	     << "untrunc <ok.mp4> <ok.mp4> - report wrong values\n"
+	     << "\n"
+	     << "other options:\n"
+	     << "-ms  - make streamable\n"
 	     << "\n"
 	     << "logging options:\n"
 	     << "-q  - quiet, only errors\n"
@@ -66,18 +69,19 @@ void printVersion() {
 }
 
 int main(int argc, char *argv[]) {
-
 	const int kExpectArg = -22;
 
 	bool show_info = false;
 	bool show_tracks = false;
+	bool show_atoms = false;
+	bool show_stats = false;
 	bool analyze = false;
 	bool find_atoms = false;
 	bool dump_samples = false;
 	bool analyze_offset = false;
+	bool make_streamable = false;
 	off_t arg_offset = -1;
 	int arg_step = -1;
-	string output_suffix;
 
 	int i = 1;
 	for (; i < argc; i++) {
@@ -88,7 +92,9 @@ int main(int argc, char *argv[]) {
 		if (arg[0] == '-') {
 			auto a = arg.substr(1);
 			if      (a == "i") show_info = true;
-			else if (a == "t") show_tracks = true;
+			else if (a == "it") show_tracks = true;
+			else if (a == "ia") show_atoms = true;
+			else if (a == "is") show_stats = true;
 			else if (a == "sv") g_stretch_video = true;
 			else if (a == "st") arg_step = kExpectArg;
 			else if (a == "s") g_ignore_unknown = true;
@@ -105,6 +111,8 @@ int main(int argc, char *argv[]) {
 			else if (a == "dr") {g_dump_repaired = true;}
 			else if (a == "d") {dump_samples = true; g_log_mode = LogMode::E;}
 			else if (a == "m") {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
+			else if (a == "ms") make_streamable = true;
+			else if (a == "-dyn") g_use_chunk_stats = true;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}
@@ -145,18 +153,20 @@ int main(int argc, char *argv[]) {
 			Mp4::step_ = arg_step;
 		}
 
-		if (g_ignore_unknown) output_suffix = ss("-s", Mp4::step_);
-
+		auto ext = getMovExtension(ok);
+		if (make_streamable) { mp4.makeStreamable(ok, ok + "_streamable" + ext); return 0; }
 
 		logg(I, "reading ", ok, '\n');
 		mp4.parseOk(ok);
 
-		if (show_tracks) mp4.printMediaInfo();
-		else if (analyze_offset) mp4.analyzeOffset(corrupt.empty() ? ok : corrupt, arg_offset);
+		if (show_tracks) mp4.printTracks();
+		else if (show_atoms) mp4.printAtoms();
+		else if (show_stats) mp4.printDynStats();
+		else if (show_info) mp4.printMediaInfo();
 		else if (dump_samples) mp4.dumpSamples();
-		else if (show_info) {mp4.printMediaInfo(); cout << "\n\n"; mp4.printAtoms();}
 		else if (analyze) mp4.analyze();
-		else if (corrupt.size()) mp4.repair(corrupt, corrupt + "_fixed" + output_suffix + ".mp4");
+		else if (analyze_offset) mp4.analyzeOffset(corrupt.empty() ? ok : corrupt, arg_offset);
+		else if (corrupt.size()) mp4.repair(corrupt);
 	}
 	catch (const char* e) {return cerr << e << '\n', 1;}
 	catch (string e) {return cerr << e << '\n', 1;}

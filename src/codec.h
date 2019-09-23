@@ -17,16 +17,16 @@ class AVCodecParserContext;
 
 class Codec {
 public:
+	Codec() = default;
 	Codec(AVCodecParameters* c);
 	std::string name_;
 
 	void parseOk(Atom* trak);
-	bool matchSample(const uchar *start) const;
+	bool matchSample(const uchar *start);
 	int getSize(const uchar *start, uint maxlength);
 
 	// specific to codec:
 	AVCodecParameters* av_codec_params_;
-	AVCodec* av_codec_;
 	AVCodecContext* av_codec_context_ = nullptr;
 	AvcConfig* avc_config_ = nullptr;
 
@@ -34,16 +34,20 @@ public:
 	bool was_keyframe_ = false;
 	bool was_bad_ = false;
 	int audio_duration_ = 0;
+	bool should_dump_ = false;  // for debug
 
-	bool matchSampleStrict(const uchar* start) const;
-	uint strictness_level_ = 0;
+	bool matchSampleStrict(const uchar* start);
+	uint strictness_lvl_ = 0;
+
+	bool isSupported();
 
 private:
-	int n_channels_ = 0;
-	uint fdsc_idx_ = -1;  // GoPro specific
-//	int tmcd_seen_ = 0;  // GoPro specific
-	AVPacket* packet_;
-	AVFrame* frame_;
+	bool (*match_fn_)(Codec*, const uchar* start, int s) = nullptr;
+	bool (*match_strict_fn_)(Codec*, const uchar* start, int s) = nullptr;
+	int (*get_size_fn_)(Codec*, const uchar* start, uint maxlength) = nullptr;
+
+	void initAVCodec();
 };
 
 #endif // CODEC_HPP
+

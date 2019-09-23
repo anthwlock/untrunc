@@ -192,6 +192,20 @@ const uchar* FileRead::getPtrAt(off_t pos, int size_requested) {
 	return ret;
 }
 
+const uchar* FileRead::getFragment(off_t off, int size) {
+	seek(off);
+	return getPtr(size);
+}
+
+bool FileRead::alredyExists(const string& fn) {
+	FILE* file;
+	if((file = fopen(fn.c_str(), "r")) != nullptr) {
+		fclose(file);
+		return true;
+	}
+	return false;
+}
+
 off_t FileWrite::pos() {
 	return ftello(file_);
 }

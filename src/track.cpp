@@ -24,7 +24,8 @@
 #include <vector>
 #include <string.h>
 #include <assert.h>
-
+#include <random>
+#include <iomanip>  // setprecision
 
 extern "C" {
 #include <stdint.h>
@@ -34,11 +35,18 @@ extern "C" {
 }
 
 #include "atom.h"
+#include "mp4.h"
 
 using namespace std;
 
-Track::Track(Atom *t, AVCodecParameters *c, int ts) : trak_(t), codec_(c),
-    mp4_timescale_(ts), n_matched(0) {}
+Track::Track(Atom *trak, AVCodecParameters *c, int ts) : trak_(trak), codec_(c),
+    mp4_timescale_(ts) {}
+
+// dummy track
+Track::Track(const string& codec_name) {
+	codec_.name_ = codec_name;
+	is_dummy_ = true;
+}
 
 int Track::getOrigSize(uint idx) {
 	if (orig_sizes_.size())
@@ -53,12 +61,12 @@ void Track::parseOk() {
 		throw "No mdhd atom: unknown duration and timescale";
 	readHeaderAtom();
 
-	times_ = getSampleTimes();
-	keyframes_ = getKeyframes();
-	sizes_ = getSampleSizes();
+	getSampleTimes();
+	getKeyframes();
+	getSampleSizes();
 
-	auto chunk_offsets = trak_->atomByName("co64") ? getChunkOffsets64() : getChunkOffsets();
-	auto sample_to_chunk = getSampleToChunk(chunk_offsets.size());
+	getChunkOffsets();
+	auto sample_to_chunk = getSampleToChunk();
 
 	if (times_.size() != sizes_.size()) {
 		cout << "Mismatch between time offsets and size offsets: \n";
@@ -70,12 +78,12 @@ void Track::parseOk() {
 	}
 
 	//compute actual offsets
-	int64_t offset = -1, old_chunk = -1;
+	off_t offset = -1, old_chunk = -1;
 	for(uint i = 0; i < sizes_.size(); i++) {
-		int chunk = sample_to_chunk[i];
-		if (chunk != old_chunk) {
-			offset = chunk_offsets[chunk];
-			old_chunk = chunk;
+		int chunk_idx = sample_to_chunk[i];
+		if (chunk_idx != old_chunk) {
+			offset = chunks_[chunk_idx].off_;
+			old_chunk = chunk_idx;
 		}
 		offsets_.push_back(offset);
 		offset += sizes_[i];
@@ -96,6 +104,18 @@ void Track::parseOk() {
 	do_stretch_ = g_stretch_video && handler_type_ == "vide";
 
 	codec_.parseOk(trak_);
+
+	if (codec_.name_ == "sowt" || codec_.name_ == "twos") {
+		int nc = codec_.av_codec_params_->channels;
+		int expected_size = 2 * nc;
+		if (sizes_.size() && sizes_[0] != expected_size) {
+			assert(sizes_.front() == sizes_.back());  // should be constant
+//			logg(W, "'stsz' for '", codec_.name_, "' ", sizes_[0], ", using expected ", nc, "*", expected_size, " instead\n");
+			logg(W, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", sizes_[0], " as found in stsz\n");
+			fill(sizes_.begin(), sizes_.end(), expected_size);
+		}
+
+	}
 }
 
 void Track::writeToAtoms(bool broken_is_64) {
@@ -159,15 +179,19 @@ void Track::writeToAtoms(bool broken_is_64) {
 }
 
 void Track::clear() {
-	offsets_.clear();
 	if (orig_sizes_.empty()) swap(sizes_, orig_sizes_);
-	if (orig_times_.empty()) swap(times_, orig_times_);
 	else sizes_.clear();
+
+	if (orig_times_.empty()) swap(times_, orig_times_);
+	else orig_times_.end();
+
+	offsets_.clear();
 	keyframes_.clear();
+	chunks_.clear();
 }
 
 void Track::fixTimes() {
-	const size_t len_offs = offsets_.size();
+	const size_t len_offs = sizes_.size();
 	if (codec_.name_ == "samr") {
 		times_.clear();
 		times_.resize(len_offs, 160);
@@ -207,9 +231,7 @@ void Track::fixTimes() {
 	for (auto t : times_) duration_ += t;
 }
 
-vector<int> Track::getSampleTimes() {
-	vector<int> sample_times;
-	//chunk offsets
+void Track::getSampleTimes() {
 	Atom *stts = trak_->atomByNameSafe("stts");
 
 	int entries = stts->readInt(4);
@@ -217,64 +239,48 @@ vector<int> Track::getSampleTimes() {
 		int nsamples = stts->readInt(8 + 8*i);
 		int time = stts->readInt(12 + 8*i);
 		for(int i = 0; i < nsamples; i++)
-			sample_times.push_back(time);
+			times_.push_back(time);
 	}
-	return sample_times;
 }
 
-vector<int> Track::getKeyframes() {
-	vector<int> sample_key;
-	//chunk offsets
+void Track::getKeyframes() {
 	Atom *stss = trak_->atomByName("stss");
-	if (!stss) return sample_key;
+	if (!stss) return;
 
 	int entries = stss->readInt(4);
 	for(int i = 0; i < entries; i++)
-		sample_key.push_back(stss->readInt(8 + 4*i) - 1);
-	return sample_key;
+		keyframes_.push_back(stss->readInt(8 + 4*i) - 1);
 }
 
-vector<int> Track::getSampleSizes() {
-	vector<int> sample_sizes;
-	//chunk offsets
+void Track::getSampleSizes() {
 	Atom *stsz = trak_->atomByNameSafe("stsz");
 
 	int entries = stsz->readInt(8);
 	int default_size = stsz->readInt(4);
-	if(default_size == 0) {
-		for(int i = 0; i < entries; i++)
-			sample_sizes.push_back(stsz->readInt(12 + 4*i));
+	if (default_size) {
+		sizes_.resize(entries, default_size);
 	} else {
-		sample_sizes.resize(entries, default_size);
+		for(int i = 0; i < entries; i++)
+			sizes_.push_back(stsz->readInt(12 + 4*i));
 	}
-	return sample_sizes;
 }
 
-
-
-vector<off_t> Track::getChunkOffsets64() {
-	vector<off_t> chunk_offsets;
-	Atom *co64 = trak_->atomByNameSafe("co64");
-
-	int nchunks = co64->readInt(4);
-	for(int i = 0; i < nchunks; i++) {
-		int64_t off = co64->readInt64(8 + i*8);
-		chunk_offsets.push_back(off);
+void Track::getChunkOffsets() {
+	Atom* co64 = trak_->atomByName("co64");
+	if (co64) {
+		int nchunks = co64->readInt(4);
+		for(int i = 0; i < nchunks; i++)
+			chunks_.emplace_back(co64->readInt(8 + i*8), -1, -1);
 	}
-	return chunk_offsets;
+	else {
+		Atom *stco = trak_->atomByNameSafe("stco");
+		int nchunks = stco->readInt(4);
+		for(int i = 0; i < nchunks; i++)
+			chunks_.emplace_back(stco->readInt(8 + i*4), -1, -1);
+	}
 }
 
-vector<off_t> Track::getChunkOffsets() {
-	vector<off_t> chunk_offsets;
-	//chunk offsets
-	Atom *stco = trak_->atomByNameSafe("stco");
-	int nchunks = stco->readInt(4);
-	for(int i = 0; i < nchunks; i++)
-		chunk_offsets.push_back(stco->readInt(8 + i*4));
-	return chunk_offsets;
-}
-
-vector<int> Track::getSampleToChunk(int n_total_chunks){
+vector<int> Track::getSampleToChunk(){
 	vector<int> sample_to_chunk;
 
 	Atom *stsc = trak_->atomByNameSafe("stsc");
@@ -284,16 +290,44 @@ vector<int> Track::getSampleToChunk(int n_total_chunks){
 	off = 4;
 	int n_entries = stsc->readInt();
 	for (int i=0; i < n_entries; i++) {
-		int end_idx = off+12 < stsc->content_.size() ? stsc->readInt(off+12) : n_total_chunks+1;
+		int end_idx = off+12 < stsc->content_.size() ? stsc->readInt(off+12) : chunks_.size()+1;
 		int start_idx = stsc->readInt();
 		int n_samples = stsc->readInt();
 		off += 4;
 
-		for (int i=start_idx; i < end_idx; i++)
+		for (int i=start_idx; i < end_idx; i++) {
+			chunks_[i-1].n_samples_ = n_samples;
 			for (int j=0; j < n_samples; j++)
 				sample_to_chunk.push_back(i-1);
+		}
 	}
 	return sample_to_chunk;
+}
+
+void Track::orderPatterns() {
+	using tuple_t = tuple<int, double, int>;
+	vector<tuple_t> perm;
+	for (uint i=0; i < dyn_patterns_.size(); i++) {
+		int max_size;
+		double max_e = 0;
+
+		for (auto& p : dyn_patterns_[i]) {
+			auto distinct = p.getDistinct();
+			auto e = calcEntropy(distinct);
+			if (e > max_e) {max_e = e; max_size = distinct.size();}
+		}
+		perm.emplace_back(i, max_e, max_size);
+	}
+
+	sort(perm.begin(), perm.end(), [](tuple_t& a, tuple_t& b) {
+		if (fabs(get<1>(a) - get<1>(b)) < 0.1) return get<1>(a) > get<1>(b);
+		return get<1>(a) > get<1>(b);
+	});
+
+	dyn_patterns_perm_.clear();
+	for (uint i=0; i < perm.size(); i++)
+		dyn_patterns_perm_.push_back(get<0>(perm[i]));
+
 }
 
 void Track::saveSampleTimes() {
@@ -339,50 +373,234 @@ void Track::saveKeyframes() {
 void Track::saveSampleSizes() {
 	Atom *stsz = trak_->atomByNameSafe("stsz");
 
-	stsz->content_.resize(4 + //version
-						  4 + //default size
-						  4 + //entries
-						  4*sizes_.size()); //size table
-	stsz->writeInt(0, 4);
-	stsz->writeInt(sizes_.size(), 8);
-	for (uint i=0; i < sizes_.size(); i++) {
-		stsz->writeInt(sizes_[i], 12 + 4*i);
+	bool is_constant = true;
+	for (uint i=1; i < sizes_.size(); i++)
+		if (sizes_[i-1] != sizes_[i]) {is_constant = false; break;}
+
+	stsz->seek(4);
+	if (is_constant && sizes_.size()) {
+		stsz->content_.resize(12);
+		stsz->writeInt(sizes_[0]);
+		stsz->writeInt(sizes_.size());
+	}
+	else {
+		stsz->content_.resize(12 + 4*sizes_.size());
+		stsz->writeInt(0);
+		stsz->writeInt(sizes_.size());
+		for (auto sz : sizes_) stsz->writeInt(sz);
 	}
 }
 
 void Track::saveSampleToChunk() {
 	Atom *stsc = trak_->atomByNameSafe("stsc");
+	stsc->seek(8);
 
 	stsc->content_.resize(4 + // version
 						  4 + //number of entries
-						  12); //one sample per chunk.
-	stsc->writeInt(1, 4);
-	stsc->writeInt(1, 8); //first chunk (1 based)
-	stsc->writeInt(1, 12); //one sample per chunk
-	stsc->writeInt(1, 16); //id 1 (WHAT IS THIS!)
+	                      12*chunks_.size());
+
+	int last_ns = -1, num_entries = 0;
+	for (uint i=0; i < chunks_.size(); i++) {
+		if (last_ns != chunks_[i].n_samples_) {
+			stsc->writeInt(i+1);
+			stsc->writeInt(chunks_[i].n_samples_);
+			stsc->writeInt(1); // todo: stsd related index
+			last_ns = chunks_[i].n_samples_;
+			num_entries++;
+		}
+	}
+	stsc->writeInt(num_entries, 4);
+	stsc->content_.resize(8 + num_entries*12);
 }
 
 void Track::saveChunkOffsets() {
 	Atom *co64 = trak_->atomByName("co64");
 	if (co64) {
-		co64->content_.resize(4 + //version
-		                      4 + //number of entries
-		                      8*offsets_.size());
-		co64->writeInt(offsets_.size(), 4);
-		for (uint i=0; i < offsets_.size(); i++)
-			co64->writeInt64(offsets_[i], 8 + 8*i);
+		co64->seek(4);
+		co64->content_.resize(8 + 8*chunks_.size());
+		co64->writeInt(chunks_.size());
+		for (auto& c : chunks_) co64->writeInt64(c.off_);
 	}
 	else {
 		Atom *stco = trak_->atomByNameSafe("stco");
-		stco->content_.resize(4 + //version
-		                      4 + //number of entries
-		                      4*offsets_.size());
-		stco->writeInt(offsets_.size(), 4);
-		for (uint i=0; i < offsets_.size(); i++)
-			stco->writeInt(offsets_[i], 8 + 4*i);
+		stco->seek(4);
+		stco->content_.resize(8 + 4*chunks_.size());
+		stco->writeInt(chunks_.size());
+		for (auto& c : chunks_) stco->writeInt(c.off_);
 	}
+}
+
+bool Track::isChunkOffsetOk(off_t off) {
+	// chunk-offsets might be regular in respect to absolute file begin, not mdat begin
+	if (!current_chunk_.off_ && (g_mp4->current_mdat_->contentStart() + off) % chunk_distance_gcd_ == 0)
+		return true;
+
+	return (off - current_chunk_.off_) % chunk_distance_gcd_ == 0;
+}
+
+int64_t Track::stepToNextChunkOff(off_t off) {
+	auto step = chunk_distance_gcd_ - ((off - current_chunk_.off_) % chunk_distance_gcd_);
+	if (!current_chunk_.off_) {
+		auto abs_off = off + g_mp4->current_mdat_->contentStart();
+		auto step_abs = chunk_distance_gcd_ - ((abs_off - current_chunk_.off_) % chunk_distance_gcd_);
+		step = min(step, step_abs);
+	}
+	logg(V, "stepToNextChunkOff(", off, "): ", codec_.name_,  " last chunk_off: ", current_chunk_.off_, " next: ", off + step, "\n");
+	return step;
+}
+
+bool Track::chunkMightBeAtAnd() {
+	if (!current_chunk_.n_samples_ || likely_n_samples_p < 0.7) return true;
+	for (auto n : likely_n_samples_) if (current_chunk_.n_samples_ == n) return true;
+	return false;
+}
+
+void Track::printDynPatterns(bool show_percentage) {
+	auto own_idx = g_mp4->getTrackIdx(codec_.name_);
+	for (uint j=0; j < dyn_patterns_perm_.size(); j++) {
+		auto idx = dyn_patterns_perm_[j];
+		auto n_total = show_percentage ? g_mp4->chunk_transitions_[{own_idx, idx}].size() : 0;
+		if (own_idx == idx) continue;
+		cout << ss(codec_.name_, "_", g_mp4->tracks_[idx].codec_.name_, " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
+		           (show_percentage ? ss(" (", n_total, ")") : ""), "\n");
+		for (auto& p : dyn_patterns_[idx]) {
+			if (n_total) cout << ss(fixed, setprecision(3), (double)p.cnt / (double)n_total, " ", p.cnt, " ");
+			cout << p << '\n';
+		}
+	}
+}
+
+void Track::genLikely() {
+	assert(sizes_.size() > 0);
+
+	if (sizes_.size() > 1) {
+		random_device rd;
+		mt19937 mt(rd());
+		auto dis = uniform_int_distribution<size_t>(0, sizes_.size()-2);
+		map<int, int> sizes_cnt;
+		int n_sample = min(to_size_t(500), sizes_.size());
+		for (int n=n_sample; n--;) {
+			auto idx = dis(mt);
+			sizes_cnt[sizes_[idx]]++;
+		}
+
+		for (auto& kv : sizes_cnt) {
+			auto size = kv.first, cnt = kv.second;
+
+			auto p = (double)cnt / n_sample;
+			if (p >= 0.2) {
+				likely_sample_sizes_.push_back(size);
+				likely_samples_sizes_p += p;
+			}
+		}
+	}
+	else {
+		likely_n_samples_.push_back(sizes_[0]);
+		likely_n_samples_p = 1;
+	}
+
+
+	assert(chunks_.size());
+
+	map<int, int> cnt;
+	for (auto& c : chunks_) cnt[c.n_samples_]++;
+	for (auto& kv : cnt) {
+		auto n_samples = kv.first, cnt = kv.second;
+		auto p = (double)cnt / chunks_.size();
+		if (p >= 0.2) {
+			likely_n_samples_.push_back(n_samples);
+			likely_n_samples_p += p;
+		}
+	}
+
+	if (chunks_.size() > 1) {
+		chunk_distance_gcd_ = chunks_[1].off_ - chunks_[0].off_;
+		for (uint i=1; i < chunks_.size(); i++) {
+			chunk_distance_gcd_ = __gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
+		}
+	}
+	else chunk_distance_gcd_ = 1;
+}
+
+int Track::useDynPatterns(off_t offset) {
+	auto buff = g_mp4->getBuffAround(offset, Mp4::pat_size_);
+	if (!buff) return -1;
+
+	for (uint i=0; i < dyn_patterns_perm_.size(); i++) {
+		auto idx = dyn_patterns_perm_[i];
+		if (!g_mp4->tracks_[idx].isChunkOffsetOk(offset)) continue;
+		if (doesMatchTransition(buff, idx)) return idx;
+	}
+	return -1;
+}
+
+void Track::genChunkSizes() {
+	if (!chunks_.size())
+		throw logic_error(ss("healthy file has a '", codec_.name_,
+	                         "' track, but no single ", codec_.name_, "-frame!\n"));
+	assert(chunks_[0].n_samples_ >= 1);
+
+	if (chunks_.size() == 1 || chunks_[0].n_samples_ == 1) {  // really? better check..
+		chunks_.clear();
+		off_t last_end = offsets_.front();
+		Track::Chunk c;
+		c.off_ = offsets_.front();
+		for (uint i=0; i < offsets_.size(); i++) {
+			auto& off = offsets_[i];
+			auto& sz = sizes_[i];
+
+			if (last_end != off) {
+				chunks_.push_back(c);
+				c.off_ = last_end = off;
+				c.size_ = c.n_samples_ = 0;
+			}
+			c.n_samples_++;
+			c.size_ += sz;
+			last_end += sz;
+		}
+		chunks_.push_back(c);
+	}
+	else {
+		int sample_idx = 0;
+		for (auto& c : chunks_) {
+			c.size_ = 0;
+			for (int i=0; i < c.n_samples_; i++)
+				c.size_ += sizes_[sample_idx++];
+		}
+	}
+
+}
+
+void Track::pushBackLastChunk() {
+	if (is_dummy_) g_mp4->addUnknownSequence(current_chunk_.off_, current_chunk_.size_);
+
+	off_to_exclude_.emplace_back(g_mp4->current_mdat_->total_excluded_yet_);
+	chunks_.emplace_back(current_chunk_);
+	current_chunk_.n_samples_ = 0;
+	// keep current_chunk_.off_
+}
+
+bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
+	for (auto& p : dyn_patterns_[track_idx])
+		if (p.doesMatch(buff)) {
+			return true;
+		}
+	return false;
+
+}
+
+void Track::applyOffsToExclude() {
+	for (size_t i=0; i < off_to_exclude_.size(); i++)
+		chunks_[i].off_ -= off_to_exclude_[i];
 }
 
 int64_t Track::getDurationInTimescale()  {
 	return (int64_t)(double)duration_ * ((double)mp4_timescale_ / (double)timescale_);
+}
+
+
+Track::Chunk::Chunk(off_t off, int64_t size, int ns) : off_(off), size_(size), n_samples_(ns) {}
+
+ostream& operator<<(ostream& out, const Track::Chunk& c) {
+	return out << ss(c.off_, "', ", c.size_, ", ", c.n_samples_);
 }

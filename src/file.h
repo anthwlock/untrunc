@@ -35,6 +35,8 @@ class FileRead {
 public:
 	FileRead() = default;
 	FileRead(const std::string& filename);
+	FileRead(const FileRead&) = delete;
+
 	~FileRead();
 	void open(const std::string& filename);
 
@@ -55,9 +57,12 @@ public:
 	const uchar* getPtr(int size_requested);
 	const uchar* getPtr2(int size_requested);  // changes state (buf_off_)
 	const uchar* getPtrAt(off_t pos, int size_requested);
+	const uchar* getFragment(off_t pos, int size);
 	ssize_t buf_size_ = 15*(1<<20); // 15 MB
 
 	std::string filename_;
+
+	static bool alredyExists(const std::string& fn);
 
 protected:
 	size_t fillBuffer(off_t location);

@@ -15,6 +15,7 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 * easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/latest)
 * \>2GB file support
 * ability to skip over unknown bytes
+* generic support for all tracks with fixed-width chunks, e.g. (twos/sowt)
 * advanced logging system
 * can stretch/shrink video to match audio duration
 * compatible with new versions of ffmpeg
@@ -44,7 +45,8 @@ Just use following commands, make will do the rest for you.
 
 #### GUI
 
-The GUI is optional. You will need [libui](https://github.com/andlabs/libui). After that, just do
+The GUI is optional. It is included in the automated [windows builds](https://github.com/anthwlock/untrunc/releases/latest).\
+You will need [libui](https://github.com/andlabs/libui). After that, just do
 
 	make untrunc-gui
 

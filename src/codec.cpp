@@ -22,22 +22,28 @@ extern "C" {
 
 using namespace std;
 
-Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {
-	av_codec_ = avcodec_find_decoder(c->codec_id);
+extern const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match;
+extern const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match;
+extern const map<string, int(*) (Codec*, const uchar*, uint)> dispatch_get_size;
 
-	if (!av_codec_) {
+Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {}
+
+void Codec::initAVCodec() {
+	auto c = av_codec_params_;
+	auto av_codec = avcodec_find_decoder(c->codec_id);
+
+	if (!av_codec) {
 		auto codec_type = av_get_media_type_string(c->codec_type);
 		auto codec_name = avcodec_get_name(c->codec_id);
 		logg(V, "FFmpeg does not support codec: <", codec_type, ", ", codec_name, ">\n");
 		return;
 	}
 
-	av_codec_context_ = avcodec_alloc_context3(av_codec_);
+	av_codec_context_ = avcodec_alloc_context3(av_codec);
 	avcodec_parameters_to_context(av_codec_context_, c);
 
-	if (avcodec_open2(av_codec_context_, av_codec_, NULL) < 0)
+	if (avcodec_open2(av_codec_context_, av_codec, NULL) < 0)
 		throw "Could not open codec: ?";
-
 }
 
 void Codec::parseOk(Atom *trak) {
@@ -48,6 +54,17 @@ void Codec::parseOk(Atom *trak) {
 
 	name_ = stsd->getString(12, 4);
 
+	if (contains({"mp4a", "sawb"}, name_)) initAVCodec();
+
+	if (dispatch_match.count(name_)) match_fn_ = dispatch_match.at(name_);
+	if (dispatch_strict_match.count(name_)) match_strict_fn_ = dispatch_strict_match.at(name_);
+
+	 if (dispatch_get_size.count(name_)) get_size_fn_ = dispatch_get_size.at(name_);
+	else if (name_ == "sawb") get_size_fn_ = dispatch_get_size.at("mp4a");
+
+	// if null gen dynamic patterns, if no good pattern exit  // REMOVE ME
+	// otherwise use matchDyn etc.
+
 	if (name_ == "avc1") {
 		avc_config_ = new AvcConfig(*stsd);
 		if (!avc_config_->is_ok)
@@ -55,52 +72,51 @@ void Codec::parseOk(Atom *trak) {
 		else
 			logg(V, "avcC got decoded\n");
 	}
-
-	else if (name_ == "mp4a") {
-		frame_ = av_frame_alloc();
-		packet_ = av_packet_alloc();
-		packet_->size = g_max_partsize;
-	}
 }
 
-// only match if we are certain -> less false positives
-// you might want to tweak these values..
-bool Codec::matchSampleStrict(const uchar *start) const {
-	int s = swap32(*(int *)start);  // big endian
+bool Codec::isSupported() {
+	return match_fn_ && get_size_fn_;
+}
 
-	if (name_ == "avc1") {
-		if (strictness_level_ > 0) {
+
+#define MATCH_FN(codec)  {codec, [](Codec* self __attribute__((unused)), \
+	const uchar* start __attribute__((unused)), int s __attribute__((unused))) -> bool
+
+const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
+	MATCH_FN("avc1") {
+		if (self->strictness_lvl_ > 0) {
 			int s2 = swap32(((int *)start)[1]);
 			return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 		}
 		int s1 = s;
 		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
-	}
-	else if (name_ == "mp4a") {
+	}},
+    MATCH_FN("mp4a") {
 		return false;
 //		return (s>>16) == 0x210A;  // this needs to be improved
-	}
-	else if (name_ == "tmcd") {
+	}},
+	MATCH_FN("tmcd") {
 		return false;
-	}
-	else {
-		return matchSample(start);
-	}
+	}}
+};
 
+// only match if we are certain -> less false positives
+// you might want to tweak these values..
+bool Codec::matchSampleStrict(const uchar *start) {
+	int s = swap32(*(int *)start);  // big endian
+	if (!match_strict_fn_) return matchSample(start);
+	return match_strict_fn_(this, start, s);
 }
 
-bool Codec::matchSample(const uchar *start) const{
-	int s = swap32(*(int *)start);  // big endian
-	if (name_ == "avc1") {
-
+const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
+	MATCH_FN("avc1") {
 		//this works only for a very specific kind of video
 		//#define SPECIAL_VIDEO
 #ifdef SPECIAL_VIDEO
-		int s2 = swap32(((int *)start)[1]);
-		return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
+		    int s2 = swap32(((int *)start)[1]);
+			return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
 		return true;
 #endif
-
 
 		//TODO use the first byte of the nal: forbidden bit and type!
 		int nal_type = (start[4] & 0x1f);
@@ -120,8 +136,9 @@ bool Codec::matchSample(const uchar *start) const{
 		}
 		logg(V, "avc1: failed for no particular reason\n");
 		return false;
+	}},
 
-	} else if (name_ == "mp4a") {
+    MATCH_FN("mp4a") {
 		if(s > 1000000) {
 			logg(V, "mp4a: Success because of large s value\n");
 			return true;
@@ -162,57 +179,76 @@ bool Codec::matchSample(const uchar *start) const{
 		if(s & 0xFFE00000 != 0xFFE0000)
 			return false;
 		return true; */
+	}},
 
-	} else if (name_ == "mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
-		if(s == 0x1b3 || s == 0x1b6)
-			return true;
-		return false;
+	MATCH_FN("mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
+		return (s == 0x1b3 || s == 0x1b6);
+	}},
 
-	} else if (name_ == "alac") {
+	MATCH_FN("alac") {
 		int t = swap32(*(int *)(start + 4));
 		t &= 0xffff0000;
 
 		if(s == 0 && t == 0x00130000) return true;
 		if(s == 0x1000 && t == 0x001a0000) return true;
 		return false;
+	}},
 
-	} else if (name_ == "samr") {
+	MATCH_FN("samr") {
 		return start[0] == 0x3c;
-	} else if (name_ == "twos") {
-		//weird audio codec: each packet is 2 signed 16b integers.
-		cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
-		exit(0);
-		return true;
-	} else if (name_ == "apcn") {
+	}},
+	MATCH_FN("apcn") {
 		return memcmp(start, "icpf", 4) == 0;
-	} else if (name_ == "lpcm") {
+	}},
+	MATCH_FN("lpcm") {
 		// This is not trivial to detect because it is just
 		// the audio waveform encoded as signed 16-bit integers.
 		// For now, just test that it is not "apcn" video:
 		return memcmp(start, "icpf", 4) != 0;
-	} else if (name_ == "in24") { //it's a codec id, in a case I found a pcm_s24le (little endian 24 bit) No way to know it's length.
-		return true;
-	} else if (name_ == "sowt") {
-		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
-		return false;
-	} else if (name_ == "sawb") {
+	}},
+	MATCH_FN("sawb") {
 		return start[0] == 0x44;
-	}
-	if (name_ == "tmcd") {  // GoPro timecode .. hardcoded in Mp4::GetMatches
+	}},
+	MATCH_FN("tmcd") {  // GoPro timecode .. hardcoded in Mp4::GetMatches
 		return false;
 //		return !tmcd_seen_ && start[0] == 0 && g_mp4->wouldMatch(start+4, "tmcd");
-	}
-	if (name_ == "gpmd") {  // GoPro timecode, 4 bytes (?)
+	}},
+	MATCH_FN("gpmd") {  // GoPro timecode, 4 bytes (?)
 		vector<string> fourcc = {"DEVC", "DVID", "DVNM", "STRM", "STNM", "RMRK",  "SCAL",
 		                         "SIUN", "UNIT", "TYPE", "TSMP", "TIMO", "EMPT"};
 		return contains(fourcc, string((char*)start, 4));
-	}
-	if (name_ == "fdsc") {  // GoPro recovery, anyone knows more?
+	}},
+	MATCH_FN("fdsc") {  // GoPro recovery.. anyone knows more?
 		return string((char*)start, 2) == "GP";
-	}
+	}},
 
+	/*
+	MATCH_FN("twos") {
+		//weird audio codec: each packet is 2 signed 16b integers.
+		cerr << "This audio codec is EVIL, there is no hope to guess it.\n";
+		return true;
+	}},
+	MATCH_FN("in24") { //it's a codec id, in a case I found a pcm_s24le (little endian 24 bit) No way to know it's length.
+		return true;
+	}},
+	MATCH_FN("sowt") {
+		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
+		return false;
+	}},
+	*/
+};
+
+bool Codec::matchSample(const uchar *start) {
+	if (match_fn_) {
+		int s = swap32(*(int *)start);  // big endian
+		return match_fn_(this, start, s);
+	}
 	return false;
 }
+
+
+#define GET_SZ_FN(codec)  {codec, [](Codec* self __attribute__((unused)), \
+	const uchar* start __attribute__((unused)), uint maxlength __attribute__((unused))) -> int
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -239,52 +275,34 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 }
 #pragma GCC diagnostic pop
 
+const map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
+	GET_SZ_FN("mp4a") {
+		static AVPacket* packet = av_packet_alloc();
+//		packet->size = g_max_partsize;
+		static AVFrame* frame = av_frame_alloc();
 
-int Codec::getSize(const uchar *start, uint maxlength) {
-	if (name_ == "mp4a" || name_ == "sawb") {
-		packet_->data = const_cast<uchar*>(start);
-		if(!is_new_ffmpeg_api) packet_->size = maxlength;
+		packet->data = const_cast<uchar*>(start);
+		if(!is_new_ffmpeg_api) packet->size = maxlength;
 		int got_frame = 0;
 
-		int consumed = untr_decode_audio4(av_codec_context_, frame_, &got_frame, packet_, maxlength);
-//		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet_);
+		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
+//		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
 
 		// simulate state for new API
 		if (is_new_ffmpeg_api && consumed >= 0) {
-			packet_->size -= consumed;
-			if (packet_->size <= 0) packet_->size = maxlength;
+			packet->size -= consumed;
+			if (packet->size <= 0) packet->size = maxlength;
 		}
 
-		audio_duration_ = frame_->nb_samples;
-		logg(V, "nb_samples: ", audio_duration_, '\n');
+		self->audio_duration_ = frame->nb_samples;
+		logg(V, "nb_samples: ", self->audio_duration_, '\n');
 
-		if (!n_channels_) n_channels_ = frame_->channels;
-		was_bad_ = (!got_frame || frame_->channels != n_channels_);
+		self->was_bad_ = (!got_frame || self->av_codec_params_->channels != frame->channels);
 
 		return consumed;
+	}},
 
-	} else if (name_ == "mp4v") {
-
-		/*     THIS DOES NOT SEEM TO WORK FOR SOME UNKNOWN REASON. IT JUST CONSUMES ALL BYTES.
-		*     AVFrame *frame = avcodec_alloc_frame();
-		if(!frame)
-			throw "Could not create AVFrame";
-		AVPacket avp;
-		av_init_packet(&avp);
-
-		int got_frame;
-		avp.data=(uchar *)(start);
-		avp.size = maxlength;
-		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp);
-		av_freep(&frame);
-		return consumed; */
-
-		//found no way to guess size, probably the only way is to use some functions in ffmpeg
-		//to decode the stream
-		cout << "Unfortunately I found no way to guess size of mp4v packets. Sorry\n";
-		return -1;
-
-	} else if (name_ == "avc1") {
+    GET_SZ_FN("avc1") {
 		//        AVFrame *frame = av_frame_alloc();
 		//        if(!frame)
 		//            throw "Could not create AVFrame";
@@ -314,24 +332,24 @@ int Codec::getSize(const uchar *start, uint maxlength) {
 		static SpsInfo sps_info;
 		if (!sps_info_initialized){
 			logg(V, "sps_info (before): ",
-			     sps_info.frame_mbs_only_flag,
-			     ' ', sps_info.log2_max_frame_num,
-			     ' ', sps_info.log2_max_poc_lsb,
-			     ' ', sps_info.poc_type, '\n');
-			if (avc_config_->is_ok){
-				sps_info = *avc_config_->sps_info_;
+			    sps_info.frame_mbs_only_flag,
+			    ' ', sps_info.log2_max_frame_num,
+			    ' ', sps_info.log2_max_poc_lsb,
+			    ' ', sps_info.poc_type, '\n');
+			if (self->avc_config_->is_ok){
+				sps_info = *self->avc_config_->sps_info_;
 			}
 			sps_info_initialized = true;
 			logg(V, "sps_info (after):  ",
-			     sps_info.frame_mbs_only_flag,
-			     ' ', sps_info.log2_max_frame_num,
-			     ' ', sps_info.log2_max_poc_lsb,
-			     ' ', sps_info.poc_type, '\n');
+			    sps_info.frame_mbs_only_flag,
+			    ' ', sps_info.log2_max_frame_num,
+			    ' ', sps_info.log2_max_poc_lsb,
+			    ' ', sps_info.poc_type, '\n');
 		}
 
 		SliceInfo previous_slice;
 		NalInfo previous_nal;
-		was_keyframe_ = false;
+		self->was_keyframe_ = false;
 
 		while(1) {
 			logg(V, "---\n");
@@ -355,7 +373,7 @@ int Codec::getSize(const uchar *start, uint maxlength) {
 					break;
 				return length;
 			case NAL_IDR_SLICE:
-				was_keyframe_ = true; // keyframe
+				self->was_keyframe_ = true; // keyframe
 				[[fallthrough]];
 			case NAL_SLICE:
 			{
@@ -398,31 +416,29 @@ int Codec::getSize(const uchar *start, uint maxlength) {
 			logg(V, "Partial avc1-length: ", length, "\n");
 		}
 		return length;
+	}},
 
-	} else if (name_ == "samr") { //lenght is multiple of 32, we split packets.
+	GET_SZ_FN("samr") { //lenght is multiple of 32, we split packets.
 		return 32;
-	} else if (name_ == "twos") { //lenght is multiple of 32, we split packets.
-		return 4;
-	} else if (name_ == "apcn") {
+	}},
+	GET_SZ_FN("apcn") {
 		return swap32(*(int *)start);
-	} else if (name_ == "lpcm") {
+	}},
+	GET_SZ_FN("lpcm") {
 		// Use hard-coded values for now....
 		const int num_samples      = 4096; // Empirical
 		const int num_channels     =    2; // Stereo
 		const int bytes_per_sample =    2; // 16-bit
 		return num_samples * num_channels * bytes_per_sample;
-	} else if (name_ == "in24") {
-		return -1;
-	} else if (name_ == "tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
+	}},
+	GET_SZ_FN("tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
 //		tmcd_seen_ = true;
 		return 4;
-	} else if (name_ == "gpmd") {  // GoPro meta data, see 'gopro/gpmf-parser'
-		int s2 = swap32(((int *)start)[1]);
-		int num = (s2 & 0x0000ffff);
-		return num + 8;
-	} else if (name_ == "fdsc") {  // GoPro recovery
+	}},
+	GET_SZ_FN("fdsc") {  // GoPro recovery
 		// TODO: How is this track used for recovery?
 
+		static int fdsc_idx_ = -1;
 		fdsc_idx_++;
 		if (fdsc_idx_ == 0) {
 			for(auto pos=start+4; maxlength; pos+=4, maxlength-=4) {
@@ -431,7 +447,46 @@ int Codec::getSize(const uchar *start, uint maxlength) {
 		}
 		else if (fdsc_idx_ == 1) return g_mp4->getTrack("fdsc").getOrigSize(1);  // probably 152 ?
 		return 16;
+	}},
+	GET_SZ_FN("gpmd") {  // GoPro meta data, see 'gopro/gpmf-parser'
+		int s2 = swap32(((int *)start)[1]);
+		int num = (s2 & 0x0000ffff);
+		return num + 8;
+	}},
 
-	}
-	else return -1;
+	/* if codec is not found in map,
+	 * untrunc will try to generate common features (chunk_size, sample_size, patterns) per track.
+	 * this is why these are commented out
+	 *
+	GET_SZ_FN("mp4v") {
+		//     THIS DOES NOT SEEM TO WORK FOR SOME UNKNOWN REASON. IT JUST CONSUMES ALL BYTES.
+		/     AVFrame *frame = avcodec_alloc_frame();
+		if(!frame)
+			throw "Could not create AVFrame";
+		AVPacket avp;
+		av_init_packet(&avp);
+
+		int got_frame;
+		avp.data=(uchar *)(start);
+		avp.size = maxlength;
+		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp);
+		av_freep(&frame);
+		return consumed;
+
+		//found no way to guess size, probably the only way is to use some functions in ffmpeg
+		//to decode the stream
+		cout << "Unfortunately I found no way to guess size of mp4v packets. Sorry\n";
+		return -1;
+	}},
+	GET_SZ_FN("twos") { //lenght is multiple of 32, we split packets.
+		return 4;
+	}},
+	GET_SZ_FN("in24") {
+		return -1;
+	}},
+	*/
+};
+
+int Codec::getSize(const uchar* start, uint maxlength) {
+	return get_size_fn_ ? get_size_fn_(this, start, maxlength) : -1;
 }

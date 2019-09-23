@@ -31,6 +31,7 @@ public:
 	void replace(Atom *original, Atom *replacement);
 
 	void prune(const std::string& name);
+	void prune(Atom* child);
 	void updateLength();
 
 	virtual int64_t contentSize() const { return content_.size(); }
@@ -40,18 +41,21 @@ public:
 	static bool isDual(const std::string& id);  // not used
 	static bool isVersioned(const std::string& id);  // neither
 
-	virtual uint readInt(int64_t offset);
+	virtual uint readInt(off_t offset);
 	uint readInt();
-	int64_t readInt64(int64_t offset);
-	std::string getString(int64_t offset, int64_t length);
+	int64_t readInt64(off_t offset);
+	std::string getString(off_t offset, int64_t length);
 
+	void writeInt(int value);
 	void writeInt(int value, off_t offset);
+	void writeInt64(int64_t value);
 	void writeInt64(int64_t value, off_t offset);
 
 	static void findAtomNames(std::string& filename);
 	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
 
 	size_t cursor_off_ = 0;  // for "stream like" read/write methods
+	void seek(size_t idx) {cursor_off_ = idx;}
 };
 
 class BufferedAtom: public Atom {
@@ -62,8 +66,8 @@ public:
 	explicit BufferedAtom(FileRead&);
 
 	int64_t contentSize() const { return file_end_ - contentStart(); }
-	const uchar *getFragment(int64_t offset, int64_t size);
-	uint readInt(int64_t offset);
+	const uchar *getFragment(off_t offset, int size);
+	uint readInt(off_t offset);
 
 	std::vector<std::pair<off_t, uint64_t>> sequences_to_exclude_;  // from resulting mdat
 	int64_t total_excluded_yet_ = 0;

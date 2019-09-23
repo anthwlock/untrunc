@@ -33,6 +33,7 @@ bool g_ignore_unknown = false;
 bool g_stretch_video = false;
 bool g_show_tracks = false;
 bool g_dont_write = false;
+bool g_use_chunk_stats = false;
 bool g_dont_exclude = false;
 bool g_dump_repaired = false;
 uint g_num_w2 = 0;
@@ -98,16 +99,19 @@ int readGolomb(const uchar *&buffer, int &offset) {
 }
 
 void printBuffer(const uchar* pos, int n){
-	cout << mkHexStr(pos, n, true) << '\n';
+	cout << mkHexStr(pos, n, 4) << '\n';
 }
 
-string mkHexStr(const uchar* pos, int n, bool bytes_seperated){
+string mkHexStr(const uchar* pos, int n, int seperate_each){
 	stringstream out;
 	out << hex;
 	for (int i=0; i != n; ++i) {
+		if (seperate_each && i % seperate_each == 0)
+			out << (seperate_each? " " : "");
+
 		int x = (int) *(pos+i);
 		if (x < 16) out << '0';
-		out << x << (bytes_seperated? " " : "");
+		out << x;
 	}
 	return out.str();
 }
@@ -208,6 +212,7 @@ void chkHiddenWarnings() {
 		cout << string(10, ' ') << '\n';
 		logg(W, g_num_w2, " warnings were hidden!\n");
 	}
+	g_num_w2 = 0;
 }
 
 void trim_right(string& in) {
@@ -260,4 +265,26 @@ void HasHeaderAtom::readHeaderAtom() {
 
 int HasHeaderAtom::getDurationInMs() {
 	return duration_ / (timescale_ / 1000);
+}
+
+string getMovExtension(const string& path) {
+	auto idx = path.find_last_of(".");
+	if (idx == string::npos) return ".mp4";
+	auto ext = path.substr(idx);
+	if (ext.find("/") != string::npos || ext.find("\\") != string::npos) return ".mp4";
+	return ext;
+}
+
+// Shannon entropy
+double calcEntropy(const vector<uchar>& in) {
+   map<char, int> cnt;
+   for (char c : in) cnt[c] ++ ;
+
+   double entropy = 0 ;
+   for (auto p : cnt) {
+	  double freq = (double)p.second / in.size() ;
+	  entropy -= freq * log2(freq) ;
+   }
+   return entropy;
+
 }

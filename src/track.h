@@ -24,15 +24,16 @@
 #include <vector>
 
 #include "codec.h"
+#include "mutual_pattern.h"
 
 class Track : public HasHeaderAtom {
 public:
-	Track(Atom* t, AVCodecParameters* c, int mp4_timescale);
+	Track(Atom* trak, AVCodecParameters* c, int mp4_timescale);
+	Track(const std::string& codec_name);
 
 	Atom *trak_;
 	Codec codec_;
 	int mp4_timescale_;
-	int n_matched;
 	double stretch_factor_ = 1; // stretch video by via stts entries
 	bool do_stretch_ = false;
 	std::string handler_type_; // 'soun' OR 'vide'
@@ -54,11 +55,12 @@ public:
 
 	int64_t getDurationInTimescale(); // in movie timescale, not track timescale
 
-	std::vector<int> getSampleTimes();
-	std::vector<int> getKeyframes();
-	std::vector<int> getSampleSizes();
-	std::vector<off_t> getChunkOffsets();
-	std::vector<int> getSampleToChunk(int nchunks);
+	void getSampleTimes();
+	void getKeyframes();
+	void getSampleSizes();
+	void getChunkOffsets();
+	std::vector<int> getSampleToChunk();
+	void orderPatterns();
 
 	std::vector<off_t> getChunkOffsets64();
 
@@ -68,13 +70,54 @@ public:
 	void saveSampleSizes();
 	void saveChunkOffsets();
 
+	struct Chunk {
+		Chunk() = default;
+		Chunk(off_t off, int64_t size, int ns);
+		off_t off_ = 0;  // absolute offset
+		int64_t size_ = 0;
+		int n_samples_ = 0;
+	};
+
+	std::vector<std::vector<MutualPattern>> dyn_patterns_;  // track_idx -> MutualPatterns
+	std::vector<Chunk> chunks_;
+	std::vector<int> likely_n_samples_;  // per chunk
+	std::vector<int> likely_sample_sizes_;
+	double likely_n_samples_p = 0;
+	double likely_samples_sizes_p = 0;
+	bool hasPredictableChunks() { return likely_n_samples_.size() && likely_sample_sizes_.size(); }
+	int64_t chunk_distance_gcd_;
+	bool isChunkOffsetOk(off_t off);
+	int64_t stepToNextChunkOff(off_t off);
+	bool is_dummy_ = false;
+
+	Chunk current_chunk_;
+//	off_t last_chunk_off_ = 0;
+//	int sample_idx_in_chunk_ = 0;  // in chunk
+	bool chunkMightBeAtAnd();
+
+	void printDynPatterns(bool show_percentage=false);
+	void genLikely();
+	bool isSupported() { return codec_.isSupported(); }
+
+	int useDynPatterns(off_t offset);
+	void genChunkSizes();
+
+	void pushBackLastChunk();
+	bool doesMatchTransition(const uchar* buff, int track_idx);
+
+	void applyOffsToExclude();
+
 private:
 	// from healthy file
+	std::vector<int64_t> off_to_exclude_;
 	std::vector<int> orig_sizes_;
 	std::vector<int> orig_times_;
 
+	std::vector<uint> dyn_patterns_perm_;
+
 };
 
+std::ostream& operator<<(std::ostream& out, const Track::Chunk& fi);
 
 
 #endif // TRACK_H

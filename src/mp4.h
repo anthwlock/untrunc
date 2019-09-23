@@ -34,24 +34,29 @@ class AVFormatContext;
 class FrameInfo;
 
 class Mp4 : public HasHeaderAtom {
+friend Track;
 public:
-	Atom *root_atom_;
-
-	Mp4();
+    Mp4() = default;
 	~Mp4();
 
-	void parseOk(std::string& filename); // parse the healthy one
+	void parseOk(const std::string& filename); // parse the healthy one
 
-	void printMediaInfo();
+	void printTracks();
 	void printAtoms();
-	void makeStreamable(std::string& filename, std::string& output);
+	void printDynStats();
+	void printMediaInfo();
+
+	void makeStreamable(const std::string& ok, const std::string& output);
+	void makeStreamable2(std::string& filename, std::string& output);
+	void saveVideo(const std::string& filename);
 
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);
-	void repair(std::string& filename, const std::string& filname_fixed);
+	void repair(std::string& filename);
 
-	bool wouldMatch(off_t offset, const std::string& skip = "", bool strict=false);
-	FrameInfo getMatch(off_t offset, bool strict);
+	bool wouldMatch(off_t offset, const std::string& skip = "", bool force_strict=false, int last_track_idx=-1);
+	bool wouldMatchDyn(off_t offset, int last_idx);
+	FrameInfo getMatch(off_t offset, bool force_strict=false);
 	void analyzeOffset(const std::string& filename, off_t offset);
 
 	bool hasCodec(const std::string& codec_name);
@@ -59,24 +64,36 @@ public:
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
 
-	static uint step_;  // step_size in unknown sequence
+	static uint64_t step_;  // step_size in unknown sequence
+	std::vector<Track> tracks_;
+	static const int pat_size_ = 64;
+	int idx_free_ = -1;  // idx of dummy track
+
+	class Chunk : public Track::Chunk {
+	public:
+		Chunk() = default;
+		Chunk(off_t off, int ns, int track_idx, int sample_size);
+		operator bool() { return track_idx_ > 0; }
+		int track_idx_ = -1;
+		int sample_size_ = 0;
+	};
 
 private:
+	Atom *root_atom_ = nullptr;
 	BufferedAtom* findMdat(FileRead& file_read);
-	std::vector<Track> tracks_;
 	AVFormatContext *context_;
 
-	void saveVideo(const std::string& filename);
 	void parseTracksOk();
 	void chkStrechFactor();
 	void setDuration();
 	void chkUntrunc(FrameInfo& fi, Codec& c, int i);
-	void addFrame(FrameInfo& frame_info);
+	void addFrame(const FrameInfo& frame_info);
 	bool chkOffset(off_t& offset);  // updates offset
-	const uchar* loadFragment(off_t offset, bool be_quiet=false);
+	const uchar* loadFragment(off_t offset);
 	bool broken_is_64_ = false;
 	int unknown_length_ = 0;
 	uint64_t pkt_idx_ = 0;
+	int last_track_idx_ = -1;  // 0th track is most relialbale
 	std::vector<int> unknown_lengths_;
 
 	std::string filename_ok_;
@@ -84,9 +101,23 @@ private:
 	std::map<off_t, FrameInfo> off_to_info_;
 	void chkDetectionAt(FrameInfo& detected, off_t off);
 	void dumpMatch(off_t off, const FrameInfo& fi, int idx);
+	std::vector<FrameInfo> to_dump_;
+
+	void genDynStats();
+	void genChunks();
+	void genChunkTransitions();
+	void genDynPatterns();
+	off_t first_off_rel_ = -1;  // relative to mdat
+	off_t first_off_abs_ = -1;
+	std::map<std::pair<int, int>, std::vector<off_t>> chunk_transitions_;
+
+	Mp4::Chunk fitChunk(off_t offset, uint track_idx);
 
 	void noteUnknownSequence(off_t offset);
+	void addUnknownSequence(off_t start, uint64_t length);
 	void addToExclude(off_t start, uint64_t length, bool force=false);
+
+	int64_t calcStep(off_t offset);
 
 	const std::vector<std::string> ignore_duration_ = {"tmcd", "fdsc"};
 
@@ -94,23 +125,47 @@ private:
 	uint current_maxlength_;
 	BufferedAtom* current_mdat_ = nullptr;
 
+	FileRead& openFile(const std::string& filename);
+	FileRead* current_file_ = nullptr;
+
+	Mp4::Chunk getChunkPrediction(off_t offset);
+	bool tryMatch(off_t& off);
+	bool tryChunkPrediction(off_t& off);
+
+	std::string offToStr(off_t offset);
+	void printOffset(off_t offset);
+
+
+	bool pointsToZeros(off_t offset);
+
+	const uchar* getBuffAround(off_t offset, int64_t n);
+
+	void removeEmptyTraks();
+	bool needDynStats();
+	bool shouldBeStrict(off_t off, int track_idx);
+	void checkForBadTracks();
+
+	std::string getOutputSuffix();
 };
 
 class FrameInfo {
 public:
 	FrameInfo() = default;
-	FrameInfo(uint track_idx, Codec& c, off_t offset, uint length);
-	FrameInfo(uint track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length);
+	FrameInfo(int track_idx, Codec& c, off_t offset, uint length);
+	FrameInfo(int track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length);
 	operator bool();
-	uint track_idx_;
+	int track_idx_;
 
 	bool keyframe_;
 	uint audio_duration_;
 	off_t offset_;
 	uint length_ = 0;
+	bool should_dump_;
 };
 bool operator==(const FrameInfo& lhs, const FrameInfo& rhs);
 bool operator!=(const FrameInfo& lhs, const FrameInfo& rhs);
 std::ostream& operator<<(std::ostream& out, const FrameInfo& fi);
+
+std::ostream& operator<<(std::ostream& out, const Mp4::Chunk& c);
 
 #endif // MP4_H
