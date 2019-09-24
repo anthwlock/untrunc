@@ -8,11 +8,11 @@
 
 using namespace std;
 
-SliceInfo::SliceInfo(const NalInfo& nal_info, const SpsInfo& sps) : first_mb(0), slice_type(0), pps_id(0),
-        frame_num(0), field_pic_flag(0), bottom_pic_flag(0), idr_pic_id(0),
-        poc_type(0), poc_lsb(0), idr_pic_flag(0) {
+SliceInfo::SliceInfo(const NalInfo& nal_info, const SpsInfo& sps) {
 	is_ok = decode(nal_info, sps);
 }
+
+SliceInfo::SliceInfo() {}
 
 bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 	//See 7.4.1.2.4 Detection of the first VCL NAL unit of a primary coded picture

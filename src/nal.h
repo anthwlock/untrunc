@@ -12,9 +12,9 @@ public:
 	int ref_idc_ = 0;
 	int nal_type_ = 0;
 
-	bool is_ok;  // did parsing work
-	bool is_forbidden_set_;
-	const uchar* data_;
+	bool is_ok = false;  // did parsing work
+	bool is_forbidden_set_ = false;
+	const uchar* data_ = nullptr;
 	bool parseNal(const uchar* start, uint32_t max_size);
 };
 
