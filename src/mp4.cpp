@@ -996,6 +996,7 @@ start:
 
 	// skip fake moov
 	if (string(start+4, start+8) == "moov") {
+		if(unknown_length_) noteUnknownSequence(offset);
 		uint moov_len = swap32(begin);
 		addToExclude(offset, moov_len, true);
 		logg(V, "Skipping moov atom: ", moov_len, '\n');
