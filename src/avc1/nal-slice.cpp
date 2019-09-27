@@ -2,7 +2,7 @@
 
 #include <iostream>
 
-#include "common.h"
+#include "../common.h"
 #include "sps-info.h"
 #include "nal.h"
 
@@ -11,8 +11,6 @@ using namespace std;
 SliceInfo::SliceInfo(const NalInfo& nal_info, const SpsInfo& sps) {
 	is_ok = decode(nal_info, sps);
 }
-
-SliceInfo::SliceInfo() {}
 
 bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 	//See 7.4.1.2.4 Detection of the first VCL NAL unit of a primary coded picture

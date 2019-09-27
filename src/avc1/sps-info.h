@@ -1,7 +1,7 @@
 #ifndef SPSINFO_H
 #define SPSINFO_H
 
-#include "common.h"
+#include "../common.h"
 
 class NalInfo;
 
@@ -16,7 +16,7 @@ public:
 	int poc_type = 0;
 	int log2_max_poc_lsb = 5;
 
-	bool is_ok;
+	bool is_ok = false;
 	bool decode(const uchar* pos);
 };
 

@@ -1,19 +1,16 @@
-#ifndef CODEC_HPP
-#define CODEC_HPP
+#ifndef CODEC_H
+#define CODEC_H
 
 #include <string>
 #include <vector>
 
 #include "common.h"
 
-class Atom;
 class AVCodecContext;
 class AVCodecParameters;
-class AVCodec;
-class AVPacket;
-class AVFrame;
+
+class Atom;
 class AvcConfig;
-class AVCodecParserContext;
 
 class Codec {
 public:
@@ -41,6 +38,8 @@ public:
 
 	bool isSupported();
 
+	static void initOnce();
+
 private:
 	bool (*match_fn_)(Codec*, const uchar* start, int s) = nullptr;
 	bool (*match_strict_fn_)(Codec*, const uchar* start, int s) = nullptr;
@@ -49,5 +48,5 @@ private:
 	void initAVCodec();
 };
 
-#endif // CODEC_HPP
+#endif // CODEC_H
 

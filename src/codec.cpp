@@ -14,17 +14,15 @@ extern "C" {
 
 #include "common.h"
 #include "atom.h"
-#include "nal.h"
-#include "sps-info.h"
-#include "nal-slice.h"
-#include "avc-config.h"
+#include "avc1/avc1.h"
+#include "avc1/avc-config.h"
 #include "mp4.h"
 
 using namespace std;
 
-extern const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match;
-extern const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match;
-extern const map<string, int(*) (Codec*, const uchar*, uint)> dispatch_get_size;
+extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match;
+extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match;
+extern map<string, int(*) (Codec*, const uchar*, uint)> dispatch_get_size;
 
 Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {}
 
@@ -46,6 +44,16 @@ void Codec::initAVCodec() {
 		throw "Could not open codec: ?";
 }
 
+void Codec::initOnce() {
+	static bool did_once = false;
+	if (did_once) return;
+	did_once = true;
+
+	assert(dispatch_get_size.count("mp4a"));
+	dispatch_get_size["sawb"] = dispatch_get_size["mp4a"];
+}
+
+
 void Codec::parseOk(Atom *trak) {
 	Atom *stsd = trak->atomByName("stsd");
 	int entries = stsd->readInt(4);
@@ -56,17 +64,15 @@ void Codec::parseOk(Atom *trak) {
 
 	if (contains({"mp4a", "sawb"}, name_)) initAVCodec();
 
-	if (dispatch_match.count(name_)) match_fn_ = dispatch_match.at(name_);
-	if (dispatch_strict_match.count(name_)) match_strict_fn_ = dispatch_strict_match.at(name_);
-
-	 if (dispatch_get_size.count(name_)) get_size_fn_ = dispatch_get_size.at(name_);
-	else if (name_ == "sawb") get_size_fn_ = dispatch_get_size.at("mp4a");
+	match_fn_ = dispatch_match[name_];
+	match_strict_fn_ = dispatch_strict_match[name_];
+	get_size_fn_ = dispatch_get_size[name_];
 
 	// if null gen dynamic patterns, if no good pattern exit  // REMOVE ME
 	// otherwise use matchDyn etc.
 
 	if (name_ == "avc1") {
-		avc_config_ = new AvcConfig(*stsd);
+		avc_config_ = new AvcConfig(stsd);
 		if (!avc_config_->is_ok)
 			logg(W, "avcC was not decoded correctly\n");
 		else
@@ -82,7 +88,7 @@ bool Codec::isSupported() {
 #define MATCH_FN(codec)  {codec, [](Codec* self __attribute__((unused)), \
 	const uchar* start __attribute__((unused)), int s __attribute__((unused))) -> bool
 
-const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
+map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
 	MATCH_FN("avc1") {
 		if (self->strictness_lvl_ > 0) {
 			int s2 = swap32(((int *)start)[1]);
@@ -108,13 +114,13 @@ bool Codec::matchSampleStrict(const uchar *start) {
 	return match_strict_fn_(this, start, s);
 }
 
-const map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
+map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("avc1") {
 		//this works only for a very specific kind of video
 		//#define SPECIAL_VIDEO
 #ifdef SPECIAL_VIDEO
-		    int s2 = swap32(((int *)start)[1]);
-			return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
+		int s2 = swap32(((int *)start)[1]);
+		return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
 		return true;
 #endif
 
@@ -275,7 +281,7 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 }
 #pragma GCC diagnostic pop
 
-const map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
+map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("mp4a") {
 		static AVPacket* packet = av_packet_alloc();
 //		packet->size = g_max_partsize;
@@ -302,7 +308,8 @@ const map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_si
 		return consumed;
 	}},
 
-    GET_SZ_FN("avc1") {
+    {"avc1", getSizeAvc1},
+//    GET_SZ_FN("avc1") {
 		//        AVFrame *frame = av_frame_alloc();
 		//        if(!frame)
 		//            throw "Could not create AVFrame";
@@ -324,99 +331,7 @@ const map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_si
 		//first 4 bytes are the length, then the nal starts.
 		//ref_idc !=0 per unit_type = 5
 		//ref_idc == 0 per unit_type = 6, 9, 10, 11, 12
-
-		uint32_t length = 0;
-		const uchar *pos = start;
-
-		static bool sps_info_initialized = false;
-		static SpsInfo sps_info;
-		if (!sps_info_initialized){
-			logg(V, "sps_info (before): ",
-			    sps_info.frame_mbs_only_flag,
-			    ' ', sps_info.log2_max_frame_num,
-			    ' ', sps_info.log2_max_poc_lsb,
-			    ' ', sps_info.poc_type, '\n');
-			if (self->avc_config_->is_ok){
-				sps_info = *self->avc_config_->sps_info_;
-			}
-			sps_info_initialized = true;
-			logg(V, "sps_info (after):  ",
-			    sps_info.frame_mbs_only_flag,
-			    ' ', sps_info.log2_max_frame_num,
-			    ' ', sps_info.log2_max_poc_lsb,
-			    ' ', sps_info.poc_type, '\n');
-		}
-
-		SliceInfo previous_slice;
-		NalInfo previous_nal;
-		self->was_keyframe_ = false;
-
-		while(1) {
-			logg(V, "---\n");
-			NalInfo nal_info(pos, maxlength);
-			if(!nal_info.is_ok){
-				logg(V, "failed parsing nal-header\n");
-				return length;
-			}
-
-			switch(nal_info.nal_type_) {
-			case NAL_SPS:
-				if(previous_slice.is_ok){
-					logg(W2, "searching end, found new 'SPS'\n");
-					return length;
-				}
-				if (!sps_info.is_ok)
-					sps_info.decode(nal_info.data_);
-				break;
-			case NAL_AUD: // Access unit delimiter
-				if (!previous_slice.is_ok)
-					break;
-				return length;
-			case NAL_IDR_SLICE:
-				self->was_keyframe_ = true; // keyframe
-				[[fallthrough]];
-			case NAL_SLICE:
-			{
-				SliceInfo slice_info(nal_info, sps_info);
-				if(!previous_slice.is_ok){
-					previous_slice = slice_info;
-					previous_nal = move(nal_info);
-				}
-				else {
-					if (slice_info.isInNewFrame(previous_slice))
-						return length;
-					if(previous_nal.ref_idc_ != nal_info.ref_idc_ &&
-					   (previous_nal.ref_idc_ == 0 || nal_info.ref_idc_ == 0)) {
-						logg(W, "Different ref idc\n");
-						return length;
-					}
-				}
-				break;
-			}
-			case NAL_FILLER_DATA:
-				if (g_log_mode >= V) {
-					logg(V, "found filler data: ");
-					printBuffer(pos, 30);
-				}
-				break;
-			default:
-				if(previous_slice.is_ok) {
-					if(!nal_info.is_forbidden_set_) {
-						logg(W2, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
-						return length;
-					} // otherwise it's malformed, don't produce an isolated malformed unit
-				}
-				break;
-			}
-			pos += nal_info.length_;
-			length += nal_info.length_;
-			maxlength -= nal_info.length_;
-			if (maxlength == 0) // we made it
-				return length;
-			logg(V, "Partial avc1-length: ", length, "\n");
-		}
-		return length;
-	}},
+//	}},
 
 	GET_SZ_FN("samr") { //lenght is multiple of 32, we split packets.
 		return 32;

@@ -12,8 +12,8 @@ ifeq ($(TARGET), $(_EXE)-33)
 else ifeq ($(TARGET), $(_EXE)-34)
   FF_VER := 3.4.5
   EXE := $(TARGET)
-else ifeq ($(TARGET), $(_EXE)-340)
-  FF_VER := 3.4.0
+else ifeq ($(TARGET), $(_EXE)-341)
+  FF_VER := 3.4.1
   EXE := $(TARGET)
 else ifeq ($(TARGET), $(_EXE)-41)
   FF_VER := 4.1
@@ -47,7 +47,7 @@ CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
 EXE ?= $(_EXE)
 DIR := $(_DIR)_$(FF_VER)
-SRC := $(wildcard src/*.cpp)
+SRC := $(wildcard src/*.cpp src/avc1/*.cpp)
 OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
 FFDIR := ffmpeg-$(FF_VER)
@@ -77,7 +77,8 @@ endif
 
 #$(info $$OBJ is [${OBJ}])
 #$(info $$OBJ_GUI is [${OBJ_GUI}])
-$(shell mkdir -p $(dir $(OBJ_GUI)) >/dev/null)
+$(shell mkdir -p $(dir $(OBJ_GUI)) 2>/dev/null)
+$(shell mkdir -p $(DIR)/src/avc1 2>/dev/null)
 
 .PHONY: all clean force
 

@@ -1,7 +1,7 @@
 #ifndef NAL_H
 #define NAL_H
 
-#include "common.h"
+#include "../common.h"
 
 class NalInfo {
 public:

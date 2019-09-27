@@ -3,17 +3,17 @@
 #include "iostream"
 
 #include "sps-info.h"
-#include "common.h"
-#include "atom.h"
+#include "../common.h"
+#include "../atom.h"
 
 using namespace std;
 
-AvcConfig::AvcConfig(const Atom& stsd) {
+AvcConfig::AvcConfig(const Atom* stsd) {
 	// find avcC payload
-	const uchar* start = stsd.content_.data()+12;
+	const uchar* start = stsd->content_.data()+12;
 	char pattern[5] = "avcC";
 	int found = 0;
-	int limit = stsd.length_-16;
+	int limit = stsd->length_-16;
 	while (limit--){
 		if (*start++ == pattern[found])
 			found++;
@@ -27,8 +27,8 @@ AvcConfig::AvcConfig(const Atom& stsd) {
 		is_ok = false;
 		return;
 	}
-	int off = start - stsd.content_.data();
-	int len = stsd.length_ - off;
+	int off = start - stsd->content_.data();
+	int len = stsd->length_ - off;
 	logg(V, "found avcC after: ", off, '\n');
 	logg(V, "remaining len:", len, '\n');
 

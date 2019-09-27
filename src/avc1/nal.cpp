@@ -4,7 +4,7 @@
 #include <cassert>
 #include <cstdint>
 
-#include "common.h"
+#include "../common.h"
 
 using namespace std;
 

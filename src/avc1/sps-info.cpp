@@ -8,7 +8,7 @@
 
 #include <cassert>
 
-#include "common.h"
+#include "../common.h"
 #include "nal.h"
 
 using namespace std;

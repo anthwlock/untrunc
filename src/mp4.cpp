@@ -104,6 +104,7 @@ void Mp4::parseOk(const string& filename) {
 }
 
 void Mp4::parseTracksOk() {
+	Codec::initOnce();
 	Atom *mdat = root_atom_->atomByName("mdat");
 	auto traks = root_atom_->atomsByName("trak");
 	for (uint i=0; i < traks.size(); i++) {

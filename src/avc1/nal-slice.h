@@ -21,8 +21,8 @@ public:
 	int idr_pic_flag = 0; //actually 1 for nal_type 5, 0 for nal_type 1
 	bool is_ok = false;
 
+	SliceInfo() = default;
 	SliceInfo(const NalInfo&, const SpsInfo&);
-	SliceInfo();
 	bool isInNewFrame(const SliceInfo&);
 	bool decode(const NalInfo&, const SpsInfo&);
 };
