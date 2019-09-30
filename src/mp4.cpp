@@ -435,6 +435,7 @@ void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 
 void Mp4::analyze(bool gen_off_map) {
 	auto& mdat = current_mdat_;
+	if (!mdat) findMdat(*current_file_);
 	assert(mdat);
 
 	for (uint idx=0; idx < tracks_.size(); idx++) {
@@ -442,19 +443,34 @@ void Mp4::analyze(bool gen_off_map) {
 		Codec& c = track.codec_;
 		if (!gen_off_map) cout << "\nTrack " << idx << " codec: " << c.name_ << endl;
 
-		uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
+		if (track.shouldUseChunkPrediction()) {
+			track.genChunkSizes();
+			for (uint i=0; i < track.chunks_.size(); i++) {
+				auto& c = track.chunks_[i];
+				auto off = c.off_ - mdat->contentStart();
+				assert(c.size_ % c.n_samples_ == 0);
+				off_to_chunk_[off] = Mp4::Chunk(off, c.n_samples_, idx, c.size_ / c.n_samples_);
+			}
+		}
+		if (track.isSupported()) {
+			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
-		for (uint i=0; i < track.sizes_.size(); i++) {
-			bool is_keyframe = k == i;
+			for (uint i=0; i < track.sizes_.size(); i++) {
+				bool is_keyframe = k == i;
 
-			if (is_keyframe && ++ik < track.keyframes_.size())
-				k = track.keyframes_[ik];
+				if (is_keyframe && ++ik < track.keyframes_.size())
+					k = track.keyframes_[ik];
 
-			off_t off = track.offsets_[i] - mdat->contentStart();
-			auto fi = FrameInfo(idx, is_keyframe, track.times_[i], off, track.sizes_[i]);
+				off_t off = track.offsets_[i] - mdat->contentStart();
+				if (off > mdat->contentSize()) {
+					logg(W, "reched premature end of mdat\n");
+					break;
+				}
+				auto fi = FrameInfo(idx, is_keyframe, track.times_[i], off, track.sizes_[i]);
 
-			if (gen_off_map) off_to_info_[off] = fi;
-			else chkUntrunc(fi, c, i);
+				if (gen_off_map) off_to_frame_[off] = fi;
+				else chkUntrunc(fi, c, i);
+			}
 		}
 	}
 }
@@ -658,7 +674,7 @@ void Mp4::dumpSamples() {
 		for (auto const& x : to_dump_)
 			dumpMatch(x.offset_, x, i++);
 	else
-		for (auto const& x : off_to_info_)
+		for (auto const& x : off_to_frame_)
 			dumpMatch(x.first, x.second, i++);
 }
 
@@ -870,10 +886,13 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 	if (last_track_idx_ < 0) return c;  // could try all instead..
 
 	auto track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
-	if (track_idx >= 0 && tracks_[track_idx].hasPredictableChunks()) {
+	if (track_idx >= 0 && !tracks_[track_idx].shouldUseChunkPrediction()) {
+		logg(V, "should not use chunk prediction for '", getCodecName(track_idx), "'\n");
+		return c;
+	}
+	else if (track_idx >= 0) {
 		auto& t = tracks_[track_idx];
-		if (t.likely_samples_sizes_p < 0.99 && t.isSupported()) return c;
-		logg(V, "transition pattern ", getCodecName(last_track_idx_), "_", getCodecName(track_idx), " worked\n");
+		logg(V, "transition pattern ", getCodecName(last_track_idx_), "_", t.codec_.name_, " worked\n");
 
 		if ((c = fitChunk(offset, track_idx))) {
 			logg(V, "chunk found: ", c, "\n");
@@ -885,8 +904,8 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 		auto s_sz = t.likely_sample_sizes_[0];
 		auto n_samples = t.likely_n_samples_[0];  // smallest sample_size
 		if (t.likely_n_samples_p < 0.9) {
-			assert(Mp4::pat_size_ % s_sz == 0);
-			int new_n_samples = Mp4::pat_size_ / s_sz;
+			const int min_sz = 64;  // min assumed chunk size
+			int new_n_samples = max(1, min_sz / s_sz);
 			logg(V, "reducing n_sample ", n_samples, " -> ", new_n_samples, " because unsure\n");
 			n_samples = new_n_samples;
 		}
@@ -947,12 +966,19 @@ ostream& operator<<(ostream& out, const FrameInfo& fi) {
 	return out << ss("'", cn, "', ", fi.length_, ", ", fi.keyframe_, ", ", fi.audio_duration_);
 }
 
+Mp4::Chunk::Chunk(off_t off, int ns, int track_idx, int sample_size)
+    : Track::Chunk (off, ns * sample_size, ns), track_idx_(track_idx), sample_size_(sample_size) {}
+
 ostream& operator<<(ostream& out, const Mp4::Chunk& c) {
 	return out << ss("'", g_mp4->getCodecName(c.track_idx_), "' (", c.n_samples_, " x", c.sample_size_, ")");
 }
 
-Mp4::Chunk::Chunk(off_t off, int ns, int track_idx, int sample_size)
-    : Track::Chunk (off, ns * sample_size, ns), track_idx_(track_idx), sample_size_(sample_size) {}
+bool operator==(const Mp4::Chunk& a, const Mp4::Chunk& b) {
+	return a.off_ == b.off_ && a.n_samples_  == b.n_samples_ &&
+	        a.track_idx_ == b.track_idx_ && a.n_samples_ == b.n_samples_ &&
+	        a.size_ == b.size_;
+}
+bool operator!=(const Mp4::Chunk& a, const Mp4::Chunk& b) { return !(a == b); }
 
 
 int64_t Mp4::calcStep(off_t offset) {
@@ -1021,10 +1047,25 @@ void Mp4::printOffset(off_t offset) {
 }
 
 
-void Mp4::chkDetectionAt(FrameInfo& detected, off_t off) {
-	auto& correct = off_to_info_[off];
+void Mp4::chkFrameDetectionAt(FrameInfo& detected, off_t off) {
+	auto& correct = off_to_frame_[off];
 	if (correct != detected) {
-		cout << "bad detection (at " << offToStr(off) << ", pkt " << pkt_idx_ << "):\n"
+		cout << "bad detection (at " << offToStr(off) << ", pkt " << pkt_idx_
+		     << ", chunk " << tracks_[correct.track_idx_].chunks_.size()
+		     << ", pkt_in_chunk " << tracks_[correct.track_idx_].current_chunk_.n_samples_
+		     << "):\n"
+		     << "detected: " << detected << '\n'
+		     << "correct : " << correct << '\n';
+		hitEnterToContinue();
+	}
+}
+
+void Mp4::chkChunkDetectionAt(Mp4::Chunk& detected, off_t off) {
+	auto& correct = off_to_chunk_[off];
+	if (correct != detected) {
+		cout << "bad chunk detection (at " << offToStr(off) << ", pkt " << pkt_idx_
+		     << ", chunk " << tracks_[correct.track_idx_].chunks_.size()
+		     << "):\n"
 		     << "detected: " << detected << '\n'
 		     << "correct : " << correct << '\n';
 		hitEnterToContinue();
@@ -1039,6 +1080,8 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 	Mp4::Chunk chunk = getChunkPrediction(offset);
 	if (chunk) {
 		auto& t = tracks_[chunk.track_idx_];
+
+		if (use_offset_map_) chkChunkDetectionAt(chunk, offset);
 
 		if (unknown_length_ && t.is_dummy_) {
 			logg(V, "found '", t.codec_.name_, "' chunk inside unknown sequence: ", chunk, "\n");
@@ -1081,7 +1124,7 @@ bool Mp4::tryMatch(off_t& offset ) {
 	if (match) {
 		auto& t = tracks_[match.track_idx_];
 
-		if (use_offset_map_) chkDetectionAt(match, offset);
+		if (use_offset_map_) chkFrameDetectionAt(match, offset);
 
 		if (unknown_length_) {
 			noteUnknownSequence(offset);

@@ -430,6 +430,14 @@ void Track::saveChunkOffsets() {
 	}
 }
 
+bool Track::hasPredictableChunks() {
+	return likely_n_samples_.size() && likely_sample_sizes_.size();
+}
+
+bool Track::shouldUseChunkPrediction() {
+	return hasPredictableChunks() && (!isSupported() || likely_samples_sizes_p >= 0.99);
+}
+
 bool Track::isChunkOffsetOk(off_t off) {
 	// chunk-offsets might be regular in respect to absolute file begin, not mdat begin
 	if (!current_chunk_.off_ && (g_mp4->current_mdat_->contentStart() + off) % chunk_distance_gcd_ == 0)
@@ -560,7 +568,7 @@ void Track::genChunkSizes() {
 		}
 		chunks_.push_back(c);
 	}
-	else {
+	else if (chunks_[0].size_ < 0) {  // not yet generated
 		int sample_idx = 0;
 		for (auto& c : chunks_) {
 			c.size_ = 0;

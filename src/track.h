@@ -84,7 +84,8 @@ public:
 	std::vector<int> likely_sample_sizes_;
 	double likely_n_samples_p = 0;
 	double likely_samples_sizes_p = 0;
-	bool hasPredictableChunks() { return likely_n_samples_.size() && likely_sample_sizes_.size(); }
+	bool hasPredictableChunks();
+	bool shouldUseChunkPrediction();
 	int64_t chunk_distance_gcd_;
 	bool isChunkOffsetOk(off_t off);
 	int64_t stepToNextChunkOff(off_t off);

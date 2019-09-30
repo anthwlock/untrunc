@@ -73,7 +73,7 @@ public:
 	public:
 		Chunk() = default;
 		Chunk(off_t off, int ns, int track_idx, int sample_size);
-		operator bool() { return track_idx_ > 0; }
+		explicit operator bool() { return track_idx_ > 0; }
 		int track_idx_ = -1;
 		int sample_size_ = 0;
 	};
@@ -98,8 +98,10 @@ private:
 
 	std::string filename_ok_;
 	bool use_offset_map_ = false;
-	std::map<off_t, FrameInfo> off_to_info_;
-	void chkDetectionAt(FrameInfo& detected, off_t off);
+	std::map<off_t, FrameInfo> off_to_frame_;
+	std::map<off_t, Mp4::Chunk> off_to_chunk_;
+	void chkFrameDetectionAt(FrameInfo& detected, off_t off);
+	void chkChunkDetectionAt(Mp4::Chunk& detected, off_t off);
 	void dumpMatch(off_t off, const FrameInfo& fi, int idx);
 	std::vector<FrameInfo> to_dump_;
 
@@ -153,7 +155,7 @@ public:
 	FrameInfo() = default;
 	FrameInfo(int track_idx, Codec& c, off_t offset, uint length);
 	FrameInfo(int track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length);
-	operator bool();
+	explicit operator bool();
 	int track_idx_;
 
 	bool keyframe_;
@@ -166,6 +168,8 @@ bool operator==(const FrameInfo& lhs, const FrameInfo& rhs);
 bool operator!=(const FrameInfo& lhs, const FrameInfo& rhs);
 std::ostream& operator<<(std::ostream& out, const FrameInfo& fi);
 
+bool operator==(const Mp4::Chunk& lhs, const Mp4::Chunk& rhs);
+bool operator!=(const Mp4::Chunk& lhs, const Mp4::Chunk& rhs);
 std::ostream& operator<<(std::ostream& out, const Mp4::Chunk& c);
 
 #endif // MP4_H
