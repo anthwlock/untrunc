@@ -213,7 +213,7 @@ void Mp4::analyzeOffset(const string& filename, off_t real_offset) {
 
 	auto off = real_offset - mdat->contentStart();
 	auto match = getMatch(off);
-	dumpMatch(off, match, 0);
+	dumpMatch(match, 0);
 }
 
 void Mp4::chkStrechFactor() {
@@ -440,8 +440,7 @@ void Mp4::analyze(bool gen_off_map) {
 
 	for (uint idx=0; idx < tracks_.size(); idx++) {
 		Track& track = tracks_[idx];
-		Codec& c = track.codec_;
-		if (!gen_off_map) cout << "\nTrack " << idx << " codec: " << c.name_ << endl;
+		if (!gen_off_map) cout << "\nTrack " << idx << " codec: " << track.codec_.name_ << endl;
 
 		if (track.shouldUseChunkPrediction()) {
 			track.genChunkSizes();
@@ -452,7 +451,8 @@ void Mp4::analyze(bool gen_off_map) {
 				off_to_chunk_[off] = Mp4::Chunk(off, c.n_samples_, idx, c.size_ / c.n_samples_);
 			}
 		}
-		if (track.isSupported()) {
+		else {
+			if (!track.isSupported() && !gen_off_map) continue;
 			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
 			for (uint i=0; i < track.sizes_.size(); i++) {
@@ -469,7 +469,7 @@ void Mp4::analyze(bool gen_off_map) {
 				auto fi = FrameInfo(idx, is_keyframe, track.times_[i], off, track.sizes_[i]);
 
 				if (gen_off_map) off_to_frame_[off] = fi;
-				else chkUntrunc(fi, c, i);
+				else chkUntrunc(fi, track.codec_, i);
 			}
 		}
 	}
@@ -634,10 +634,19 @@ FileRead& Mp4::openFile(const string& filename) {
 	return *current_file_;
 }
 
-void Mp4::dumpMatch(off_t off, const FrameInfo& fi, int idx) {
-	auto real_off = current_mdat_->contentStart() + off;
-//	cout << setw(15) << ss("(", idx++, ") ", mdat_off, "+") << setw(10) << off << " : "  << fi << '\n';
-	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ") << setw(8) << real_off << " : " << fi << '\n';
+void Mp4::dumpMatch(const FrameInfo& fi, int idx) {
+	auto real_off = current_mdat_->contentStart() + fi.offset_;
+	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(fi.offset_, " / ")
+	     << setw(8) << real_off << " : " << fi << '\n';
+}
+
+void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx) {
+	int dur = tracks_[chunk.track_idx_].times_[0];
+	FrameInfo match(chunk.track_idx_, 0, dur, chunk.off_, chunk.sample_size_);
+	for (uint n=chunk.n_samples_; n--;) {
+		dumpMatch(match, idx++);
+		match.offset_ += chunk.sample_size_;
+	}
 }
 
 void Mp4::genDynStats() {
@@ -662,20 +671,40 @@ void Mp4::checkForBadTracks() {
 }
 
 void Mp4::dumpSamples() {
-	if (!current_mdat_) {
-		FileRead file(filename_ok_);
+	auto& mdat = current_mdat_;
+	if (!mdat) {
+		auto& file = openFile(filename_ok_);
 		findMdat(file);
 	}
+	if (needDynStats())
+		for (auto& t : tracks_) t.genLikely();
 	analyze(true);
 	cout << filename_ok_ << '\n';
 
 	int i = 0;
 	if (to_dump_.size())
 		for (auto const& x : to_dump_)
-			dumpMatch(x.offset_, x, i++);
-	else
-		for (auto const& x : off_to_frame_)
-			dumpMatch(x.first, x.second, i++);
+			dumpMatch(x, i++);
+	else {
+		auto frame_it = off_to_frame_.begin();
+		auto chunk_it = off_to_chunk_.begin();
+		auto frameItAtEnd = [&](){return frame_it == off_to_frame_.end();};
+		auto chunkItAtEnd = [&](){return chunk_it == off_to_chunk_.end();};
+		while (true) {
+			if (!chunkItAtEnd() && !frameItAtEnd()) {
+				if (frame_it->second.offset_ < chunk_it->second.off_)
+					dumpMatch((frame_it++)->second, i++);
+				else
+					dumpChunk((chunk_it++)->second, i);
+			}
+			else if (!frameItAtEnd())
+				dumpMatch((frame_it++)->second, i++);
+			else if (!chunkItAtEnd())
+				dumpChunk((chunk_it++)->second, i);
+			else
+				break;
+		}
+	}
 }
 
 BufferedAtom* Mp4::findMdat(FileRead& file_read) {

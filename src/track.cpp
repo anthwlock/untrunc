@@ -77,18 +77,6 @@ void Track::parseOk() {
 		cout << "Time offsets: " << times_.size() << " Chunk offsets: " << sample_to_chunk.size() << endl;
 	}
 
-	//compute actual offsets
-	off_t offset = -1, old_chunk = -1;
-	for(uint i = 0; i < sizes_.size(); i++) {
-		int chunk_idx = sample_to_chunk[i];
-		if (chunk_idx != old_chunk) {
-			offset = chunks_[chunk_idx].off_;
-			old_chunk = chunk_idx;
-		}
-		offsets_.push_back(offset);
-		offset += sizes_[i];
-	}
-
 	Atom *hdlr = trak_->atomByName("hdlr");
 	handler_type_ = hdlr->getString(8, 4);
 
@@ -110,11 +98,21 @@ void Track::parseOk() {
 		int expected_size = 2 * nc;
 		if (sizes_.size() && sizes_[0] != expected_size) {
 			assert(sizes_.front() == sizes_.back());  // should be constant
-//			logg(W, "'stsz' for '", codec_.name_, "' ", sizes_[0], ", using expected ", nc, "*", expected_size, " instead\n");
 			logg(W, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", sizes_[0], " as found in stsz\n");
 			fill(sizes_.begin(), sizes_.end(), expected_size);
 		}
+	}
 
+	//compute actual offsets
+	off_t offset = -1, old_chunk = -1;
+	for(uint i = 0; i < sizes_.size(); i++) {
+		int chunk_idx = sample_to_chunk[i];
+		if (chunk_idx != old_chunk) {
+			offset = chunks_[chunk_idx].off_;
+			old_chunk = chunk_idx;
+		}
+		offsets_.push_back(offset);
+		offset += sizes_[i];
 	}
 }
 

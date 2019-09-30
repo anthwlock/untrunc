@@ -102,7 +102,8 @@ private:
 	std::map<off_t, Mp4::Chunk> off_to_chunk_;
 	void chkFrameDetectionAt(FrameInfo& detected, off_t off);
 	void chkChunkDetectionAt(Mp4::Chunk& detected, off_t off);
-	void dumpMatch(off_t off, const FrameInfo& fi, int idx);
+	void dumpMatch(const FrameInfo& fi, int idx);
+	void dumpChunk(const Mp4::Chunk& chunk, int& idx);
 	std::vector<FrameInfo> to_dump_;
 
 	void genDynStats();
