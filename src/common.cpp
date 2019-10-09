@@ -264,7 +264,11 @@ void HasHeaderAtom::readHeaderAtom() {
 }
 
 int HasHeaderAtom::getDurationInMs() {
-	return duration_ / (timescale_ / 1000);
+	int scale = timescale_ / 1000;
+	if (!scale) {
+		return 0;
+	}
+	return duration_ / scale;
 }
 
 string getMovExtension(const string& path) {
