@@ -601,7 +601,7 @@ void Track::applyOffsToExclude() {
 }
 
 int64_t Track::getDurationInTimescale()  {
-	return (int64_t)(double)duration_ * ((double)mp4_timescale_ / (double)timescale_);
+	return duration_ * mp4_timescale_ / timescale_;
 }
 
 

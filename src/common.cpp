@@ -264,7 +264,7 @@ void HasHeaderAtom::readHeaderAtom() {
 }
 
 int HasHeaderAtom::getDurationInMs() {
-	return duration_ / (timescale_ / 1000);
+	return 1000 * duration_ / timescale_;
 }
 
 string getMovExtension(const string& path) {
@@ -286,5 +286,4 @@ double calcEntropy(const vector<uchar>& in) {
 	  entropy -= freq * log2(freq) ;
    }
    return entropy;
-
 }
