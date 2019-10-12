@@ -1209,7 +1209,7 @@ void Mp4::repair(string& filename) {
 
 	off_t offset = 0;
 
-	if (g_use_chunk_stats && !wouldMatch(offset)) {
+	if (g_use_chunk_stats) {
 		auto first_off_abs = first_off_abs_ - mdat->contentStart();
 		if (wouldMatch(first_off_abs)) offset = first_off_abs;
 		else if (wouldMatch(first_off_rel_)) offset = first_off_rel_;
