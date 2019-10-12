@@ -447,6 +447,7 @@ void BufferedAtom::write(FileWrite &output) {
 			logg(V, "skipped ", to_skip_it->first, " ", to_skip_it->second, '\n');
 			offset += to_skip_it->second;
 			to_skip_it++;
+			assert(at_end(to_skip_it) || to_skip_it->first > (to_skip_it-1)->first);
 		}
 	}
 	for (uint i=0; i < children_.size(); i++)

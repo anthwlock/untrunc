@@ -578,12 +578,14 @@ void Track::genChunkSizes() {
 }
 
 void Track::pushBackLastChunk() {
-	if (is_dummy_) g_mp4->addUnknownSequence(current_chunk_.off_, current_chunk_.size_);
+	if (is_dummy_ && current_chunk_.size_)
+		g_mp4->addUnknownSequence(current_chunk_.off_, current_chunk_.size_);
 
 	off_to_exclude_.emplace_back(g_mp4->current_mdat_->total_excluded_yet_);
 	chunks_.emplace_back(current_chunk_);
 	current_chunk_.n_samples_ = 0;
-	// keep current_chunk_.off_
+	current_chunk_.size_ = 0;
+	// keep current_chunk_.off_ for stepToNextChunkOff()
 }
 
 bool Track::doesMatchTransition(const uchar* buff, int track_idx) {

@@ -618,12 +618,15 @@ void Mp4::noteUnknownSequence(off_t offset) {
 }
 
 void Mp4::addUnknownSequence(off_t start, uint64_t length) {
+	assert(length);
 	addToExclude(start, length);
 	unknown_lengths_.emplace_back(length);
 }
 
 void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 	if (g_dont_exclude && !force) return;
+	assert(!current_mdat_->sequences_to_exclude_.size() ||
+	       start > current_mdat_->sequences_to_exclude_.back().first);
 	current_mdat_->sequences_to_exclude_.emplace_back(start, length);
 	current_mdat_->total_excluded_yet_ += length;
 }
@@ -1030,7 +1033,9 @@ int64_t Mp4::calcStep(off_t offset) {
 bool Mp4::chkOffset(off_t& offset) {
 start:
 	if (offset >= current_mdat_->contentSize()) {  // at end?
-		if(unknown_length_) noteUnknownSequence(offset);
+		if (last_track_idx_ >= 0)
+			tracks_[last_track_idx_].pushBackLastChunk();
+		if (unknown_length_) noteUnknownSequence(offset);
 		return false;
 	}
 
@@ -1045,6 +1050,11 @@ start:
 		int64_t step = 4;
 		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
 		if (unknown_length_) unknown_length_ += step;
+		else if (tracks_[last_track_idx_].is_dummy_) {
+			auto& c = tracks_[idx_free_].current_chunk_;
+			c.size_ += step;
+			c.n_samples_ += step;  // sample size is 1
+		}
 		offset += step;
 		goto start;
 	}
@@ -1121,11 +1131,9 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			logg(V, "found healthy chunk again: ", chunk, "\n");
 		}
 
-		if (last_track_idx_ != chunk.track_idx_) {
-			if (last_track_idx_ >= 0)
-				tracks_[last_track_idx_].pushBackLastChunk();
-			t.current_chunk_ = chunk;
-		}
+		if (last_track_idx_ >= 0)
+			tracks_[last_track_idx_].pushBackLastChunk();
+		t.current_chunk_ = chunk;
 
 		if (!t.is_dummy_) {
 			FrameInfo match(chunk.track_idx_, 0, 0, offset, chunk.sample_size_);
