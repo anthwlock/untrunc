@@ -63,6 +63,7 @@ public:
 	uint getTrackIdx(const std::string& codec_name);
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
+	std::string offToStr(off_t offset);
 
 	static uint64_t step_;  // step_size in unknown sequence
 	std::vector<Track> tracks_;
@@ -136,7 +137,6 @@ private:
 	bool tryMatch(off_t& off);
 	bool tryChunkPrediction(off_t& off);
 
-	std::string offToStr(off_t offset);
 	void printOffset(off_t offset);
 
 

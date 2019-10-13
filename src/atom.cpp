@@ -6,6 +6,7 @@
 #include <string>
 #include <map>
 #include <iostream>
+#include <iomanip>  // setw
 #include <string.h>
 
 #include <assert.h>
@@ -444,14 +445,17 @@ void BufferedAtom::write(FileWrite &output) {
 		output.writeChar(buff, toread);
 
 		if (!at_end(to_skip_it) && offset == to_skip_it->first) {
-			logg(V, "skipped ", to_skip_it->first, " ", to_skip_it->second, '\n');
+			logg(V, "skipping ", setfill(' '), left, setw(6), to_skip_it->second, " at ", g_mp4->offToStr(to_skip_it->first), '\n');
 			offset += to_skip_it->second;
 			to_skip_it++;
 			assert(at_end(to_skip_it) || to_skip_it->first > (to_skip_it-1)->first);
+			assert(offset <= contentSize());
 		}
 	}
+
 	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(output);
+
 	off_t end = output.pos();
 	assert(end - start == new_length);
 }
