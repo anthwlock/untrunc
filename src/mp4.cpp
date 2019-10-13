@@ -342,6 +342,7 @@ void Mp4::saveVideo(const string& filename) {
 		offset += ftyp->length_; //not all mov have a ftyp.
 
 	for (Track& track : tracks_) {
+		assert(track.chunks_.size());
 		for (auto& c : track.chunks_) c.off_ += offset;
 		track.saveChunkOffsets(); //need to save the offsets back to the atoms
 	}
@@ -806,11 +807,20 @@ bool Mp4::shouldBeStrict(off_t off, int track_idx) {
 }
 
 bool Mp4::wouldMatch(off_t offset, const string& skip, bool force_strict, int last_track_idx) {
+	auto chkChunkOffOk = [&](uint i) -> bool {
+		if (g_use_chunk_stats && to_uint(last_track_idx) != i && !tracks_[i].isChunkOffsetOk(offset)) {
+			logg(V, "would match, but offset is not accepted as start-of-chunk by '", tracks_[i].codec_.name_, "'\n");
+			return false;
+		}
+		else logg(V, "chunkOffOk: ", offset, " ok for ", tracks_[i].codec_.name_, "\n");
+		return true;
+	};
+
 	auto start = loadFragment(offset);
 	if (idx_free_ >= 0 && pointsToZeros(offset)) {
 		if (tracks_[last_track_idx].doesMatchTransition(start, idx_free_)) {
 			logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes, ", getCodecName(last_track_idx), "_free\n");
-			return true;
+			return chkChunkOffOk(idx_free_);
 		}
 		return false;
 	}
@@ -823,11 +833,12 @@ bool Mp4::wouldMatch(off_t offset, const string& skip, bool force_strict, int la
 		if (!be_strict && !c.matchSample(start)) continue;
 
 		logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes, ", c.name_, "\n");
-		return true;
+		return chkChunkOffOk(i);
 	}
 
 	if (g_use_chunk_stats) {
 		auto last_idx = last_track_idx >= 0 ? last_track_idx : last_track_idx_;
+		if (last_idx < 0) return false;
 		if (wouldMatchDyn(offset, last_idx)) {
 			logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes\n");
 			return true;
@@ -1030,6 +1041,21 @@ int64_t Mp4::calcStep(off_t offset) {
 	return step;
 }
 
+bool isAllZeros(const uchar* buf, int n) {
+	for (int i=0; i < n; i+=4) if (*(int*)(buf+i)) return false;
+	return true;
+}
+
+bool Mp4::isAllZerosAt(off_t off, int n) {
+	if (current_mdat_->contentSize() - off < n) return false;
+	auto buff = current_mdat_->getFragment(off, 4);
+	if (isAllZeros(buff, n)) {
+		logg(V, "isAllZerosAt: found ", n, " zero bytes at ", off, "\n");
+		return true;
+	}
+	return false;
+}
+
 bool Mp4::chkOffset(off_t& offset) {
 start:
 	if (offset >= current_mdat_->contentSize()) {  // at end?
@@ -1039,13 +1065,27 @@ start:
 		return false;
 	}
 
+
 	auto start = loadFragment(offset);
 	uint begin = *(uint*)start;
 
 	static uint loop_cnt = 0;
 	if (g_log_mode == I && loop_cnt++ % 2000 == 0) outProgress(offset, current_mdat_->file_end_);
 
-	if (*(int*)start == 0) {
+	auto shouldIgnoreZeros = [&]() {
+		if (g_use_chunk_stats) {
+			for (auto& cn : {"sowt", "twos"}) {
+				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset)
+				    && !isAllZeros(start+4, 32-4)) {
+					logg(V, "won't skip zeros at: ", offToStr(offset), "\n");
+					return true;
+				}
+			}
+		}
+		return false;
+	};
+
+	if (*(int*)start == 0 && !shouldIgnoreZeros()) {
 		logg(V, "skipping zeros at: ", offToStr(offset), "\n");
 		int64_t step = 4;
 		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
@@ -1061,7 +1101,7 @@ start:
 
 	// skip fake moov
 	if (string(start+4, start+8) == "moov") {
-		if(unknown_length_) noteUnknownSequence(offset);
+		if (unknown_length_) noteUnknownSequence(offset);
 		uint moov_len = swap32(begin);
 		addToExclude(offset, moov_len, true);
 		logg(V, "Skipping moov atom: ", moov_len, '\n');
@@ -1128,7 +1168,8 @@ void Mp4::chkChunkDetectionAt(Mp4::Chunk& detected, off_t off) {
 bool Mp4::tryChunkPrediction(off_t& offset) {
 	if (!g_use_chunk_stats) return false;
 
-	if (pointsToZeros(offset)) return false;
+//	if (pointsToZeros(offset)) return false;
+	if (isAllZerosAt(offset, 32)) return false;
 
 	Mp4::Chunk chunk = getChunkPrediction(offset);
 	if (chunk) {

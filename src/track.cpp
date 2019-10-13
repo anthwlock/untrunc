@@ -589,10 +589,16 @@ void Track::pushBackLastChunk() {
 }
 
 bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
-	for (auto& p : dyn_patterns_[track_idx])
+//	logg(V, codec_.name_, "_", g_mp4->getCodecName(track_idx), '\n');
+	for (auto& p : dyn_patterns_[track_idx]) {
+//		if (g_log_mode >= LogMode::V) {
+//			printBuffer(buff, Mp4::pat_size_);
+//			cout << p << '\n';
+//		}
 		if (p.doesMatch(buff)) {
 			return true;
 		}
+	}
 	return false;
 
 }

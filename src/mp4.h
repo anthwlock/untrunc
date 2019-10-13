@@ -66,7 +66,8 @@ public:
 
 	static uint64_t step_;  // step_size in unknown sequence
 	std::vector<Track> tracks_;
-	static const int pat_size_ = 64;
+//	static const int pat_size_ = 64;
+	static const int pat_size_ = 32;
 	int idx_free_ = -1;  // idx of dummy track
 
 	class Chunk : public Track::Chunk {
@@ -140,6 +141,7 @@ private:
 
 
 	bool pointsToZeros(off_t offset);
+	bool isAllZerosAt(off_t offset, int n);
 
 	const uchar* getBuffAround(off_t offset, int64_t n);
 
