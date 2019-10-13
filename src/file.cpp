@@ -23,6 +23,10 @@
 #include <cstring>
 #include <iostream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include "common.h"
 
 using namespace std;
@@ -55,6 +59,8 @@ void FileRead::open(const string& filename) {
 	fseeko(file_, 0L, SEEK_END);
 	size_ = ftello(file_);
 	fseeko(file_, 0L, SEEK_SET);
+
+	if (!isRegularFile(filename)) throw("not a regular file: " + filename);
 
 	buffer_ = (uchar*) malloc(buf_size_);
 	fread(buffer_, 1, buf_size_, file_);
@@ -197,13 +203,15 @@ const uchar* FileRead::getFragment(off_t off, int size) {
 	return getPtr(size);
 }
 
+bool FileRead::isRegularFile(const string& path) {
+	struct stat path_stat;
+	stat(path.c_str(), &path_stat);
+	return S_ISREG(path_stat.st_mode);
+}
+
 bool FileRead::alredyExists(const string& fn) {
-	FILE* file;
-	if((file = fopen(fn.c_str(), "r")) != nullptr) {
-		fclose(file);
-		return true;
-	}
-	return false;
+	struct stat fn_stat;
+	return (stat(fn.c_str(), &fn_stat) == 0);
 }
 
 off_t FileWrite::pos() {
