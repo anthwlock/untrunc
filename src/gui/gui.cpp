@@ -234,19 +234,25 @@ uiControl* Gui::settingsTab() {
 	g_onProgress = Gui::Analyze::onProgress; \
 	string file_ok = uiEntryText(Analyze::entry_ok_); \
 	if (file_ok.empty()) { \
-	    msgBoxError("Please specify reference file!"); \
-	    return; \
+		msgBoxError("Please specify reference file!"); \
+		return; \
 	} \
+
+#define ASYNC(fn, data) uiQueueMain((void (*)(void*))fn, (void*)data)
+
+#define CATCH_THEM(R) \
+	catch (const char* e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
+	catch (string e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
+	catch (const std::exception& e) {cerr << e.what() << '\n'; msgBoxError(e.what(), true); R;}
 
 #define defineMp4ForAnalyze() \
 	defineFileForAnalyze(); \
 	Mp4 mp4; \
 	try { \
-	    mp4.parseOk(file_ok); \
-	    g_mp4 = &mp4; \
+		mp4.parseOk(file_ok); \
+		g_mp4 = &mp4; \
 	} \
-	catch (const char* e) {cerr << e << '\n'; msgBoxError(e); return;} \
-	catch (string e) {cerr << e << '\n'; msgBoxError(e.c_str()); return;} \
+	CATCH_THEM(return);
 
 uiControl* Gui::analyzeTab() {
 	auto v_box = newVerticalBox();
@@ -290,13 +296,17 @@ uiControl* Gui::analyzeTab() {
 	}, NULL);
 
 	uiButtonOnClicked(b_atoms, [](uiButton* b, void* data){
+		defineFileForAnalyze();  // for findAtomNames, file_ok can be truncated as well
 		setDisabled(true);
-		thread_ = new thread([](){
-			defineFileForAnalyze();
-			Atom::findAtomNames(file_ok);  // file could be truncated as well
-			uiQueueMain((void (*)(void*))setDisabled, (void*)false);
-			Repair::onProgress(100);
-		});
+		thread_ = new thread([](const string& file){
+			try {
+				Atom::findAtomNames(file);
+				Analyze::onProgress(100);
+			}
+			CATCH_THEM();
+
+			ASYNC(setDisabled, false);
+		}, file_ok);
 	}, NULL);
 
 	Analyze::progressbar_ = uiNewProgressBar();
@@ -328,11 +338,23 @@ void Gui::msgBox(const char* text) {
 	uiMsgBox(window_, "Info", text);
 }
 
-void Gui::msgBoxError(const char* text) {
-	auto txt = uiNewAttributedString(text);
+void Gui::msgBoxError(const string& text, bool async) {
+	if (async)
+		ASYNC(msgBoxErrorQueued, new string(text));
+	else
+		msgBoxErrorSync(text);
+}
+
+void Gui::msgBoxErrorSync(const string& text) {
+	auto txt = uiNewAttributedString(text.c_str());
 	uiMsgBox(window_, "Error", uiAttributedStringString(txt));
 	uiFreeAttributedString(txt);
-	//	uiMsgBox(window_, "Error", text);
+//	uiMsgBox(window_, "Error", text);
+}
+
+void Gui::msgBoxErrorQueued(const string* s) {
+	msgBoxErrorSync(*s);
+	delete s;
 }
 
 void Gui::printToEntry(const char* text) {
@@ -341,19 +363,18 @@ void Gui::printToEntry(const char* text) {
 }
 
 void Gui::startRepair(uiButton* b, void* data) {
-	setDisabled(true);
 	current_text_entry_ = Repair::text_entry_;
 	uiMultilineEntrySetText(current_text_entry_, "");
 
-	thread_ = new thread([](){
-		string file_ok = uiEntryText(Repair::entry_ok_);
-		string file_bad = uiEntryText(Repair::entry_bad_);
-		if (file_ok.empty() || file_bad.empty()) {
-			msgBoxError("Please specify the reference and the truncated file!");
-			return;
-		}
-	//	cout << file_ok << ' ' << file_bad << '\n';
+	string file_ok = uiEntryText(Repair::entry_ok_);
+	string file_bad = uiEntryText(Repair::entry_bad_);
+	if (file_ok.empty() || file_bad.empty()) {
+		msgBoxError("Please specify the reference and the truncated file!");
+		return;
+	}
 
+	setDisabled(true);
+	thread_ = new thread([](const string& file_ok, const string& file_bad){
 		string output_suffix = g_ignore_unknown ? ss("-s", Mp4::step_) : "";
 
 		try {
@@ -364,14 +385,12 @@ void Gui::startRepair(uiButton* b, void* data) {
 
 			mp4.repair(file_bad);
 			chkHiddenWarnings();
-			uiQueueMain((void (*)(void*))setDisabled, (void*)false);
 			Repair::onProgress(100);
 			cout << "\ndone!";
 		}
-		catch (const char* e) {cerr << e << '\n'; msgBoxError(e);}
-		catch (string e) {cerr << e << '\n'; msgBoxError(e.c_str());}
-	});
-
+		CATCH_THEM();
+		ASYNC(setDisabled, false);
+	}, file_ok, file_bad);
 }
 
 void Gui::Repair::onProgress(int percentage) {

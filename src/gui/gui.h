@@ -49,7 +49,9 @@ private:
 	static uiControl* aboutTab();
 
 	static void msgBox(const char* text);
-	static void msgBoxError(const char* text);
+	static void msgBoxError(const std::string& text, bool async=false);
+	static void msgBoxErrorSync(const std::string& text);
+	static void msgBoxErrorQueued(const std::string* s);
 	static void printToEntry(const char* text);
 
 	static std::thread* thread_;
