@@ -61,6 +61,7 @@ void Codec::parseOk(Atom *trak) {
 		throw "Multiplexed stream! Not supported";
 
 	name_ = stsd->getString(12, 4);
+	name_ = name_.c_str();  // might be smaller than 4
 
 	if (contains({"mp4a", "sawb"}, name_)) initAVCodec();
 
