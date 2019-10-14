@@ -268,7 +268,7 @@ void Track::getChunkOffsets() {
 	if (co64) {
 		int nchunks = co64->readInt(4);
 		for(int i = 0; i < nchunks; i++)
-			chunks_.emplace_back(co64->readInt(8 + i*8), -1, -1);
+			chunks_.emplace_back(co64->readInt64(8 + i*8), -1, -1);
 	}
 	else {
 		Atom *stco = trak_->atomByNameSafe("stco");
