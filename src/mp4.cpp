@@ -643,6 +643,8 @@ void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 FileRead& Mp4::openFile(const string& filename) {
 	delete current_file_;
 	current_file_ = new FileRead(filename);
+	if (!current_file_->length())
+		throw length_error(ss("zero-length file: ", filename));
 	return *current_file_;
 }
 
@@ -729,7 +731,7 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		off_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
 		if (new_pos >= file_read.length() || new_pos < 0) {
 			logg(W, "start of mdat not found\n");
-			atom.start_ = 0;
+			atom.start_ = -8;  // no header
 			file_read.seek(0);
 			break;
 		}
