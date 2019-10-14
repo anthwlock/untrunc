@@ -378,6 +378,8 @@ string Mp4::getOutputSuffix() {
 	string output_suffix;
 	if (g_ignore_unknown) output_suffix += ss("-s", Mp4::step_);
 	if (g_use_chunk_stats) output_suffix += "-dyn";
+	if (g_dont_exclude) output_suffix += "-k";
+	if (g_stretch_video) output_suffix += "-sv";
 	return output_suffix;
 }
 
