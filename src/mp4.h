@@ -47,12 +47,11 @@ public:
 	void printMediaInfo();
 
 	void makeStreamable(const std::string& ok, const std::string& output);
-	void makeStreamable2(std::string& filename, std::string& output);
 	void saveVideo(const std::string& filename);
 
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);
-	void repair(std::string& filename);
+	void repair(const std::string& filename);
 
 	bool wouldMatch(off_t offset, const std::string& skip = "", bool force_strict=false, int last_track_idx=-1);
 	bool wouldMatchDyn(off_t offset, int last_idx);

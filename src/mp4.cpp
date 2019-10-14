@@ -1251,7 +1251,7 @@ bool Mp4::tryMatch(off_t& offset ) {
 }
 
 
-void Mp4::repair(string& filename) {
+void Mp4::repair(const string& filename) {
 	if (needDynStats()) {
 		g_use_chunk_stats = true;
 		genDynStats();

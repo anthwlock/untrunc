@@ -114,7 +114,7 @@ off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searchi
 	return file.length();
 }
 
-void Atom::findAtomNames(string& filename) {
+void Atom::findAtomNames(const string& filename) {
 	FileRead file(filename);
 	Atom atom;
 
