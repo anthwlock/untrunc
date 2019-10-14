@@ -33,7 +33,7 @@ void Atom::parseHeader(FileRead &file) {
 	name_ = file.getString(4);
 	if(length_ == 1) {
 		length_ = file.readInt64() - 8;
-		start_ += 8;
+		start_ += 8;  // dirty hack
 	}
 	else if(length_ == 0)
 		length_ = file.length() - start_;
@@ -419,16 +419,29 @@ uint BufferedAtom::readInt(off_t offset) {
 	return *(uint*) file_read_.getPtr(sizeof(int));
 }
 
+bool BufferedAtom::is64bitVersion() {
+	return length_ - total_excluded_yet_ > 1LL<<32;
+}
+
 void BufferedAtom::write(FileWrite &output) {
 	off_t start = output.pos();
 
 	auto to_skip_it = sequences_to_exclude_.begin();
 	auto at_end = [this](decltype(to_skip_it) it) -> bool {return it == sequences_to_exclude_.end();};
 
-	auto new_length = length_ - total_excluded_yet_;
+	int64_t new_length = length_ - total_excluded_yet_;
 
-	output.writeInt(new_length);
-	output.writeChar(name_.data(), 4);
+	if (is64bitVersion()) {
+		new_length += 8;
+		output.writeInt(1);
+		output.writeChar(name_.data(), 4);
+		output.writeInt64(new_length);
+	}
+	else {
+		output.writeInt(new_length);
+		output.writeChar(name_.data(), 4);
+	}
+
 	off_t offset = 0;
 	int loop_cnt = 0;
 	while (offset < contentSize()) {

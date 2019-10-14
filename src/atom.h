@@ -68,6 +68,8 @@ public:
 	int64_t contentSize() const { return file_end_ - contentStart(); }
 	const uchar *getFragment(off_t offset, int size);
 	uint readInt(off_t offset);
+	int headerSize() { return is64bitVersion() ? 16 : 8; }
+	bool is64bitVersion();
 
 	std::vector<std::pair<off_t, uint64_t>> sequences_to_exclude_;  // from resulting mdat
 	int64_t total_excluded_yet_ = 0;

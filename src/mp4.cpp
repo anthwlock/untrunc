@@ -337,7 +337,7 @@ void Mp4::saveVideo(const string& filename) {
 	}
 
 	//fix offsets
-	off_t offset = 8 + moov->length_;  // 8 for mdat header
+	off_t offset = mdat->headerSize() + moov->length_;
 	if(ftyp)
 		offset += ftyp->length_; //not all mov have a ftyp.
 
@@ -356,7 +356,7 @@ void Mp4::saveVideo(const string& filename) {
 		cout.rdbuf(f_out.rdbuf());
 
 		filename_ok_ = filename;
-		mdat->start_ = offset - 8;
+		mdat->start_ = offset - 8;  // not mdat->headerSize()
 		current_mdat_ = (BufferedAtom*) mdat;
 		dumpSamples();
 		exit(0);
