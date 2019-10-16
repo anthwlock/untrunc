@@ -20,7 +20,7 @@ public:
 	Atom();
 	virtual ~Atom();
 
-	void parseHeader(FileRead &file); //read just name and length
+	void parseHeader(FileRead &file, bool no_check=false); //read just name and length
 	void parse(FileRead &file);
 	virtual void write(FileWrite &file);
 	void print(int offset);

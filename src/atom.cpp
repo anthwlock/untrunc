@@ -27,7 +27,7 @@ Atom::~Atom() {
 
 
 
-void Atom::parseHeader(FileRead &file) {
+void Atom::parseHeader(FileRead &file, bool no_check) {
 	start_ = file.pos();
 	length_ = file.readInt();
 	name_ = file.getString(4);
@@ -37,6 +37,8 @@ void Atom::parseHeader(FileRead &file) {
 	}
 	else if(length_ == 0)
 		length_ = file.length() - start_;
+
+	if (no_check) return;
 
 	logg(VV, "start_ = ", start_, '\n');
 	logg(VV, "length_ = ", length_, '\n');
@@ -121,17 +123,18 @@ void Atom::findAtomNames(const string& filename) {
 	bool ignore_avc1 = 0;
 	off_t off = findNextAtomOff(file, &atom);
 	while (off < file.length()) {
-		const uchar* buff = file.getPtrAt(off, 4);
-		uint length = swap32(*(uint*)buff);
-		atom.name_ = string((char*)buff+4, 4);
-		atom.length_ = length;
-		atom.start_ = off;
+		file.seek(off);
+		atom.parseHeader(file, true);
 
 		if (atom.name_ == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || atom.name_ != "avc1") {
-			cout << ss(off, ": ", atom.name_, " (", length, ")");
-			off_t next_off = off + length;
+			cout << ss(off, ": ", atom.name_, " (", atom.length_, ")");
+			off_t next_off = off + atom.length_;
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
+			else if (atom.length_ < 8) {  // 8bytes just for header
+				cout << " <-- negative length\n";
+				next_off = next_off + 8;
+			}
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
 				cout << " <-- invalid length\n";
 			else if (next_off > file.length())
