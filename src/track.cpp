@@ -522,7 +522,7 @@ void Track::genLikely() {
 	if (chunks_.size() > 1) {
 		chunk_distance_gcd_ = chunks_[1].off_ - chunks_[0].off_;
 		for (uint i=1; i < chunks_.size(); i++) {
-			chunk_distance_gcd_ = __gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
+			chunk_distance_gcd_ = gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
 		}
 	}
 	else chunk_distance_gcd_ = 1;

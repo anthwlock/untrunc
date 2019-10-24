@@ -133,6 +133,8 @@ std::string getOutputSuffix();
 
 double calcEntropy(const std::vector<uchar>& in);
 
+int64_t gcd(int64_t a, int64_t b);
+
 #define to_uint(a) static_cast<unsigned int>(a)
 #define to_size_t(a) static_cast<size_t>(a)
 
