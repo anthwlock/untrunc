@@ -105,7 +105,13 @@ void Mp4::parseOk(const string& filename) {
 
 void Mp4::parseTracksOk() {
 	Codec::initOnce();
-	Atom *mdat = root_atom_->atomByName("mdat");
+	auto mdats = root_atom_->atomsByName("mdat", true);
+	if (mdats.size() > 1)
+		logg(W, "multiple mdats detected, see '-ia'\n");
+	Atom* mdat = mdats[0];
+	for (auto p : mdats)
+		if (p->length_ > mdat->length_) mdat = p;  // dont use Atom::contentSize() for mdat
+
 	auto traks = root_atom_->atomsByName("trak");
 	for (uint i=0; i < traks.size(); i++) {
 		tracks_.emplace_back(traks[i], context_->streams[i]->codecpar, timescale_);
@@ -1130,6 +1136,19 @@ start:
 		addToExclude(offset, atom_len);
 		logg(V, "Skipping 'free' atom: ", atom_len, " at: ", offToStr(offset), '\n');
 		offset += atom_len;
+		goto start;
+	}
+
+	// skip 'mdat' headers
+	if (string(start+4, start+8) == "mdat") {
+		if (unknown_length_) noteUnknownSequence(offset);
+		if (last_track_idx_ >= 0)
+			tracks_[last_track_idx_].pushBackLastChunk();
+		if (idx_free_ >= 0) last_track_idx_ = idx_free_;
+
+		addToExclude(offset, 8);
+		logg(V, "Skipping 'mdat' header: ", offToStr(offset), '\n');
+		offset += 8;
 		goto start;
 	}
 

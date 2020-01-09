@@ -289,13 +289,16 @@ bool Atom::isVersioned(const string& id) {
 	return def.box_type == VERSIONED_ATOM;
 }
 
-vector<Atom *> Atom::atomsByName(const string& name) {
+vector<Atom *> Atom::atomsByName(const string& name, bool no_recursive) {
 	vector<Atom *> atoms;
 	for (uint i=0; i < children_.size(); i++) {
 		if(children_[i]->name_ == name)
 			atoms.push_back(children_[i]);
-		vector<Atom *> a = children_[i]->atomsByName(name);
-		atoms.insert(atoms.end(), a.begin(), a.end());
+
+		if (!no_recursive) {
+			vector<Atom *> a = children_[i]->atomsByName(name);
+			atoms.insert(atoms.end(), a.begin(), a.end());
+		}
 	}
 	return atoms;
 }
