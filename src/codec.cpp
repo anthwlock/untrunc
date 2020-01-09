@@ -96,7 +96,8 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
 			return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 		}
 		int s1 = s;
-		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
+//		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
+		return s1 == 0x01 || (s1>>8) == 0x01 || s1 == 0x02 || s1 == 0x03;
 	}},
     MATCH_FN("mp4a") {
 		return false;
