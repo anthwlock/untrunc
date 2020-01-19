@@ -281,7 +281,7 @@ void Mp4::saveVideo(const string& filename) {
 	setDuration();
 
 	for(Track& track : tracks_) {
-		track.applyOffsToExclude();
+		track.applyExcludedToOffs();
 		track.writeToAtoms(broken_is_64_);
 
 		auto& cn = track.codec_.name_;
@@ -1215,6 +1215,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		if (last_track_idx_ >= 0)
 			tracks_[last_track_idx_].pushBackLastChunk();
 		t.current_chunk_ = chunk;
+		t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
 
 		if (!t.is_dummy_) {
 			FrameInfo match(chunk.track_idx_, 0, 0, offset, chunk.sample_size_);
@@ -1251,6 +1252,7 @@ bool Mp4::tryMatch(off_t& offset ) {
 		if (last_track_idx_ != match.track_idx_) {
 			if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
 			t.current_chunk_.off_ = offset;
+			t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
 		}
 
 		addFrame(match);

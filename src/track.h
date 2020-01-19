@@ -74,6 +74,7 @@ public:
 		Chunk() = default;
 		Chunk(off_t off, int64_t size, int ns);
 		off_t off_ = 0;  // absolute offset
+		int64_t alredy_excluded_ = 0;
 		int64_t size_ = 0;
 		int n_samples_ = 0;
 	};
@@ -91,7 +92,7 @@ public:
 	int64_t stepToNextChunkOff(off_t off);
 	bool is_dummy_ = false;
 
-	Chunk current_chunk_;
+	Track::Chunk current_chunk_;
 //	off_t last_chunk_off_ = 0;
 //	int sample_idx_in_chunk_ = 0;  // in chunk
 	bool chunkMightBeAtAnd();
@@ -106,11 +107,11 @@ public:
 	void pushBackLastChunk();
 	bool doesMatchTransition(const uchar* buff, int track_idx);
 
-	void applyOffsToExclude();
+	void applyExcludedToOffs();
 
 private:
 	// from healthy file
-	std::vector<int64_t> off_to_exclude_;
+//	std::vector<int64_t> off_to_exclude_;
 	std::vector<int> orig_sizes_;
 	std::vector<int> orig_times_;
 

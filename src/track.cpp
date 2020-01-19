@@ -412,6 +412,8 @@ void Track::saveSampleToChunk() {
 }
 
 void Track::saveChunkOffsets() {
+	assert(chunks_[0].off_ >= 0);
+
 	Atom *co64 = trak_->atomByName("co64");
 	if (co64) {
 		co64->seek(4);
@@ -581,7 +583,6 @@ void Track::pushBackLastChunk() {
 	if (is_dummy_ && current_chunk_.size_)
 		g_mp4->addUnknownSequence(current_chunk_.off_, current_chunk_.size_);
 
-	off_to_exclude_.emplace_back(g_mp4->current_mdat_->total_excluded_yet_);
 	chunks_.emplace_back(current_chunk_);
 	current_chunk_.n_samples_ = 0;
 	current_chunk_.size_ = 0;
@@ -603,9 +604,9 @@ bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 
 }
 
-void Track::applyOffsToExclude() {
-	for (size_t i=0; i < off_to_exclude_.size(); i++)
-		chunks_[i].off_ -= off_to_exclude_[i];
+void Track::applyExcludedToOffs() {
+	for (auto& c : chunks_)
+		c.off_ -= c.alredy_excluded_;
 }
 
 int64_t Track::getDurationInTimescale()  {
@@ -616,5 +617,5 @@ int64_t Track::getDurationInTimescale()  {
 Track::Chunk::Chunk(off_t off, int64_t size, int ns) : off_(off), size_(size), n_samples_(ns) {}
 
 ostream& operator<<(ostream& out, const Track::Chunk& c) {
-	return out << ss(c.off_, "', ", c.size_, ", ", c.n_samples_);
+	return out << ss(c.off_, ", ", c.size_, ", ", c.n_samples_);
 }
