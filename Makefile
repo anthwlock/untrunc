@@ -120,10 +120,10 @@ $(EXE)-gui: print_info $(filter-out $(DIR)/src/main.o, $(OBJ)) $(OBJ_GUI)
 $(DIR)/%/win_resources.o: %/win_resources.rc
 	windres.EXE $< $@
 
-# rebuild common.o if new version/CPPFLAGS
+# rebuild src/common.o on new version/CPPFLAGS
 $(DIR)/cpp_flags: force
 	@echo '$(CPPFLAGS)' | cmp -s - $@ || echo '$(CPPFLAGS)' > $@
-common.o: $(DIR)/cpp_flags
+$(DIR)/src/common.o: $(DIR)/cpp_flags
 
 $(DIR)/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $<
