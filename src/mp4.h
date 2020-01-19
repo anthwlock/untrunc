@@ -150,6 +150,7 @@ private:
 	void checkForBadTracks();
 
 	std::string getOutputSuffix();
+	bool chkNeedOldApi();
 };
 
 class FrameInfo {

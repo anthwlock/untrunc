@@ -996,6 +996,17 @@ bool Mp4::needDynStats() {
 	return false;
 }
 
+bool Mp4::chkNeedOldApi() {
+	if (!is_new_ffmpeg_api) return false;
+	vector<string> v = {"mp4v"};
+	for (auto& t: tracks_)
+		if (contains(v, t.codec_.name_)) {
+			logg(E, "track '", t.codec_.name_, "' is not supported with ffmpeg > 3.3!\n");
+			return true;
+		}
+	return false;
+}
+
 FrameInfo::FrameInfo(int track_idx, Codec& c, off_t offset, uint length)
     : track_idx_(track_idx), keyframe_(c.was_keyframe_), audio_duration_(c.audio_duration_),
       offset_(offset), length_(length), should_dump_(c.should_dump_) {}
@@ -1270,6 +1281,11 @@ bool Mp4::tryMatch(off_t& offset ) {
 
 
 void Mp4::repair(const string& filename) {
+	if (chkNeedOldApi()) {
+		cout << "Help: You need to build against ffmpeg 3.3.\n"
+		     << "      See the README.md on how to do that.\n";
+		return;
+	}
 	if (needDynStats()) {
 		g_use_chunk_stats = true;
 		genDynStats();

@@ -63,7 +63,7 @@ void Codec::parseOk(Atom *trak) {
 	name_ = stsd->getString(12, 4);
 	name_ = name_.c_str();  // might be smaller than 4
 
-	if (contains({"mp4a", "sawb"}, name_)) initAVCodec();
+	if (contains({"mp4a", "sawb", "mp4v"}, name_)) initAVCodec();
 
 	match_fn_ = dispatch_match[name_];
 	match_strict_fn_ = dispatch_strict_match[name_];
@@ -190,7 +190,7 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	}},
 
 	MATCH_FN("mp4v") { //as far as I know keyframes are 1b3, frames are 1b6 (ISO/IEC 14496-2, 6.3.4 6.3.5)
-		return (s == 0x1b3 || s == 0x1b6);
+		return s == 0x1b3 || s == 0x1b6;
 	}},
 
 	MATCH_FN("alac") {
@@ -260,8 +260,7 @@ bool Codec::matchSample(const uchar *start) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt, uint maxlength)
-{
+inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt, uint maxlength) {
 	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
 
 	// ffmpeg 3.4+ uses internal buffer which needs to be updated.
@@ -280,6 +279,14 @@ inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 		}
 	}
 	return consumed;
+}
+
+inline int untr_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt) {
+	// ffmpeg3.4+ expects every video packet to contain exactly 1 frame..
+	// thus there is no way to detect video frame bounderies using ffmpeg3.4+..
+	// https://github.com/FFmpeg/FFmpeg/blob/7fc329e2dd6226dfecaa4a1d7adf353bf2773726/libavcodec/avcodec.h#L4793
+	// https://github.com/FFmpeg/FFmpeg/commit/061a0c14bb5767bca72e3a7227ca400de439ba09
+	return avcodec_decode_video2(avctx, frame, got_frame, pkt);
 }
 #pragma GCC diagnostic pop
 
@@ -370,31 +377,26 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		int num = (s2 & 0x0000ffff);
 		return num + 8;
 	}},
+	GET_SZ_FN("mp4v") {
+		static AVPacket* packet = av_packet_alloc();
+		static AVFrame* frame = av_frame_alloc();
+
+		packet->data = const_cast<uchar*>(start);
+		packet->size = maxlength;
+		int got_frame = 0;
+
+		int consumed = untr_decode_video2(self->av_codec_context_, frame, &got_frame, packet);
+
+		self->was_keyframe_ = frame->key_frame;
+		self->was_bad_ = !got_frame;
+
+		return consumed;
+	}}
 
 	/* if codec is not found in map,
 	 * untrunc will try to generate common features (chunk_size, sample_size, patterns) per track.
 	 * this is why these are commented out
 	 *
-	GET_SZ_FN("mp4v") {
-		//     THIS DOES NOT SEEM TO WORK FOR SOME UNKNOWN REASON. IT JUST CONSUMES ALL BYTES.
-		/     AVFrame *frame = avcodec_alloc_frame();
-		if(!frame)
-			throw "Could not create AVFrame";
-		AVPacket avp;
-		av_init_packet(&avp);
-
-		int got_frame;
-		avp.data=(uchar *)(start);
-		avp.size = maxlength;
-		int consumed = avcodec_decode_video2(context, frame, &got_frame, &avp);
-		av_freep(&frame);
-		return consumed;
-
-		//found no way to guess size, probably the only way is to use some functions in ffmpeg
-		//to decode the stream
-		cout << "Unfortunately I found no way to guess size of mp4v packets. Sorry\n";
-		return -1;
-	}},
 	GET_SZ_FN("twos") { //lenght is multiple of 32, we split packets.
 		return 4;
 	}},
