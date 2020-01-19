@@ -108,9 +108,6 @@ void Mp4::parseTracksOk() {
 	auto mdats = root_atom_->atomsByName("mdat", true);
 	if (mdats.size() > 1)
 		logg(W, "multiple mdats detected, see '-ia'\n");
-	Atom* mdat = mdats[0];
-	for (auto p : mdats)
-		if (p->length_ > mdat->length_) mdat = p;  // dont use Atom::contentSize() for mdat
 
 	auto traks = root_atom_->atomsByName("trak");
 	for (uint i=0; i < traks.size(); i++) {
@@ -119,8 +116,8 @@ void Mp4::parseTracksOk() {
 		track.parseOk();
 
 		if (track.offsets_.size()) {
-			assert(track.offsets_.front() >= mdat->contentStart());
-			assert(track.offsets_.back() < mdat->start_ + mdat->length_);
+			assert(track.offsets_.front() >= mdats.front()->contentStart());
+			assert(track.offsets_.back() < mdats.back()->start_ + mdats.back()->length_);
 		}
 	}
 
