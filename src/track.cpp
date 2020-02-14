@@ -48,7 +48,22 @@ Track::Track(const string& codec_name) {
 	is_dummy_ = true;
 }
 
+int64_t Track::getNumSamples() const {
+	if (sizes_.size()) assert(num_samples_ == sizes_.size());
+	return num_samples_;
+}
+
+int Track::getSize(size_t idx) {
+	return constant_size_ ? constant_size_ : sizes_[idx];
+}
+
+int Track::getTime(size_t idx) {
+	return constant_duration_ != -1 ? constant_duration_ : times_[idx];
+}
+
 int Track::getOrigSize(uint idx) {
+	if (constant_size_) return constant_size_;
+
 	if (orig_sizes_.size())
 		return orig_sizes_[idx];
 	else
@@ -56,25 +71,24 @@ int Track::getOrigSize(uint idx) {
 }
 
 void Track::parseOk() {
+	codec_.parseOk(trak_);
+
 	header_atom_ = trak_->atomByName("mdhd");
 	if(!header_atom_)
 		throw "No mdhd atom: unknown duration and timescale";
 	readHeaderAtom();
+
 
 	getSampleTimes();
 	getKeyframes();
 	getSampleSizes();
 
 	getChunkOffsets();
-	auto sample_to_chunk = getSampleToChunk();
+	parseSampleToChunk();
 
-	if (times_.size() != sizes_.size()) {
+	if (constant_duration_ == -1 && !constant_size_ && times_.size() != sizes_.size()) {
 		cout << "Mismatch between time offsets and size offsets: \n";
 		cout << "Time offsets: " << times_.size() << " Size offsets: " << sizes_.size() << endl;
-	}
-	if (times_.size() != sample_to_chunk.size()) {
-		cout << "Mismatch between time offsets and sample_to_chunk offsets: \n";
-		cout << "Time offsets: " << times_.size() << " Chunk offsets: " << sample_to_chunk.size() << endl;
 	}
 
 	Atom *hdlr = trak_->atomByName("hdlr");
@@ -91,28 +105,16 @@ void Track::parseOk() {
 	}
 	do_stretch_ = g_stretch_video && handler_type_ == "vide";
 
-	codec_.parseOk(trak_);
-
 	if (codec_.name_ == "sowt" || codec_.name_ == "twos") {
+		assert(constant_size_);
+
 		int nc = codec_.av_codec_params_->channels;
 		int expected_size = 2 * nc;
-		if (sizes_.size() && sizes_[0] != expected_size) {
-			assert(sizes_.front() == sizes_.back());  // should be constant
-			logg(W, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", sizes_[0], " as found in stsz\n");
-			fill(sizes_.begin(), sizes_.end(), expected_size);
-		}
-	}
 
-	//compute actual offsets
-	off_t offset = -1, old_chunk = -1;
-	for(uint i = 0; i < sizes_.size(); i++) {
-		int chunk_idx = sample_to_chunk[i];
-		if (chunk_idx != old_chunk) {
-			offset = chunks_[chunk_idx].off_;
-			old_chunk = chunk_idx;
+		if (constant_size_ != expected_size) {
+			logg(W, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", constant_size_, " as found in stsz\n");
+			constant_size_ = expected_size;
 		}
-		offsets_.push_back(offset);
-		offset += sizes_[i];
 	}
 }
 
@@ -183,13 +185,20 @@ void Track::clear() {
 	if (orig_times_.empty()) swap(times_, orig_times_);
 	else orig_times_.end();
 
-	offsets_.clear();
 	keyframes_.clear();
 	chunks_.clear();
+
+	num_samples_ = 0;
 }
 
 void Track::fixTimes() {
-	const size_t len_offs = sizes_.size();
+	const size_t len_offs = getNumSamples();
+
+	if (constant_duration_ != -1) {
+		duration_ = len_offs * constant_duration_;
+		return;
+	};
+
 	if (codec_.name_ == "samr") {
 		times_.clear();
 		times_.resize(len_offs, 160);
@@ -233,11 +242,18 @@ void Track::getSampleTimes() {
 	Atom *stts = trak_->atomByNameSafe("stts");
 
 	int entries = stts->readInt(4);
-	for(int i = 0; i < entries; i++) {
-		int nsamples = stts->readInt(8 + 8*i);
-		int time = stts->readInt(12 + 8*i);
-		for(int i = 0; i < nsamples; i++)
-			times_.push_back(time);
+	int nsamples1 = stts->readInt(8);
+	if (entries == 1 && nsamples1 > 500) {
+		constant_duration_ = stts->readInt(12);
+		logg(V, "assuming constant duration of ", constant_duration_, " for '", codec_.name_, "' (x", nsamples1, ")\n");
+	}
+	else {
+		for(int i = 0; i < entries; i++) {
+			int nsamples = stts->readInt(8 + 8*i);
+			int time = stts->readInt(12 + 8*i);
+			for(int i = 0; i < nsamples; i++)
+				times_.push_back(time);
+		}
 	}
 }
 
@@ -254,12 +270,14 @@ void Track::getSampleSizes() {
 	Atom *stsz = trak_->atomByNameSafe("stsz");
 
 	int entries = stsz->readInt(8);
-	int default_size = stsz->readInt(4);
-	if (default_size) {
-		sizes_.resize(entries, default_size);
+	int constant_size = stsz->readInt(4);
+	if (constant_size) {
+		constant_size_ = constant_size;
+		num_samples_ = entries;
 	} else {
 		for(int i = 0; i < entries; i++)
 			sizes_.push_back(stsz->readInt(12 + 4*i));
+		num_samples_ = sizes_.size();
 	}
 }
 
@@ -278,9 +296,7 @@ void Track::getChunkOffsets() {
 	}
 }
 
-vector<int> Track::getSampleToChunk(){
-	vector<int> sample_to_chunk;
-
+void Track::parseSampleToChunk(){
 	Atom *stsc = trak_->atomByNameSafe("stsc");
 
 	vector<int> first_chunks;
@@ -295,11 +311,8 @@ vector<int> Track::getSampleToChunk(){
 
 		for (int i=start_idx; i < end_idx; i++) {
 			chunks_[i-1].n_samples_ = n_samples;
-			for (int j=0; j < n_samples; j++)
-				sample_to_chunk.push_back(i-1);
 		}
 	}
-	return sample_to_chunk;
 }
 
 void Track::orderPatterns() {
@@ -331,14 +344,16 @@ void Track::orderPatterns() {
 void Track::saveSampleTimes() {
 	Atom *stts = trak_->atomByNameSafe("stts");
 	vector<pair<int,int>> vp;
-	for (uint i = 0; i < times_.size(); i++){
-		int v = do_stretch_ ? round(times_[i]*stretch_factor_) : times_[i];
-		if (vp.empty() || v != vp.back().second) {  // don't repeat same value
-//			cout << times_[i] << " -> " << v << '\n';
-			vp.emplace_back(1, v);
+
+	if (constant_duration_ != -1) {
+		vp.emplace_back(getNumSamples(), constant_duration_);
+	}
+	else {
+		for (uint i = 0; i < times_.size(); i++){
+			int v = do_stretch_ ? round(times_[i]*stretch_factor_) : times_[i];
+			if (!vp.empty() && v == vp.back().second) vp.back().first++;  // don't repeat same value
+			else vp.emplace_back(1, v);
 		}
-		else
-			vp.back().first++;
 	}
 	stts->content_.resize(4 + //version
 	                      4 + //entries
@@ -371,15 +386,11 @@ void Track::saveKeyframes() {
 void Track::saveSampleSizes() {
 	Atom *stsz = trak_->atomByNameSafe("stsz");
 
-	bool is_constant = true;
-	for (uint i=1; i < sizes_.size(); i++)
-		if (sizes_[i-1] != sizes_[i]) {is_constant = false; break;}
-
 	stsz->seek(4);
-	if (is_constant && sizes_.size()) {
+	if (constant_size_ && num_samples_) {
 		stsz->content_.resize(12);
-		stsz->writeInt(sizes_[0]);
-		stsz->writeInt(sizes_.size());
+		stsz->writeInt(constant_size_);
+		stsz->writeInt(num_samples_);
 	}
 	else {
 		stsz->content_.resize(12 + 4*sizes_.size());
@@ -479,7 +490,7 @@ void Track::printDynPatterns(bool show_percentage) {
 }
 
 void Track::genLikely() {
-	assert(sizes_.size() > 0);
+	assert(sizes_.size() > 0 || constant_size_);
 
 	if (sizes_.size() > 1) {
 		random_device rd;
@@ -502,9 +513,13 @@ void Track::genLikely() {
 			}
 		}
 	}
+	else if (constant_size_) {
+		likely_sample_sizes_.push_back(constant_size_);
+		likely_samples_sizes_p = 1;
+	}
 	else {
-		likely_n_samples_.push_back(sizes_[0]);
-		likely_n_samples_p = 1;
+		likely_sample_sizes_.push_back(sizes_[0]);
+		likely_samples_sizes_p = 1;
 	}
 
 
@@ -548,32 +563,39 @@ void Track::genChunkSizes() {
 	                         "' track, but no single ", codec_.name_, "-frame!\n"));
 	assert(chunks_[0].n_samples_ >= 1);
 
-	if (chunks_.size() == 1 || chunks_[0].n_samples_ == 1) {  // really? better check..
-		chunks_.clear();
-		off_t last_end = offsets_.front();
-		Track::Chunk c;
-		c.off_ = offsets_.front();
-		for (uint i=0; i < offsets_.size(); i++) {
-			auto& off = offsets_[i];
-			auto& sz = sizes_[i];
+	if (chunks_[0].n_samples_ == 1) {  // really? better check..
+		vector<Track::Chunk> orig_chunks;
+		swap(orig_chunks, chunks_);
 
-			if (last_end != off) {
-				chunks_.push_back(c);
-				c.off_ = last_end = off;
-				c.size_ = c.n_samples_ = 0;
+		size_t sample_idx = 0;
+		auto chunkSize = [&](Chunk c){
+			int64_t sz = 0;
+			for (int i=0; i < c.n_samples_; i++) sz += getSize(sample_idx++);
+			return sz;
+		};
+
+		auto& c1 = orig_chunks[0];
+		c1.size_ = chunkSize(c1);
+		for (uint i=0; i+1 < orig_chunks.size(); i++) {
+			auto& c2 = orig_chunks[i+1];
+			c2.size_ = chunkSize(c2);
+			if (c1.off_ + c1.size_ == c2.off_) {
+				c1.size_ += c2.size_;
+				c1.n_samples_ += c2.n_samples_;
 			}
-			c.n_samples_++;
-			c.size_ += sz;
-			last_end += sz;
+			else {
+				chunks_.emplace_back(c1);
+				c1 = c2;
+			}
 		}
-		chunks_.push_back(c);
+		chunks_.push_back(c1);
 	}
-	else if (chunks_[0].size_ < 0) {  // not yet generated
+	else if (chunks_[0].size_ < 0) {  // chunk sizes not yet generated
 		int sample_idx = 0;
 		for (auto& c : chunks_) {
 			c.size_ = 0;
 			for (int i=0; i < c.n_samples_; i++)
-				c.size_ += sizes_[sample_idx++];
+				c.size_ += getSize(sample_idx++);
 		}
 	}
 

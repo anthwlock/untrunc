@@ -115,10 +115,9 @@ void Mp4::parseTracksOk() {
 		auto& track = tracks_.back();
 		track.parseOk();
 
-		if (track.offsets_.size()) {
-			assert(track.offsets_.front() >= mdats.front()->contentStart());
-			assert(track.offsets_.back() < mdats.back()->start_ + mdats.back()->length_);
-		}
+		assert(track.chunks_.size());
+		assert(track.chunks_.front().off_ >= mdats.front()->contentStart());
+		assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
 	}
 
 	if (hasCodec("fdsc") && hasCodec("avc1"))
@@ -270,7 +269,7 @@ void Mp4::saveVideo(const string& filename) {
 	if (g_log_mode >= I) {
 		cout << "Info: Found " << pkt_idx_ << " packets ( ";
 		for(const Track& t : tracks_){
-			cout << t.codec_.name_ << ": " << t.sizes_.size() << ' ';
+			cout << t.codec_.name_ << ": " << t.getNumSamples() << ' ';
 			if (t.codec_.name_ == "avc1")
 				cout << "avc1-keyframes: " << t.keyframes_.size() << " ";
 		}
@@ -331,7 +330,7 @@ void Mp4::saveVideo(const string& filename) {
 
 	// remove empty tracks
 	for (auto it=tracks_.begin(); it != tracks_.end();) {
-		if (!it->sizes_.size()) {
+		if (!it->getNumSamples()) {
 			moov->prune(it->trak_);
 			logg(I, "pruned empty '", it->codec_.name_, "' track\n");
 			it = tracks_.erase(it);
@@ -388,12 +387,9 @@ string Mp4::getOutputSuffix() {
 
 void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 	auto offset = fi.offset_;
-	auto& mdat = current_mdat_;
-	off_t real_off = mdat->contentStart() + offset;
-
 	auto start = loadFragment(offset);
 
-	cout << "\n(" << i << ") Size: " << fi.length_ << " offset " << real_off
+	cout << "\n(" << i << ") Size: " << fi.length_ << " offset: " << offToStr(offset)
 	     << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4)
 	     << " end: " << mkHexStr(start+fi.length_-4, 8) << '\n';
 
@@ -461,21 +457,31 @@ void Mp4::analyze(bool gen_off_map) {
 			if (!track.isSupported() && !gen_off_map) continue;
 			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
+			auto c_it = track.chunks_.begin();
+			size_t sample_idx_in_chunk = 0;
+			off_t cur_off = c_it->off_ - mdat->contentStart();
 			for (uint i=0; i < track.sizes_.size(); i++) {
 				bool is_keyframe = k == i;
 
 				if (is_keyframe && ++ik < track.keyframes_.size())
 					k = track.keyframes_[ik];
 
-				off_t off = track.offsets_[i] - mdat->contentStart();
-				if (off > mdat->contentSize()) {
+				auto sz = track.getSize(i);
+				if (cur_off > mdat->contentSize()) {
 					logg(W, "reched premature end of mdat\n");
 					break;
 				}
-				auto fi = FrameInfo(idx, is_keyframe, track.times_[i], off, track.sizes_[i]);
+				auto fi = FrameInfo(idx, is_keyframe, track.getTime(i), cur_off, sz);
 
-				if (gen_off_map) off_to_frame_[off] = fi;
+				if (gen_off_map) off_to_frame_[cur_off] = fi;
 				else chkUntrunc(fi, track.codec_, i);
+
+				if (++sample_idx_in_chunk >= to_uint(c_it->n_samples_)) {
+					cur_off = (++c_it)->off_ - mdat->contentStart();
+					sample_idx_in_chunk = 0;
+				}
+				else
+					cur_off += sz;
 			}
 		}
 	}
@@ -487,12 +493,11 @@ void Mp4::genChunks() {
 }
 
 void Mp4::genChunkTransitions() {
-	auto& transitions = chunk_transitions_;
 	vector<uint> cur_chunk_idx(tracks_.size());
 	int last_track_idx = -1;
 
 	tracks_.emplace_back("free");
-	tracks_.back().sizes_ = {1, 1};  // for genLikely
+	tracks_.back().constant_size_ = 1;  // for genLikely
 	idx_free_ = tracks_.size()-1;
 	logg(V, "created dummy track 'free'\n");
 
@@ -515,12 +520,12 @@ void Mp4::genChunkTransitions() {
 			assert(off - current_mdat_->contentStart() >= pat_size_ / 2);
 			assert(off >= last_end);
 			if (off != last_end) {
-				transitions[{last_track_idx, idx_free_}].emplace_back(last_end);
+				chunk_transitions_[{last_track_idx, idx_free_}].emplace_back(last_end);
 				tracks_[idx_free_].chunks_.emplace_back(last_end, off - last_end, off - last_end);
-				transitions[{idx_free_, track_idx}].emplace_back(off);
+				chunk_transitions_[{idx_free_, track_idx}].emplace_back(off);
 			}
 			else {
-				transitions[{last_track_idx, track_idx}].emplace_back(off);
+				chunk_transitions_[{last_track_idx, track_idx}].emplace_back(off);
 			}
 		}
 		last_track_idx = track_idx;
@@ -535,7 +540,6 @@ void Mp4::genChunkTransitions() {
 }
 
 void Mp4::genDynPatterns() {
-	auto& transitions = chunk_transitions_;
 	for (auto& t : tracks_) t.dyn_patterns_.resize(tracks_.size());
 
 	first_off_abs_ = numeric_limits<off_t>::max();
@@ -543,7 +547,7 @@ void Mp4::genDynPatterns() {
 		first_off_abs_ = min(t.chunks_[0].off_, first_off_abs_);
 	first_off_rel_ = first_off_abs_ - current_mdat_->contentStart();
 
-	for (auto const& kv: transitions) {
+	for (auto const& kv: chunk_transitions_) {
 		auto& patterns = tracks_[kv.first.first].dyn_patterns_[kv.first.second];
 		vector<vector<uchar>> buffs_to_consider;
 		auto& all_offs = kv.second;
@@ -574,7 +578,7 @@ void Mp4::genDynPatterns() {
 		}
 	}
 
-	for (auto const& kv: transitions) {
+	for (auto const& kv: chunk_transitions_) {
 		auto& all_offs = kv.second;
 		auto& patterns = tracks_[kv.first.first].dyn_patterns_[kv.first.second];
 
@@ -593,7 +597,7 @@ void Mp4::genDynPatterns() {
 
 	}
 
-	for (auto const& kv: transitions) {
+	for (auto const& kv: chunk_transitions_) {
 		auto& t = tracks_[kv.first.first];
 		auto& all_offs = kv.second;
 		auto& patterns = t.dyn_patterns_[kv.first.second];
@@ -658,7 +662,7 @@ void Mp4::dumpMatch(const FrameInfo& fi, int idx) {
 }
 
 void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx) {
-	int dur = tracks_[chunk.track_idx_].times_[0];
+	int dur = tracks_[chunk.track_idx_].getTime(0);
 	FrameInfo match(chunk.track_idx_, 0, dur, chunk.off_, chunk.sample_size_);
 	for (uint n=chunk.n_samples_; n--;) {
 		dumpMatch(match, idx++);
@@ -749,6 +753,7 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 
 void Mp4::addFrame(const FrameInfo& fi) {
 	Track& track = tracks_[fi.track_idx_];
+	track.num_samples_++;
 
 	if (fi.keyframe_)
 		track.keyframes_.push_back(track.sizes_.size());
@@ -756,11 +761,8 @@ void Mp4::addFrame(const FrameInfo& fi) {
 	if (fi.should_dump_)
 		to_dump_.emplace_back(fi);
 
-//	track.offsets_.push_back(fi.offset_ - current_mdat_->total_excluded_yet_);
-	track.offsets_.push_back(fi.offset_);
-	if (fi.audio_duration_) track.times_.push_back(fi.audio_duration_);
-
-	track.sizes_.push_back(fi.length_);
+	if (fi.audio_duration_ && track.constant_duration_ == -1) track.times_.push_back(fi.audio_duration_);
+	if (!track.constant_size_) track.sizes_.push_back(fi.length_);
 }
 
 const uchar* Mp4::loadFragment(off_t offset) {

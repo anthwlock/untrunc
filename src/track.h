@@ -41,11 +41,17 @@ public:
 
 	//mp4a can be decoded and repors the number of samples (duration in samplerate scale).
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
-	std::vector<int> times_; // sample times
+	std::vector<int> times_; // sample durations
+	int constant_duration_ = -1;
 
-	std::vector<off_t> offsets_;
 	std::vector<int> sizes_;
+	int constant_size_ = 0;
 	std::vector<int> keyframes_; //used for 'avc1', 0 based!
+	size_t num_samples_ = 0;
+	int64_t getNumSamples() const;
+	int getSize(size_t idx);
+	int getTime(size_t idx);
+
 	int getOrigSize(uint idx);
 
 	void parseOk();
@@ -59,7 +65,7 @@ public:
 	void getKeyframes();
 	void getSampleSizes();
 	void getChunkOffsets();
-	std::vector<int> getSampleToChunk();
+	void parseSampleToChunk();
 	void orderPatterns();
 
 	std::vector<off_t> getChunkOffsets64();
@@ -93,8 +99,6 @@ public:
 	bool is_dummy_ = false;
 
 	Track::Chunk current_chunk_;
-//	off_t last_chunk_off_ = 0;
-//	int sample_idx_in_chunk_ = 0;  // in chunk
 	bool chunkMightBeAtAnd();
 
 	void printDynPatterns(bool show_percentage=false);
@@ -111,7 +115,6 @@ public:
 
 private:
 	// from healthy file
-//	std::vector<int64_t> off_to_exclude_;
 	std::vector<int> orig_sizes_;
 	std::vector<int> orig_times_;
 
