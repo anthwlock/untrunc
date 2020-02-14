@@ -7,11 +7,18 @@
 #include <vector>
 #include <sstream>
 #include <algorithm>
+#include <random>
 
 class Mp4;
 
-typedef unsigned int uint;
-typedef unsigned char uchar;
+using uint = unsigned int;
+using uchar = unsigned char;
+
+using buffs_t = std::vector<std::vector<uchar>>;
+using offs_t = std::vector<off_t>;
+
+#define to_uint(a) static_cast<unsigned int>(a)
+#define to_size_t(a) static_cast<size_t>(a)
 
 enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
@@ -25,13 +32,13 @@ extern Mp4* g_mp4;
 extern void (*g_onProgress)(int);
 extern void (*g_onStatus)(const std::string&);
 
+
 #define UNFOLD_PARAM_PACK(pack, os) \
 	_Pragma("GCC diagnostic push"); \
 	_Pragma("GCC diagnostic ignored \"-Wunused-value\""); \
 	using creator = int[]; \
 	creator{ 0, ( os << (std::forward<decltype(pack)>(pack)), 0) ... }; \
 	_Pragma("GCC diagnostic pop"); \
-
 
 template<class... Args>
 void logg(Args&&... args){
@@ -67,6 +74,31 @@ template <typename Container>
 bool contains(Container const& c, typename Container::const_reference v) {
   return std::find(c.begin(), c.end(), v) != c.end();
 }
+
+std::mt19937& getRandomGenerator();
+
+template <template <typename, typename...> class C, class T>
+C<T> choose100(const C<T>& in) {
+	size_t n = 100, k = 10;
+	if (n > in.size()) return in;
+
+	auto gen = getRandomGenerator();
+	std::uniform_int_distribution<size_t> dis(0, std::distance(in.begin(), in.end()) - 1 - k);
+	C<T> out;
+
+	for (uint i=0; i < k-1; i++) {
+		size_t idx = dis(gen);
+		for (size_t j=idx; j < idx+k; j++)
+			out.push_back(in[j]);
+	}
+
+	auto it = in.end() - k;
+	for (uint i=0; i < k; i++) out.push_back(*it++);
+
+	std::sort(out.begin(), out.end());
+	return out;
+}
+
 
 /* NAL unit types */
 enum {
@@ -111,7 +143,7 @@ uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);
 uint64_t swap64(uint64_t ull);
 
-void outProgress(double now, double all);
+void outProgress(double now, double all, const std::string& prefix="");
 
 int readGolomb(const uchar *&buffer, int &offset);
 uint readBits(int n, const uchar *&buffer, int &offset);
@@ -134,9 +166,6 @@ std::string getOutputSuffix();
 double calcEntropy(const std::vector<uchar>& in);
 
 int64_t gcd(int64_t a, int64_t b);
-
-#define to_uint(a) static_cast<unsigned int>(a)
-#define to_size_t(a) static_cast<size_t>(a)
 
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd

@@ -483,7 +483,7 @@ void Track::printDynPatterns(bool show_percentage) {
 		cout << ss(codec_.name_, "_", g_mp4->tracks_[idx].codec_.name_, " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
 		           (show_percentage ? ss(" (", n_total, ")") : ""), "\n");
 		for (auto& p : dyn_patterns_[idx]) {
-			if (n_total) cout << ss(fixed, setprecision(3), (double)p.cnt / (double)n_total, " ", p.cnt, " ");
+			if (n_total) cout << ss(fixed, setprecision(3), (double)p.cnt_ / (double)n_total, " ", p.cnt_, " ");
 			cout << p << '\n';
 		}
 	}

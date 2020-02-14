@@ -176,10 +176,10 @@ void hitEnterToContinue(bool new_line) {
 //	else cout << '\n';
 }
 
-void outProgress(double now, double all) {
+void outProgress(double now, double all, const string& prefix) {
 	double x = round(1000*(now/all));
 	if (g_onProgress) g_onProgress(x/10);
-	else cout << x/10 << "%  \r" << flush;
+	else cout << prefix << x/10 << "%  \r" << flush;
 }
 
 void mute() {
@@ -290,4 +290,10 @@ double calcEntropy(const vector<uchar>& in) {
 
 int64_t gcd(int64_t a, int64_t b) {
 	return b ? gcd(b, a%b) : a;
+}
+
+mt19937& getRandomGenerator() {
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	return gen;
 }

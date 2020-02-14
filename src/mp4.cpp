@@ -24,7 +24,6 @@
 #include <iomanip>  // setprecision
 #include <algorithm>
 #include <fstream>
-#include <random>
 
 extern "C" {
 #include <stdint.h>
@@ -539,6 +538,33 @@ void Mp4::genChunkTransitions() {
 	}
 }
 
+buffs_t Mp4::offsToBuffs(const offs_t& offs, const string& load_prefix) {
+	int cnt=0;
+	buffs_t buffs;
+	for (auto off : offs) {
+		if (g_log_mode == I) outProgress(cnt++, offs.size(), load_prefix);
+		auto buff = current_file_->getFragment(off - pat_size_/2, pat_size_);
+		buffs.emplace_back(buff, buff+pat_size_);
+	}
+	if (g_log_mode == I) cout << string(20, ' ') << '\r';
+	return buffs;
+}
+
+patterns_t Mp4::offsToPatterns(const offs_t& all_offs, const string& load_prefix) {
+	auto offs_to_consider = choose100(all_offs);
+	auto buffs = offsToBuffs(offs_to_consider, load_prefix);
+	auto patterns = genRawPatterns(buffs);
+
+	auto offs_to_check = choose100(all_offs);
+	auto buffs2 = offsToBuffs(offs_to_consider, load_prefix);
+	countPatternsSuccess(patterns, buffs2);
+
+//	for (auto& p : patterns) cout << p.successRate() << " " << p << '\n';
+
+	filterBySuccessRate(patterns, load_prefix);
+	return patterns;
+}
+
 void Mp4::genDynPatterns() {
 	for (auto& t : tracks_) t.dyn_patterns_.resize(tracks_.size());
 
@@ -549,74 +575,9 @@ void Mp4::genDynPatterns() {
 
 	for (auto const& kv: chunk_transitions_) {
 		auto& patterns = tracks_[kv.first.first].dyn_patterns_[kv.first.second];
-		vector<vector<uchar>> buffs_to_consider;
-		auto& all_offs = kv.second;
-		int step = max(int(0.5 + all_offs.size()/100), 1);
-		for (uint i=0; i < all_offs.size(); i++) {
-			if (i % step && i != all_offs.size()-1) continue;
-			auto buff = current_file_->getFragment(all_offs[i] - pat_size_/2, pat_size_);
-			buffs_to_consider.emplace_back(buff, buff+pat_size_);
-		}
+		string prefix = ss(kv.first.first, "->", kv.first.second, ": ");
 
-		random_device rd;
-		mt19937 mt(rd());
-		auto dis = uniform_int_distribution<uint>(0, buffs_to_consider.size()-1);
-		shuffle(buffs_to_consider.begin(), buffs_to_consider.end(), mt);
-
-		for (uint i=0; i+1 < buffs_to_consider.size(); i++) {
-			auto a = buffs_to_consider[i], b = buffs_to_consider[i+1];
-			auto p = MutualPattern(a, b);
-			if (!p.size_mutual_) continue;
-
-			for (int n=4; n; n--) {  // remove (some) noise
-				uint idx = dis(mt);
-				p.intersectBufIf(buffs_to_consider[idx]);
-			}
-
-			if (!contains(patterns, p))
-				patterns.emplace_back(p);
-		}
-	}
-
-	for (auto const& kv: chunk_transitions_) {
-		auto& all_offs = kv.second;
-		auto& patterns = tracks_[kv.first.first].dyn_patterns_[kv.first.second];
-
-//		cout << "len_patterns: " << patterns.size() << '\n';
-//		if (patterns.size() < 10)
-//			for (auto& p : patterns) cout << p << '\n';
-
-		for (auto off : all_offs) {
-			auto buff_ptr = current_file_->getFragment(off - pat_size_/2, pat_size_);
-			auto buff = vector<uchar>(buff_ptr, buff_ptr+pat_size_);
-			for (auto it = patterns.begin(); it != patterns.end();)
-				if (it->intersectBufIf(buff, true) && count(patterns.begin(), patterns.end(), *it) > 1)
-					it = patterns.erase(it);
-				else it++;
-		}
-
-	}
-
-	for (auto const& kv: chunk_transitions_) {
-		auto& t = tracks_[kv.first.first];
-		auto& all_offs = kv.second;
-		auto& patterns = t.dyn_patterns_[kv.first.second];
-
-		double total_p = 0;
-		for (auto it = patterns.begin(); it != patterns.end();) {
-			auto p = (double)it->cnt / all_offs.size() ;
-			if (p < 0.2) patterns.erase(it);
-			else  {
-				it++;
-				total_p += p;
-			}
-		}
-
-		if (total_p > 1.1) {
-			logg(V, "ignoring all ", patterns.size(), " patterns for ", t.codec_.name_, "_",
-			     getCodecName(kv.first.second), ".. they overlap too much (", total_p, ")\n");
-			patterns.clear();
-		}
+		patterns = offsToPatterns(kv.second, prefix);
 	}
 }
 

@@ -115,6 +115,9 @@ private:
 	off_t first_off_abs_ = -1;
 	std::map<std::pair<int, int>, std::vector<off_t>> chunk_transitions_;
 
+	buffs_t offsToBuffs(const offs_t& offs, const std::string& load_prefix);
+	patterns_t offsToPatterns(const offs_t& offs, const std::string& load_prefix);
+
 	Mp4::Chunk fitChunk(off_t offset, uint track_idx);
 
 	void noteUnknownSequence(off_t offset);
