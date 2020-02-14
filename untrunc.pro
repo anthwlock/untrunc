@@ -18,6 +18,6 @@ DEFINES += UNTR_VERSION=\\\"$$GIT_VERSION\\\"
 TEMPLATE = app
 
 SOURCES += $$files(src/*.cpp) $$files(src/avc1/*.cpp)
-#HEADERS += $$files(src/*.h)
+HEADERS += $$files(src/*.h) $$files(src/avc1/*.h)
 
 LIBS += -lavformat -lavcodec -lavutil
