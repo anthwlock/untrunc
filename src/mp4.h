@@ -105,6 +105,7 @@ private:
 	void chkChunkDetectionAt(Mp4::Chunk& detected, off_t off);
 	void dumpMatch(const FrameInfo& fi, int idx);
 	void dumpChunk(const Mp4::Chunk& chunk, int& idx);
+	void dumpIdxAndOff(off_t off, int idx);
 	std::vector<FrameInfo> to_dump_;
 
 	void genDynStats();

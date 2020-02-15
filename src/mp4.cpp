@@ -616,19 +616,21 @@ FileRead& Mp4::openFile(const string& filename) {
 	return *current_file_;
 }
 
+void Mp4::dumpIdxAndOff(off_t off, int idx) {
+	auto real_off = current_mdat_->contentStart() + off;
+	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ")
+	     << setw(8) << real_off << " : ";
+}
+
 void Mp4::dumpMatch(const FrameInfo& fi, int idx) {
-	auto real_off = current_mdat_->contentStart() + fi.offset_;
-	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(fi.offset_, " / ")
-	     << setw(8) << real_off << " : " << fi << '\n';
+	dumpIdxAndOff(fi.offset_, idx);
+	cout << fi << '\n';
 }
 
 void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx) {
-	int dur = tracks_[chunk.track_idx_].getTime(0);
-	FrameInfo match(chunk.track_idx_, 0, dur, chunk.off_, chunk.sample_size_);
-	for (uint n=chunk.n_samples_; n--;) {
-		dumpMatch(match, idx++);
-		match.offset_ += chunk.sample_size_;
-	}
+	dumpIdxAndOff(chunk.off_, idx);
+	cout << chunk << '\n';
+	idx += chunk.n_samples_;
 }
 
 void Mp4::genDynStats() {
@@ -1000,7 +1002,7 @@ Mp4::Chunk::Chunk(off_t off, int ns, int track_idx, int sample_size)
     : Track::Chunk (off, ns * sample_size, ns), track_idx_(track_idx), sample_size_(sample_size) {}
 
 ostream& operator<<(ostream& out, const Mp4::Chunk& c) {
-	return out << ss("'", g_mp4->getCodecName(c.track_idx_), "' (", c.n_samples_, " x", c.sample_size_, ")");
+	return out << ss("'", g_mp4->getCodecName(c.track_idx_), "' (", c.sample_size_, " x", c.n_samples_, ")");
 }
 
 bool operator==(const Mp4::Chunk& a, const Mp4::Chunk& b) {
