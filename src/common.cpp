@@ -208,9 +208,9 @@ string pretty_bytes(double num) {
 }
 
 void chkHiddenWarnings() {
-	if (g_num_w2) {
+	if (g_num_w2 && g_log_mode >= W) {
 		cout << string(10, ' ') << '\n';
-		logg(W, g_num_w2, " warnings were hidden!\n");
+		cout << g_num_w2 << " warnings were hidden!\n";
 	}
 	g_num_w2 = 0;
 }

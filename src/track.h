@@ -66,7 +66,7 @@ public:
 	void getSampleSizes();
 	void getChunkOffsets();
 	void parseSampleToChunk();
-	void orderPatterns();
+	void genPatternPerm();
 
 	std::vector<off_t> getChunkOffsets64();
 
@@ -85,7 +85,9 @@ public:
 		int n_samples_ = 0;
 	};
 
+	// we try to predict next track_idx with these
 	std::vector<std::vector<MutualPattern>> dyn_patterns_;  // track_idx -> MutualPatterns
+
 	std::vector<Chunk> chunks_;
 	std::vector<int> likely_n_samples_;  // per chunk
 	std::vector<int> likely_sample_sizes_;

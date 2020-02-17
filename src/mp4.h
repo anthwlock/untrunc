@@ -108,7 +108,7 @@ private:
 	void dumpIdxAndOff(off_t off, int idx);
 	std::vector<FrameInfo> to_dump_;
 
-	void genDynStats();
+	void genDynStats(bool force_patterns=false);
 	void genChunks();
 	void genChunkTransitions();
 	void genDynPatterns();
@@ -120,7 +120,7 @@ private:
 	patterns_t offsToPatterns(const offs_t& offs, const std::string& load_prefix);
 
 	bool anyPatternMatchesHalf(off_t offset, uint track_idx_to_try);
-	Mp4::Chunk fitChunk(off_t offset, uint track_idx);
+	Mp4::Chunk fitChunk(off_t offset, uint track_idx, uint known_n_samples=0);
 
 	void noteUnknownSequence(off_t offset);
 	void addUnknownSequence(off_t start, uint64_t length);
@@ -160,6 +160,15 @@ private:
 	bool shouldPreferChunkPrediction();
 
 	Track* orig_first_track_;
+
+	// repeating order (track_idx, n_samples) in mdat
+	// ATM only recognizes very easy patterns
+	std::vector<std::pair<int, int>> track_order_;
+	uint64_t chunk_idx_ = 0;
+	int getLikelyNextTrackIdx(int* n_samples=nullptr);
+	bool isTrackOrderEnough();
+	bool dummyIsSkippable();
+	void correctChunkIdx(int track_idx);
 
 	static const int kDefaultFreeIdx = -2;
 };

@@ -153,7 +153,7 @@ void Mp4::printAtoms() {
 }
 
 void Mp4::printDynStats() {
-	if (first_off_abs_ < 0) genDynStats();
+	if (first_off_abs_ < 0) genDynStats(true);
 	cout << "\ndynamic stats:";
 	cout << "\nfirst_off_: " << first_off_abs_;
 	cout << "\nfirst_off_rel_: " << first_off_rel_ << '\n';
@@ -500,6 +500,10 @@ void Mp4::genChunkTransitions() {
 	idx_free_ = tracks_.size()-1;
 	logg(V, "created dummy track 'free'\n");
 
+	vector<pair<int, int>> order;
+	bool order_finished = false;
+	size_t chunk_idx = 0, first_failed = 0;
+
 	while (true) {
 		int track_idx = -1;
 		auto off = numeric_limits<off_t>::max();
@@ -512,6 +516,23 @@ void Mp4::genChunkTransitions() {
 			}
 		}
 		if (track_idx < 0) break;
+
+		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
+		if (!order_finished && order.size() < 25) {
+			auto p = make_pair(track_idx, cur_chunk.n_samples_);
+			if (order.size() && order.front() == p) order_finished = true;
+			else order.emplace_back(p);
+		}
+		else if (order_finished && !first_failed) {
+			auto p = make_pair(track_idx, cur_chunk.n_samples_);
+			if (order[chunk_idx % order.size()] != p) first_failed = chunk_idx;
+		}
+
+		if (chunk_idx == 0) {
+			first_off_abs_ = cur_chunk.off_;
+			first_off_rel_ = first_off_abs_ - current_mdat_->contentStart();
+			orig_first_track_ = &tracks_[track_idx];
+		}
 
 		if (last_track_idx >= 0) {
 			auto& last_chunk = tracks_[last_track_idx].chunks_[cur_chunk_idx[last_track_idx]-1];
@@ -529,6 +550,7 @@ void Mp4::genChunkTransitions() {
 		}
 		last_track_idx = track_idx;
 		cur_chunk_idx[track_idx]++;
+		chunk_idx++;
 	}
 
 	if (!tracks_.back().chunks_.size()) {
@@ -536,6 +558,16 @@ void Mp4::genChunkTransitions() {
 		idx_free_ = kDefaultFreeIdx;
 		logg(V, "removed dummy track 'free'\n");
 	}
+
+	if (g_log_mode >= V) {
+		cout << "first_failed: " << first_failed << " of " << chunk_idx << '\n';
+		cout << "order_finished: " << order_finished << '\n';
+		cout << "order: ";
+		for (auto& p : order) cout << ss("(", p.first, ", ", p.second, ") ");
+		cout << '\n';
+	}
+	if (order_finished && (!first_failed || chunk_idx - first_failed <= order.size()))  // last chunks may be shorter
+		track_order_ = order;
 }
 
 buffs_t Mp4::offsToBuffs(const offs_t& offs, const string& load_prefix) {
@@ -567,15 +599,6 @@ patterns_t Mp4::offsToPatterns(const offs_t& all_offs, const string& load_prefix
 
 void Mp4::genDynPatterns() {
 	for (auto& t : tracks_) t.dyn_patterns_.resize(tracks_.size());
-
-	first_off_abs_ = numeric_limits<off_t>::max();
-	for (auto& t : tracks_) {
-		if (t.chunks_[0].off_ < first_off_abs_) {
-			first_off_abs_ = t.chunks_[0].off_;
-			orig_first_track_ = &tracks_[getTrackIdx(t.codec_.name_)];
-		}
-	}
-	first_off_rel_ = first_off_abs_ - current_mdat_->contentStart();
 
 	for (auto const& kv: chunk_transitions_) {
 		auto& patterns = tracks_[kv.first.first].dyn_patterns_[kv.first.second];
@@ -637,19 +660,72 @@ void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx) {
 	idx += chunk.n_samples_;
 }
 
-void Mp4::genDynStats() {
+bool Mp4::dummyIsSkippable() {
+	auto& t = tracks_[idx_free_];
+	logg(V, "running dummyIsSkippable() ... \n");
+//	offs_t all_offs;
+	vector<pair<off_t, off_t>> tests;
+//	for (auto& c : t.chunks_) tests.emplace_back(c.off_, c.off_+c.size_);
+	for (auto& c : t.chunks_) tests.emplace_back(c.off_ - current_mdat_->contentStart(), c.off_+c.size_ - current_mdat_->contentStart());
+	auto chosen_tests = choose100(tests);
+	logg(V, "chosen_tests.size(): ", chosen_tests.size(), '\n');
+	for (auto& kv : tests) {
+		off_t off = kv.first, off_end = kv.second;
+		chkOffset(off);
+//		if (off != off_end) return false;
+		if (off != off_end) {
+			logg(V, "dumyIsSkippable = false\n");
+			return false;
+		}
+	}
+	logg(V, "dumyIsSkippable = true\n");
+	return true;
+}
+
+void Mp4::correctChunkIdx(int track_idx) {
+	assert(track_idx >= 0 && track_idx != idx_free_);
+	if (!track_order_.size()) return;
+
+	// TODO: call correctChunkIdx once we know n_samples
+	//       ATM result could be wrong if 'chunk::ĺikely_n_samples_.size() > 1'
+	while (track_order_[chunk_idx_].first != track_idx) chunk_idx_++;
+
+	if (tracks_[track_idx].likely_n_samples_.size() > 1)
+		logg(W, "correctChunkIdx(", track_idx, ") could be wrong");
+}
+
+bool Mp4::isTrackOrderEnough() {
+	if (!track_order_.size()) return false;
+	for (auto& t : tracks_) {
+		if (t.isSupported()) continue;
+		if (t.is_dummy_ && dummyIsSkippable()) continue;
+		if (!t.is_dummy_ && t.likely_sample_sizes_.size() == 1) continue;
+	}
+	return true;
+}
+
+void Mp4::genDynStats(bool force_patterns) {
+	if (chunk_transitions_.size()) return;  // alredy generated
 	if (!current_mdat_) findMdat(*current_file_);
 	genChunks();
-	genChunkTransitions();
-	genDynPatterns();
 
-	for (auto& t: tracks_) {
-		t.orderPatterns();
-		t.genLikely();
+	genChunkTransitions();
+	for (auto& t: tracks_) t.genLikely();
+	bool is_enough = isTrackOrderEnough();
+	logg(force_patterns ? I : V, "isTrackOrderEnough: ", is_enough, "  (sz=", track_order_.size(), ")\n");
+	if (is_enough && !force_patterns) return;
+	else if (track_order_.size()) {
+		// in theory this could probably still be used somehow..
+		logg(W, "track_order_ found, but not sufficient\n");
+		track_order_.clear();
 	}
+
+	genDynPatterns();
+	for (auto& t: tracks_) t.genPatternPerm();
 }
 
 void Mp4::checkForBadTracks() {
+	if (track_order_.size()) return;  // we alredy checked via `isTrackOrderEnough()`
 	for (auto& t: tracks_) {
 		if (!t.hasPredictableChunks() && !t.codec_.isSupported()) {
 			logg(E, "bad track: '", t.codec_.name_, "'\n");
@@ -902,14 +978,16 @@ bool Mp4::anyPatternMatchesHalf(off_t offset, uint track_idx_to_try) {
 		}
 	}
 	return false;
+
 }
 
-Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit) {
+Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit, uint known_n_samples) {
 	Mp4::Chunk c;
 	auto& t = tracks_[track_idx_to_fit];
 	if (!t.hasPredictableChunks()) return c;
 
 	for (auto n_samples : t.likely_n_samples_) {
+		if (known_n_samples) n_samples = known_n_samples;
 		for (auto s_sz : t.likely_sample_sizes_) {
 			auto dst_off = offset + n_samples*s_sz;
 			if (dst_off < current_mdat_->contentSize() && wouldMatch(dst_off, "", false, track_idx_to_fit)) {
@@ -918,16 +996,43 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit) {
 				return c;
 			}
 		}
+		if (known_n_samples) break;
 	}
 	return c;
 }
 
+int Mp4::getLikelyNextTrackIdx(int* n_samples) {
+	auto p = track_order_[chunk_idx_ % track_order_.size()];
+	if (n_samples) *n_samples = p.second;
+	return p.first;
+}
+
 Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
-	logg(V, "called getChunkPrediction(", offset, ") ... \n");
+	logg(V, "called getChunkPrediction(", offToStr(offset), ") ... \n");
 	Mp4::Chunk c;
 	if (last_track_idx_ == kDefaultFreeIdx) return c;  // could try all instead..
-
 	int track_idx;
+
+	if (track_order_.size()) {
+		int n_samples;
+		track_idx = getLikelyNextTrackIdx(&n_samples);
+		auto& track = tracks_[track_idx];
+		if (!track.hasPredictableChunks()) return c;
+		else if (track.likely_sample_sizes_.size() > 1) {
+			c = fitChunk(offset, track_idx, n_samples);
+			if (!c) logg(V, "fitChunk() failed despite supposedly known (track_idx, n_samples) = ", track_idx, ", ", n_samples, "\n");
+			return c;
+		}
+		else {
+			auto s_sz = track.likely_sample_sizes_[0];
+			if (n_samples * s_sz > current_mdat_->contentSize() - offset) return c;
+			c = Chunk(offset, n_samples, track_idx, s_sz);
+			logg(V, "chunk derived from track_order_:", c, "\n");
+			return c;
+		}
+
+	}
+
 	if (last_track_idx_ == -1) {  // very first offset
 		track_idx = getTrackIdx(orig_first_track_->codec_.name_);
 		cout << "orig_trak:" << orig_first_track_->codec_.name_ << " " << track_idx << '\n';
@@ -940,41 +1045,43 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 		track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
 	}
 
+//	auto track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
 	if (track_idx >= 0 && !tracks_[track_idx].shouldUseChunkPrediction()) {
 		logg(V, "should not use chunk prediction for '", getCodecName(track_idx), "'\n");
 		return c;
 	}
-	else if (track_idx >= 0) {
-		auto& t = tracks_[track_idx];
-		logg(V, "transition pattern ", getCodecName(last_track_idx_), "_", t.codec_.name_, " worked\n");
-
-		if ((c = fitChunk(offset, track_idx))) {
-			logg(V, "chunk found: ", c, "\n");
-			return c;
-		}
-		bool at_end = false;
-
-		// we boldly assume that track_idx was correct
-		auto s_sz = t.likely_sample_sizes_[0];
-		auto n_samples = t.likely_n_samples_[0];  // smallest sample_size
-		if (t.likely_n_samples_p < 0.9) {
-			const int min_sz = 64;  // min assumed chunk size
-			int new_n_samples = max(1, min_sz / s_sz);
-			logg(V, "reducing n_sample ", n_samples, " -> ", new_n_samples, " because unsure\n");
-			n_samples = new_n_samples;
-		}
-		n_samples = min(n_samples, int((current_mdat_->contentSize() - offset) / s_sz));
-		at_end = n_samples != t.likely_n_samples_[0];
-		c = Chunk(offset, n_samples, track_idx, s_sz);
-
-		assert(c.track_idx_ >= 0 && to_size_t(c.track_idx_) < tracks_.size());
-		if (!at_end)
-			logg(W2, "found chunk has no future: ", c, " at ", offToStr(c.off_ + c.size_), "\n");
-
+	else if (track_idx < 0) {
+//		logg(V, "no chunk with future found\n");
+		logg(V, "found no plausible chunk-pattern match\n");
 		return c;
 	}
 
-	logg(V, "no chunk with future found\n");
+	auto& t = tracks_[track_idx];
+	logg(V, "transition pattern ", getCodecName(last_track_idx_), "_", t.codec_.name_, " worked\n");
+
+	if ((c = fitChunk(offset, track_idx))) {
+		logg(V, "chunk found: ", c, "\n");
+		return c;
+	}
+
+	// we boldly assume that track_idx was correct
+	auto s_sz = t.likely_sample_sizes_[0];
+	auto n_samples = t.likely_n_samples_[0];  // smallest sample_size
+	if (t.likely_n_samples_p < 0.9) {
+		const int min_sz = 64;  // min assumed chunk size
+		int new_n_samples = max(1, min_sz / s_sz);
+		logg(V, "reducing n_sample ", n_samples, " -> ", new_n_samples, " because unsure\n");
+		n_samples = new_n_samples;
+	}
+	n_samples = min(n_samples, int((current_mdat_->contentSize() - offset) / s_sz));
+	c = Chunk(offset, n_samples, track_idx, s_sz);
+
+	assert(c.track_idx_ >= 0 && to_size_t(c.track_idx_) < tracks_.size());
+
+	bool at_end = n_samples < t.likely_n_samples_[0];
+	if (!at_end)
+		logg(W2, "found chunk has no future: ", c, " at ", offToStr(c.off_ + c.size_), "\n");
+
 	return c;
 }
 
@@ -1219,10 +1326,12 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		else if (unknown_length_) {
 			noteUnknownSequence(offset);
 			logg(V, "found healthy chunk again: ", chunk, "\n");
+			correctChunkIdx(chunk.track_idx_);
 		}
 
-		if (last_track_idx_ >= 0)
-			tracks_[last_track_idx_].pushBackLastChunk();
+		if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
+		if (chunk.track_idx_ != idx_free_) chunk_idx_++;
+
 		t.current_chunk_ = chunk;
 		t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
 
@@ -1264,8 +1373,10 @@ bool Mp4::tryMatch(off_t& offset ) {
 		if (unknown_length_) {
 			noteUnknownSequence(offset);
 			logg(V, "found healthy packet again: ", match, "\n");
+			correctChunkIdx(match.track_idx_);
 		}
 		if (last_track_idx_ != match.track_idx_) {
+			if (match.track_idx_ != idx_free_) chunk_idx_++;
 			if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
 			t.current_chunk_.off_ = offset;
 			t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
@@ -1346,8 +1457,7 @@ void Mp4::repair(const string& filename) {
 		if (!unknown_length_) {
 			if (last_track_idx_ >= 0)
 				tracks_[last_track_idx_].pushBackLastChunk();
-
-			last_track_idx_ = idx_free_;
+			last_track_idx_ = idx_free_;  // negative is fine
 		}
 
 		if (g_ignore_unknown) {

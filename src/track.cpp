@@ -112,7 +112,7 @@ void Track::parseOk() {
 		int expected_size = 2 * nc;
 
 		if (constant_size_ != expected_size) {
-			logg(W, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", constant_size_, " as found in stsz\n");
+			logg(W2, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", constant_size_, " as found in stsz\n");
 			constant_size_ = expected_size;
 		}
 	}
@@ -315,7 +315,7 @@ void Track::parseSampleToChunk(){
 	}
 }
 
-void Track::orderPatterns() {
+void Track::genPatternPerm() {
 	using tuple_t = tuple<int, double, int>;
 	vector<tuple_t> perm;
 	for (uint i=0; i < dyn_patterns_.size(); i++) {
