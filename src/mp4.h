@@ -74,7 +74,7 @@ public:
 	public:
 		Chunk() = default;
 		Chunk(off_t off, int ns, int track_idx, int sample_size);
-		explicit operator bool() { return track_idx_ > 0; }
+		explicit operator bool() { return track_idx_ >= 0; }
 		int track_idx_ = -1;
 		int sample_size_ = 0;
 	};
