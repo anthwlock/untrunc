@@ -47,14 +47,15 @@ bool SliceInfo::isInNewFrame(const SliceInfo& previous_slice) {
 	}
 
 	// TODO: 'poc_lsb' differs OR 'delta_poc_bottom' differs
-	if(previous_slice.poc_type == 0  && poc_type == 0 && previous_slice.poc_lsb != poc_lsb) {
+	if(g_strict_nal_frame_check && previous_slice.poc_type == 0 && poc_type == 0 && previous_slice.poc_lsb != poc_lsb) {
 		logg(W2, "Different poc lsb\n");
 		return true;
 	}
+
 	// TODO: both 'poc_type' == 1 AND either 'delta_pic_order_cnt[0]' or 'delta_pic_order_cnt[1]' differs
 //	if(previous_slice.poc_type == 1  && poc_type == 1 && ... )
 
-	if(previous_slice.idr_pic_flag == 1 && idr_pic_flag == 1 && previous_slice.idr_pic_id != idr_pic_id) {
+	if(g_strict_nal_frame_check && previous_slice.idr_pic_flag == 1 && idr_pic_flag == 1 && previous_slice.idr_pic_id != idr_pic_id) {
 		logg(W, "Different idr pic id for keyframe\n");
 		return true;
 	}

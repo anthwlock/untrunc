@@ -70,6 +70,9 @@ public:
 	static const int pat_size_ = 32;
 	int idx_free_ = kDefaultFreeIdx;  // idx of dummy track
 
+	std::string ftyp_;
+	off_t orig_mdat_start_;
+
 	class Chunk : public Track::Chunk {
 	public:
 		Chunk() = default;
@@ -137,7 +140,7 @@ private:
 	FileRead& openFile(const std::string& filename);
 	FileRead* current_file_ = nullptr;
 
-	Mp4::Chunk getChunkPrediction(off_t offset);
+	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
 	bool tryMatch(off_t& off);
 	bool tryChunkPrediction(off_t& off);
 

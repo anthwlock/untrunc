@@ -302,12 +302,13 @@ vector<Atom *> Atom::atomsByName(const string& name, bool no_recursive) {
 	}
 	return atoms;
 }
-Atom *Atom::atomByName(const string& name) {
+Atom *Atom::atomByName(const string& name, bool no_recursive) {
 	for (uint i=0; i < children_.size(); i++) {
-		if(children_[i]->name_ == name)
-			return children_[i];
-		Atom *a = children_[i]->atomByName(name);
-		if(a) return a;
+		if (children_[i]->name_ == name) return children_[i];
+		if (!no_recursive) {
+			Atom *a = children_[i]->atomByName(name);
+			if (a) return a;
+		}
 	}
 	return NULL;
 }

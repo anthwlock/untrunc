@@ -70,6 +70,21 @@ void Mp4::parseOk(const string& filename) {
 	av_register_all();
     #endif
 
+	auto ftyp = root_atom_->atomByName("ftyp", true);
+	if (ftyp) {
+		ftyp_ = ftyp->getString(0, 4);
+		logg(V, "ftyp_ = '", ftyp_, "'\n");
+	}
+	else {
+		logg(V, "no 'ftyp' atom found\n");
+	}
+
+	if (ftyp_ == "XAVC") {
+		logg(V, "detected 'XAVC', deactivating 'g_strict_nal_frame_check'\n");
+		g_strict_nal_frame_check = false;
+		g_ignore_forbidden_nal_bit = false;
+	}
+
 	unmute(); // sets AV_LOG_LEVEL
 	context_ = avformat_alloc_context();
 	// Open video file
@@ -107,6 +122,8 @@ void Mp4::parseTracksOk() {
 	auto mdats = root_atom_->atomsByName("mdat", true);
 	if (mdats.size() > 1)
 		logg(W, "multiple mdats detected, see '-ia'\n");
+
+	orig_mdat_start_ = mdats.front()->start_;
 
 	auto traks = root_atom_->atomsByName("trak");
 	for (uint i=0; i < traks.size(); i++) {
@@ -777,6 +794,22 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	mdat->name_ = "mdat";
 
 	Atom atom;
+
+	if (!isPointingAtAtom(file_read)) {
+		logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");
+		if (ftyp_ == "XAVC") {
+			logg(V, "using orig_mdat_start_ (== ", orig_mdat_start_, ")\n");
+			atom.start_ = orig_mdat_start_;
+			atom.name_ = "mdat";
+		}
+		else if (!g_search_mdat) {
+			logg(I, "assuming start_offset=0. \n",
+			     "      use '-sm' to search for 'mdat' atom instead (via brute-force)\n");
+			mdat->start_ = -8;
+			atom.name_ = "mdat";
+		}
+	}
+
 	while(atom.name_ != "mdat") {
 		off_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
 		if (new_pos >= file_read.length() || new_pos < 0) {
@@ -1007,12 +1040,11 @@ int Mp4::getLikelyNextTrackIdx(int* n_samples) {
 	return p.first;
 }
 
-Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
+Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 	logg(V, "called getChunkPrediction(", offToStr(offset), ") ... \n");
 	Mp4::Chunk c;
 	if (last_track_idx_ == kDefaultFreeIdx) return c;  // could try all instead..
 	int track_idx;
-
 	if (track_order_.size()) {
 		int n_samples;
 		track_idx = getLikelyNextTrackIdx(&n_samples);
@@ -1052,7 +1084,7 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 	}
 	else if (track_idx < 0) {
 //		logg(V, "no chunk with future found\n");
-		logg(V, "found no plausible chunk-pattern match\n");
+		logg(V, "found no plausible chunk-transition pattern-match\n");
 		return c;
 	}
 
@@ -1063,6 +1095,8 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 		logg(V, "chunk found: ", c, "\n");
 		return c;
 	}
+
+	if (only_perfect_fit) return c;
 
 	// we boldly assume that track_idx was correct
 	auto s_sz = t.likely_sample_sizes_[0];
@@ -1204,9 +1238,14 @@ start:
 	auto shouldIgnoreZeros = [&]() {
 		if (g_use_chunk_stats) {
 			for (auto& cn : {"sowt", "twos"}) {
-				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset)
-				    && !isAllZeros(start+4, 32-4)) {
+				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset) && !isAllZeros(start+4, 32-4)) {
 					logg(V, "won't skip zeros at: ", offToStr(offset), "\n");
+					return true;
+				}
+			}
+			for (auto& cn : {"rtmd"}) {
+				if (hasCodec(cn) && getChunkPrediction(offset, true)) {
+					logg(V, "won't skip zeros at: ", offToStr(offset), " (perfect chunk-match)\n");
 					return true;
 				}
 			}
@@ -1309,9 +1348,6 @@ void Mp4::chkChunkDetectionAt(Mp4::Chunk& detected, off_t off) {
 
 bool Mp4::tryChunkPrediction(off_t& offset) {
 	if (!g_use_chunk_stats) return false;
-
-//	if (pointsToZeros(offset)) return false;
-	if (isAllZerosAt(offset, 32)) return false;
 
 	Mp4::Chunk chunk = getChunkPrediction(offset);
 	if (chunk) {
@@ -1434,10 +1470,10 @@ void Mp4::repair(const string& filename) {
 
 	if (g_use_chunk_stats) {
 		auto first_off_abs = first_off_abs_ - mdat->contentStart();
-		if (wouldMatch(first_off_abs)) offset = first_off_abs;
+		if (first_off_abs > 0 && wouldMatch(first_off_abs)) offset = first_off_abs;
 		else if (wouldMatch(first_off_rel_)) offset = first_off_rel_;
 		if (offset) {
-			logg(I, "beginning at offset ", offToStr(offset), " instead of 0\n");
+			logg(V, "beginning at offset ", offToStr(offset), " instead of 0\n");
 			addUnknownSequence(0, offset);
 		}
 	}

@@ -23,8 +23,9 @@ using offs_t = std::vector<off_t>;
 enum LogMode { E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern size_t g_max_partsize;
-extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
-    g_show_tracks, g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired;
+extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks,
+    g_dont_write,  g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
+    g_strict_nal_frame_check, g_ignore_forbidden_nal_bit;
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings

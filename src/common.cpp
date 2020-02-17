@@ -26,7 +26,8 @@ const bool is_new_ffmpeg_api = true;
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;
-size_t g_max_partsize = 1600000;
+size_t g_max_partsize = 1600000;  // 1.6MB
+//size_t g_max_partsize = 1<<23;  // 8MiB
 bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;
@@ -36,6 +37,9 @@ bool g_dont_write = false;
 bool g_use_chunk_stats = false;
 bool g_dont_exclude = false;
 bool g_dump_repaired = false;
+bool g_search_mdat = false;
+bool g_strict_nal_frame_check = true;
+bool g_ignore_forbidden_nal_bit = true;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;

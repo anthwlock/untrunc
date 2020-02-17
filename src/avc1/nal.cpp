@@ -38,15 +38,15 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	if(length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "length_ = " << length_ << '\n';
-		logg(W, "buffer exceeded by: ", len-maxlength, '\n');
+		logg(W2, "buffer exceeded by: ", len-maxlength, '\n');
 		return false;
 	}
 	buffer += 4;
 	if(*buffer & (1 << 7)) {
 		logg(V, "Warning: Forbidden first bit 1\n");
 		is_forbidden_set_ = true;
-		// means payload is garbage, header might be ok though
-		// so dont return false
+		// sometimes the length is still correct
+		if (!g_ignore_forbidden_nal_bit) return false;
 	}
 	ref_idc_ = *buffer >> 5;
 	logg(V, "Ref idc: ", ref_idc_, "\n");

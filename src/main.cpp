@@ -42,6 +42,7 @@ void usage() {
 	     << "-dw - don't write _fixed.mp4\n"
 	     << "-dr - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
+	     << "-sm  - search mdat, even if no mp4-structure found\n"
 	     << "--dyn  - use dynamic stats\n"
 	     << "\n"
 	     << "analyze options:\n"
@@ -95,6 +96,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "it") show_tracks = true;
 			else if (a == "ia") show_atoms = true;
 			else if (a == "is") show_stats = true;
+			else if (a == "sm") g_search_mdat = true;
 			else if (a == "sv") g_stretch_video = true;
 			else if (a == "st") arg_step = kExpectArg;
 			else if (a == "s") g_ignore_unknown = true;

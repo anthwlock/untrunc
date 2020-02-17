@@ -15,12 +15,12 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 * easier to build + automated [windows builds](https://github.com/anthwlock/untrunc/releases/latest)
 * \>2GB file support
 * ability to skip over unknown bytes
-* generic support for all tracks with fixed-width chunks, e.g. (twos/sowt)
+* generic support for all tracks with fixed-width chunks (e.g. twos/sowt)
 * advanced logging system
 * can stretch/shrink video to match audio duration
 * compatible with new versions of ffmpeg
 * handles invalid atom lengths
-* supports GoPro videos
+* supports GoPro and Sony XAVC videos
 * many bugs got fixed, actively maintained
 
 ## Building

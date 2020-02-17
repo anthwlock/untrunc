@@ -26,7 +26,7 @@ public:
 	void print(int offset);
 
 	std::vector<Atom *> atomsByName(const std::string& name, bool no_recursive=false);
-	Atom *atomByName(const std::string& name);
+	Atom *atomByName(const std::string& name, bool no_recursive=false);
 	Atom *atomByNameSafe(const std::string& name);
 	void replace(Atom *original, Atom *replacement);
 
@@ -77,5 +77,7 @@ public:
 	void write(FileWrite &file);
 
 };
+
+bool isPointingAtAtom(FileRead& file);
 
 #endif // ATOM_H
