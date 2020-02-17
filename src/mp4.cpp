@@ -533,7 +533,7 @@ void Mp4::genChunkTransitions() {
 
 	if (!tracks_.back().chunks_.size()) {
 		tracks_.pop_back();
-		idx_free_ = -1;
+		idx_free_ = kDefaultFreeIdx;
 		logg(V, "removed dummy track 'free'\n");
 	}
 }
@@ -569,8 +569,12 @@ void Mp4::genDynPatterns() {
 	for (auto& t : tracks_) t.dyn_patterns_.resize(tracks_.size());
 
 	first_off_abs_ = numeric_limits<off_t>::max();
-	for (auto& t : tracks_)
-		first_off_abs_ = min(t.chunks_[0].off_, first_off_abs_);
+	for (auto& t : tracks_) {
+		if (t.chunks_[0].off_ < first_off_abs_) {
+			first_off_abs_ = t.chunks_[0].off_;
+			orig_first_track_ = &tracks_[getTrackIdx(t.codec_.name_)];
+		}
+	}
 	first_off_rel_ = first_off_abs_ - current_mdat_->contentStart();
 
 	for (auto const& kv: chunk_transitions_) {
@@ -883,6 +887,23 @@ bool Mp4::wouldMatchDyn(off_t offset, int last_idx) {
 	return false;
 }
 
+bool Mp4::anyPatternMatchesHalf(off_t offset, uint track_idx_to_try) {
+	auto buff = g_mp4->current_mdat_->getFragment(offset, Mp4::pat_size_ / 2);
+	if (!buff) return false;
+
+	for (auto& t : tracks_) {
+		for (auto& p : t.dyn_patterns_[track_idx_to_try]) {
+			if (g_log_mode >= V) {
+				cout << string(36, ' ');
+				printBuffer(buff, Mp4::pat_size_);
+				cout << p << '\n';
+			}
+			if (p.doesMatchHalf(buff)) return true;
+		}
+	}
+	return false;
+}
+
 Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit) {
 	Mp4::Chunk c;
 	auto& t = tracks_[track_idx_to_fit];
@@ -904,9 +925,21 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit) {
 Mp4::Chunk Mp4::getChunkPrediction(off_t offset) {
 	logg(V, "called getChunkPrediction(", offset, ") ... \n");
 	Mp4::Chunk c;
-	if (last_track_idx_ < 0) return c;  // could try all instead..
+	if (last_track_idx_ == kDefaultFreeIdx) return c;  // could try all instead..
 
-	auto track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
+	int track_idx;
+	if (last_track_idx_ == -1) {  // very first offset
+		track_idx = getTrackIdx(orig_first_track_->codec_.name_);
+		cout << "orig_trak:" << orig_first_track_->codec_.name_ << " " << track_idx << '\n';
+		if (!anyPatternMatchesHalf(offset, track_idx)) {
+			cout << "no pattern suggests this..\n";
+			return c;
+		}
+	}
+	else {
+		track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
+	}
+
 	if (track_idx >= 0 && !tracks_[track_idx].shouldUseChunkPrediction()) {
 		logg(V, "should not use chunk prediction for '", getCodecName(track_idx), "'\n");
 		return c;
@@ -1210,6 +1243,13 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 	return false;
 }
 
+bool Mp4::shouldPreferChunkPrediction() {
+	return g_use_chunk_stats &&
+	            ((last_track_idx_ >= 0 && tracks_[last_track_idx_].chunkMightBeAtAnd()) ||
+	            (last_track_idx_ == -1 && orig_first_track_->shouldUseChunkPrediction())
+	            );
+}
+
 string Mp4::offToStr(off_t offset) {
 	return ss(offset, " / " , current_mdat_->contentStart() + offset);
 }
@@ -1295,7 +1335,7 @@ void Mp4::repair(const string& filename) {
 		FrameInfo match;
 		Mp4::Chunk chunk;
 
-		if (g_use_chunk_stats && last_track_idx_ >= 0 && tracks_[last_track_idx_].chunkMightBeAtAnd()) {
+		if (shouldPreferChunkPrediction()) {
 			logg(V, "trying chunkPredict first.. \n");
 			if (tryChunkPrediction(offset) || tryMatch(offset)) continue;
 		}

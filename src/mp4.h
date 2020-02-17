@@ -68,7 +68,7 @@ public:
 	std::vector<Track> tracks_;
 //	static const int pat_size_ = 64;
 	static const int pat_size_ = 32;
-	int idx_free_ = -1;  // idx of dummy track
+	int idx_free_ = kDefaultFreeIdx;  // idx of dummy track
 
 	class Chunk : public Track::Chunk {
 	public:
@@ -119,6 +119,7 @@ private:
 	buffs_t offsToBuffs(const offs_t& offs, const std::string& load_prefix);
 	patterns_t offsToPatterns(const offs_t& offs, const std::string& load_prefix);
 
+	bool anyPatternMatchesHalf(off_t offset, uint track_idx_to_try);
 	Mp4::Chunk fitChunk(off_t offset, uint track_idx);
 
 	void noteUnknownSequence(off_t offset);
@@ -155,6 +156,12 @@ private:
 
 	std::string getOutputSuffix();
 	bool chkNeedOldApi();
+
+	bool shouldPreferChunkPrediction();
+
+	Track* orig_first_track_;
+
+	static const int kDefaultFreeIdx = -2;
 };
 
 class FrameInfo {

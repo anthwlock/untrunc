@@ -4,10 +4,11 @@
 using namespace std;
 
 MutualPattern::MutualPattern(ByteArr& a, ByteArr& b) {
-	is_mutual.resize(a.size(), true);
+	is_mutual_.resize(a.size(), true);
 	mutual_till_ = a.size();
 	size_mutual_ = a.size();
-	data = a;
+	size_mutual_half_ = a.size() / 2;
+	data_ = a;
 	intersectBuf(b);
 }
 
@@ -28,12 +29,13 @@ void MutualPattern::intersectBuf(const ByteArr& other) {
 	uint first_mutual = numeric_limits<uint>::max();
 	uint last_mutual = first_mutual;
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual[i]) continue;
+		if (!is_mutual_[i]) continue;
 
-		if (data[i] != other[i]) {
-			data[i] = 63;
-			is_mutual[i] = false;
+		if (data_[i] != other[i]) {
+			data_[i] = 63;
+			is_mutual_[i] = false;
 			size_mutual_--;
+			if (i >= data_.size() / 2) size_mutual_half_--;
 		} else {
 			first_mutual = min(first_mutual, i);
 			last_mutual = i;
@@ -51,8 +53,17 @@ uint MutualPattern::intersectLen(const uchar* other) {
 	uint sum = 0;
 //	cout << first_mutual_ << ' ' << last_mutual_ << '\n';
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual[i]) continue;
-		if (data[i] == other[i]) sum++;
+		if (!is_mutual_[i]) continue;
+		if (data_[i] == other[i]) sum++;
+	}
+	return sum;
+}
+
+uint MutualPattern::intersectLenHalf(const uchar* other) {
+	uint start_idx = data_.size() / 2, sum = 0;
+	for (uint i=start_idx; i < mutual_till_; i++) {
+		if (!is_mutual_[i]) continue;
+		if (data_[i] == other[i-start_idx]) sum++;
 	}
 	return sum;
 }
@@ -61,11 +72,17 @@ bool MutualPattern::doesMatch(const uchar* buf) {
 	return intersectLen(buf) == size_mutual_;
 }
 
+bool MutualPattern::doesMatchHalf(const uchar* buf) {
+	auto r = intersectLenHalf(buf);
+	cout << r << " == " << size_mutual_ << '\n';
+	return intersectLenHalf(buf) == size_mutual_half_;
+}
+
 bool MutualPattern::doesMatchApprox(const uchar* buf) {
 	vector<uchar> mutual;
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual[i]) continue;
-		if (data[i] == buf[i]) mutual.emplace_back(data[i]);
+		if (!is_mutual_[i]) continue;
+		if (data_[i] == buf[i]) mutual.emplace_back(data_[i]);
 	}
 
 	if (mutual.size() == size_mutual_) return true;
@@ -77,8 +94,8 @@ bool MutualPattern::doesMatchApprox(const uchar* buf) {
 vector<uchar> MutualPattern::getDistinct() const {
 	vector<uchar> r;
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual[i]) continue;
-		r.emplace_back(data[i]);
+		if (!is_mutual_[i]) continue;
+		r.emplace_back(data_[i]);
 	}
 	return r;
 }
@@ -88,16 +105,16 @@ double MutualPattern::successRate() {
 }
 
 std::ostream& operator<<(std::ostream& out, const MutualPattern& mp) {
-	for (uint i=0; i < mp.data.size(); i++) {
+	for (uint i=0; i < mp.data_.size(); i++) {
 		if (i % 4 == 0) out << ' ';
-		out << (mp.is_mutual[i]? mkHexStr(&mp.data[i], 1) : "__");
+		out << (mp.is_mutual_[i]? mkHexStr(&mp.data_[i], 1) : "__");
 	}
 	return out;
 }
 
 bool operator==(const MutualPattern& a, const MutualPattern& b) {
-	for (uint i=0; i < a.data.size(); i++)
-		if (a.data[i] != b.data[i]) return false;
+	for (uint i=0; i < a.data_.size(); i++)
+		if (a.data_[i] != b.data_[i]) return false;
 	return true;
 }
 
