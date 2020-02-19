@@ -1363,6 +1363,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			noteUnknownSequence(offset);
 			logg(V, "found healthy chunk again: ", chunk, "\n");
 			correctChunkIdx(chunk.track_idx_);
+			disableNoiseBuffer();
 		}
 
 		if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
@@ -1410,6 +1411,7 @@ bool Mp4::tryMatch(off_t& offset ) {
 			noteUnknownSequence(offset);
 			logg(V, "found healthy packet again: ", match, "\n");
 			correctChunkIdx(match.track_idx_);
+			disableNoiseBuffer();
 		}
 		if (last_track_idx_ != match.track_idx_) {
 			if (match.track_idx_ != idx_free_) chunk_idx_++;
@@ -1497,9 +1499,12 @@ void Mp4::repair(const string& filename) {
 		}
 
 		if (g_ignore_unknown) {
-			if (!g_muted && g_log_mode < LogMode::V && !g_muted) {
-				logg(I, "unknown sequence -> muting ffmpeg and warnings ..\n");
+			if (!g_muted && g_log_mode < LogMode::V) {
 				mute();
+			}
+			else if (!g_noise_buffer_active && g_log_mode >= LogMode::V && !g_dont_omit) {
+				logg(V, "unknown sequence -> enabling noise buffer ..\n");
+				mute();  // ffmpeg warnings are mostly noise and unhelpful without knowing file offset
 			}
 
 			auto step = calcStep(offset);

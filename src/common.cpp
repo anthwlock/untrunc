@@ -40,10 +40,17 @@ bool g_dump_repaired = false;
 bool g_search_mdat = false;
 bool g_strict_nal_frame_check = true;
 bool g_ignore_forbidden_nal_bit = true;
+bool g_dont_omit = false;
+bool g_noise_buffer_active = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
 void (*g_onStatus)(const string&) = nullptr;
+
+std::stringstream noise_buffer;
+std::streambuf *orig_cout, *orig_cerr;
+void enableNoiseBuffer();
+void disableNoiseBuffer();
 
 std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
 
@@ -189,6 +196,7 @@ void outProgress(double now, double all, const string& prefix) {
 void mute() {
 	g_muted = true;
 	av_log_set_level(AV_LOG_QUIET);
+	if (g_log_mode >= V) enableNoiseBuffer();
 }
 
 void unmute() {
@@ -196,6 +204,7 @@ void unmute() {
 	if(g_log_mode <= E) av_log_set_level(AV_LOG_QUIET);
 	else if(g_log_mode < V) av_log_set_level(AV_LOG_WARNING);
 	else if(g_log_mode > V) av_log_set_level(AV_LOG_DEBUG);
+	disableNoiseBuffer();
 }
 
 string pretty_bytes(double num) {
@@ -300,4 +309,42 @@ mt19937& getRandomGenerator() {
 	static std::random_device rd;
 	static std::mt19937 gen(rd());
 	return gen;
+}
+
+int64_t total_omited = 0;
+
+void cutNoiseBuffer(bool force) {
+	if (noise_buffer.tellp() < 1<<16 && !force) return;
+	auto s = noise_buffer.str();
+	auto off = std::max(0LL, (long long)s.size() - (1<<11));
+	s = s.substr(off);
+	total_omited += off;
+	noise_buffer.str(s);
+	noise_buffer.seekp(0, ios::end);
+}
+
+void enableNoiseBuffer() {
+	orig_cout = std::cout.rdbuf(noise_buffer.rdbuf());
+	orig_cerr = std::cerr.rdbuf(noise_buffer.rdbuf());
+	g_noise_buffer_active = true;
+}
+
+void disableNoiseBuffer() {
+	if (!g_noise_buffer_active) return;
+	std::cout.rdbuf(orig_cout);
+	std::cerr.rdbuf(orig_cerr);
+	g_noise_buffer_active = false;
+
+	if (!total_omited) return;
+
+	cutNoiseBuffer(true);
+	auto s = noise_buffer.str();
+	auto off = s.find_first_of('\n');
+	if (off != std::string::npos)
+		s = s.substr(off);
+	logg("[[ ", total_omited, " bytes omitted, next ", s.size(), " bytes were buffered ]]\n");
+	std::cout << s;
+//	cout << "---end_buf\n";
+	noise_buffer.str("");
+	total_omited = 0;
 }

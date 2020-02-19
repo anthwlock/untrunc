@@ -60,7 +60,8 @@ void usage() {
 	     << "-q  - quiet, only errors\n"
 	     << "-w  - show hidden warnings\n"
 	     << "-v  - verbose\n"
-	     << "-vv - more verbose\n";
+	     << "-vv - more verbose\n"
+	     << "-do - don't omit potential noise\n";
 	exit(-1);
 }
 
@@ -109,8 +110,9 @@ int main(int argc, char *argv[]) {
 			else if (a == "q") g_log_mode = LogMode::E;
 			else if (a == "n") g_interactive = false;
 			else if (a == "f") find_atoms = true;
-			else if (a == "dw") {g_dont_write = true;}
-			else if (a == "dr") {g_dump_repaired = true;}
+			else if (a == "do") g_dont_omit = true;
+			else if (a == "dw") g_dont_write = true;
+			else if (a == "dr") g_dump_repaired = true;
 			else if (a == "d") {dump_samples = true; g_log_mode = LogMode::E;}
 			else if (a == "m") {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
 			else if (a == "ms") make_streamable = true;
