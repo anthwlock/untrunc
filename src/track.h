@@ -31,7 +31,7 @@ public:
 	Track(Atom* trak, AVCodecParameters* c, int mp4_timescale);
 	Track(const std::string& codec_name);
 
-	Atom *trak_;
+	Atom *trak_ = nullptr;
 	Codec codec_;
 	int mp4_timescale_;
 	double stretch_factor_ = 1; // stretch video by via stts entries

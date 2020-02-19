@@ -189,6 +189,8 @@ void Track::clear() {
 	chunks_.clear();
 
 	num_samples_ = 0;
+
+	if (trak_) trak_->prune("edts");
 }
 
 void Track::fixTimes() {
