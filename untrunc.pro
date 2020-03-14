@@ -12,12 +12,14 @@ CONFIG += console
 CONFIG -= -qt app_bundle
 CONFIG += debug
 
+CONFIG += object_parallel_to_source
+
 GIT_VERSION = $$system(git describe --always --dirty --abbrev=7)
 DEFINES += UNTR_VERSION=\\\"$$GIT_VERSION\\\"
 
 TEMPLATE = app
 
-SOURCES += $$files(src/*.cpp) $$files(src/avc1/*.cpp)
-HEADERS += $$files(src/*.h) $$files(src/avc1/*.h)
+SOURCES += $$files(src/*.cpp) $$files(src/avc1/*.cpp) $$files(src/hvc1/*.cpp)
+HEADERS += $$files(src/*.h) $$files(src/avc1/*.h) $$files(src/hvc1/*.h)
 
 LIBS += -lavformat -lavcodec -lavutil

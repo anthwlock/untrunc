@@ -8,12 +8,12 @@
 
 using namespace std;
 
-NalInfo::NalInfo(const uchar* start, int max_size) {
+H265NalInfo::H265NalInfo(const uchar* start, int max_size) {
 	is_ok = parseNal(start, max_size);
 }
 
-//return false means this probably is not a nal.
-bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
+// see avc1/nal.cpp for more detailed comments
+bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 //	cout << "parsing nal here:\n";
 //	printBuffer(buffer, 30);
@@ -22,9 +22,8 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		logg(V, "First byte expected 0\n");
 		return false;
 	}
-	//this is supposed to be the length of the NAL unit.
-	// FIXIT: only true if 'avcc' bytestream standard used, not 'Annex B'!
-	//        https://stackoverflow.com/a/24890903
+
+	// following only works with 'avcc' bytestream, see avc1/nal.cpp
 	uint32_t len = swap32(*(uint32_t *)buffer);
 	length_ = len + 4;
 	logg(V, "Length: ", length_, "\n");
@@ -40,7 +39,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "length_ = " << length_ << '\n';
 		logg(W2, "buffer exceeded by: ", len-maxlength, '\n');
-		return false;
+//		return false;
 	}
 	buffer += 4;
 	if(*buffer & (1 << 7)) {
@@ -49,15 +48,19 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		// sometimes the length is still correct
 		if (!g_ignore_forbidden_nal_bit) return false;
 	}
-	ref_idc_ = *buffer >> 5;
-	logg(V, "Ref idc: ", ref_idc_, "\n");
-
-	nal_type_ = *buffer & 0x1f;
+	nal_type_ = *buffer >> 1 ;
 	logg(V, "Nal type: ", nal_type_, "\n");
-	if(nal_type_ != NAL_SLICE
-	   && nal_type_ != NAL_IDR_SLICE
-	   && nal_type_ != NAL_SPS)
-		return true;
+
+	nuh_layer_id_ = (*buffer & 1) << 6 | (*(buffer+1) >> 5);
+	logg(V, "nuh_layer_id: ", nuh_layer_id_, "\n");
+
+	nuh_temporal_id_plus1 = (*(buffer+1) & 0b111);
+	logg(V, "nuh_temporal_id_plus1: ", nuh_temporal_id_plus1, "\n");
+
+	if ((nal_type_ == NAL_EOB_NUT && nuh_temporal_id_plus1) || (nal_type_ != NAL_EOB_NUT && !nuh_temporal_id_plus1)) {
+		logg(V, "Warning: nuh_temporal_id_plus1 is wrong\n");
+		return false;
+	}
 
 	//check size is reasonable:
 	if(len < 8) {
@@ -67,22 +70,6 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 	buffer++; //skip nal header
 
-	// remove the emulation prevention 3 byte.
-	// could be done in place to speed up things.
-	// EDIT: only needed for 'annex b' bytestream standard, which
-	//       is currently not supported anyways. See nal-decoder.
-	// FIXIT: citation needed
-
-//	data_.reserve(len);
-//	for(int i =0; i < len; i++) {
-//		if(i+2 < len && buffer[i] == 0 && buffer[i+1] == 0 && buffer[i+2] == 3) {
-//			data_.push_back(buffer[i]);
-//			data_.push_back(buffer[i+1]);
-//			assert(buffer[i+2] == 0x3);
-//			i += 2; //skipping 0x3 byte!
-//		} else
-//			data_.push_back(buffer[i]);
-//	}
 	data_ = buffer;
 	return true;
 }

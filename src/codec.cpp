@@ -16,6 +16,7 @@ extern "C" {
 #include "atom.h"
 #include "avc1/avc1.h"
 #include "avc1/avc-config.h"
+#include "hvc1/hvc1.h"
 #include "mp4.h"
 
 using namespace std;
@@ -229,6 +230,11 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("fdsc") {  // GoPro recovery.. anyone knows more?
 		return string((char*)start, 2) == "GP";
 	}},
+	MATCH_FN("hvc1") {
+		// no idea if this generalizes well..
+		int s2 = swap32(((int *)start)[1]);
+		return (s >> 24) == 0x00 && ((s2 >> 16) & 0x00ff) == 0x01;
+	}},
 
 	/*
 	MATCH_FN("twos") {
@@ -318,6 +324,7 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	}},
 
     {"avc1", getSizeAvc1},
+    {"hvc1", getSizeHvc1},
 //    GET_SZ_FN("avc1") {
 		//        AVFrame *frame = av_frame_alloc();
 		//        if(!frame)

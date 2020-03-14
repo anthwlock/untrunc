@@ -1,8 +1,6 @@
 #ifndef NALSLICE_H
 #define NALSLICE_H
 
-#include <cstdint>
-
 class SpsInfo;
 class NalInfo;
 

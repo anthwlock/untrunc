@@ -47,7 +47,7 @@ CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
 EXE ?= $(_EXE)
 DIR := $(_DIR)_$(FF_VER)
-SRC := $(wildcard src/*.cpp src/avc1/*.cpp)
+SRC := $(wildcard src/*.cpp src/avc1/*.cpp src/hvc1/*.cpp)
 OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
 FFDIR := ffmpeg-$(FF_VER)
@@ -78,7 +78,7 @@ endif
 #$(info $$OBJ is [${OBJ}])
 #$(info $$OBJ_GUI is [${OBJ_GUI}])
 $(shell mkdir -p $(dir $(OBJ_GUI)) 2>/dev/null)
-$(shell mkdir -p $(DIR)/src/avc1 2>/dev/null)
+$(shell mkdir -p $(DIR)/src/avc1 $(DIR)/src/hvc1 2>/dev/null)
 
 .PHONY: all clean force
 

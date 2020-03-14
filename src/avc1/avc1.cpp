@@ -60,7 +60,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 				break;
 			return length;
 		case NAL_IDR_SLICE:
-			self->was_keyframe_ = true; // keyframe
+			self->was_keyframe_ = true;
 			[[fallthrough]];
 		case NAL_SLICE:
 		{
