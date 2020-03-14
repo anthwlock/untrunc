@@ -72,6 +72,7 @@ int getSizeHvc1(Codec* self, const uchar* start, uint maxlength) {
 		maxlength -= nal_info.length_;
 		if (maxlength == 0) // we made it
 			return length;
+		pos = self->loadAfter(length);
 		logg(V, "Partial hvc1-length: ", length, "\n");
 	}
 	return length;

@@ -418,7 +418,7 @@ void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 				ok = false;
 			} else {matches = true; break;}
 		}
-	uint size = c.getSize(start, current_maxlength_);
+	uint size = c.getSize(start, current_maxlength_, offset);
 	uint duration = c.audio_duration_;
 	//TODO check if duration is working with the stts duration.
 
@@ -841,9 +841,11 @@ void Mp4::addFrame(const FrameInfo& fi) {
 	if (!track.constant_size_) track.sizes_.push_back(fi.length_);
 }
 
-const uchar* Mp4::loadFragment(off_t offset) {
-	current_maxlength_ = min((int64_t) g_max_partsize, current_mdat_->contentSize() - offset); // max 1.6MB
-	return current_fragment_ = current_mdat_->getFragment(offset, current_maxlength_);
+const uchar* Mp4::loadFragment(off_t offset, bool update_cur_maxlen) {
+	if (update_cur_maxlen)
+		current_maxlength_ = min((int64_t) g_max_partsize, current_mdat_->contentSize() - offset);
+	auto buf_sz = min((int64_t) g_max_buf_sz_needed, current_mdat_->contentSize() - offset);
+	return current_fragment_ = current_mdat_->getFragment(offset, buf_sz);
 }
 
 bool Mp4::hasCodec(const string& codec_name) {
@@ -966,7 +968,7 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 		if (be_strict && !c.matchSampleStrict(start)) continue;
 		if (!be_strict && !c.matchSample(start)) continue;
 
-		int length_signed = c.getSize(start, current_maxlength_);
+		int length_signed = c.getSize(start, current_maxlength_, offset);
 		uint length = static_cast<uint>(length_signed);
 
 		logg(V, "part-length: ", length_signed, '\n');
@@ -974,7 +976,8 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 			logg(V, "Invalid length: part-length is ", length_signed, '\n');
 			continue;
 		}
-		if(length > g_max_partsize || length > current_maxlength_) {
+		if(length > current_maxlength_) {
+			logg(V, "limit: ", min(g_max_partsize, current_maxlength_), "\n");
 			logg(E, "Invalid length: ", length, " - too big (track: ", i, ")\n");
 			continue;
 		}

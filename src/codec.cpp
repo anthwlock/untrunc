@@ -306,6 +306,7 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		if(!is_new_ffmpeg_api) packet->size = maxlength;
 		int got_frame = 0;
 
+		maxlength = min(g_max_buf_sz_needed, maxlength);
 		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
 //		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
 
@@ -413,6 +414,11 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	*/
 };
 
-int Codec::getSize(const uchar* start, uint maxlength) {
+int Codec::getSize(const uchar* start, uint maxlength, off_t offset) {
+	cur_off_ = offset;
 	return get_size_fn_ ? get_size_fn_(this, start, maxlength) : -1;
+}
+
+const uchar* Codec::loadAfter(off_t length) {
+	return g_mp4->loadFragment(cur_off_ + length, false);
 }

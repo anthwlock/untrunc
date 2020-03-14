@@ -16,11 +16,12 @@ class Codec {
 public:
 	Codec() = default;
 	Codec(AVCodecParameters* c);
+	static void initOnce();
 	std::string name_;
 
 	void parseOk(Atom* trak);
 	bool matchSample(const uchar *start);
-	int getSize(const uchar *start, uint maxlength);
+	int getSize(const uchar *start, uint maxlength, off_t offset);
 
 	// specific to codec:
 	AVCodecParameters* av_codec_params_;
@@ -35,10 +36,10 @@ public:
 
 	bool matchSampleStrict(const uchar* start);
 	uint strictness_lvl_ = 0;
+	off_t cur_off_ = 0;
 
 	bool isSupported();
-
-	static void initOnce();
+	const uchar* loadAfter(off_t offset);
 
 private:
 	bool (*match_fn_)(Codec*, const uchar* start, int s) = nullptr;

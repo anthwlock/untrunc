@@ -29,14 +29,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	length_ = len + 4;
 	logg(V, "Length: ", length_, "\n");
 
-
-	uint MAX_AVC1_LENGTH = 8*(1<<20); // 8MB
-	if(len > MAX_AVC1_LENGTH) {
-		logg(V, "Max length exceeded\n");
-		return false;
-	}
-
-	if(length_ > maxlength) {
+	if (length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "length_ = " << length_ << '\n';
 		logg(W2, "buffer exceeded by: ", len-maxlength, '\n');

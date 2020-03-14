@@ -26,8 +26,9 @@ const bool is_new_ffmpeg_api = true;
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;
-size_t g_max_partsize = 1600000;  // 1.6MB
-//size_t g_max_partsize = 1<<23;  // 8MiB
+//uint g_max_partsize = 1600000;  // 1.6MB
+uint g_max_partsize = 1<<23;  // 8MiB
+uint g_max_buf_sz_needed = 1<<19;  // 512kiB
 bool g_interactive = true;
 bool g_muted = false;
 bool g_ignore_unknown = false;

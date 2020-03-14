@@ -26,20 +26,13 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	// following only works with 'avcc' bytestream, see avc1/nal.cpp
 	uint32_t len = swap32(*(uint32_t *)buffer);
 	length_ = len + 4;
-	logg(V, "Length: ", length_, "\n");
-
-
-	uint MAX_AVC1_LENGTH = 8*(1<<20); // 8MB
-	if(len > MAX_AVC1_LENGTH) {
-		logg(V, "Max length exceeded\n");
-		return false;
-	}
+	logg(V, "Length: ", length_ - 4, "+4\n");
 
 	if(length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "length_ = " << length_ << '\n';
 		logg(W2, "buffer exceeded by: ", len-maxlength, '\n');
-//		return false;
+		return false;
 	}
 	buffer += 4;
 	if(*buffer & (1 << 7)) {

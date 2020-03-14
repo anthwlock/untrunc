@@ -35,6 +35,7 @@ class FrameInfo;
 
 class Mp4 : public HasHeaderAtom {
 friend Track;
+friend Codec;
 public:
     Mp4() = default;
 	~Mp4();
@@ -93,7 +94,7 @@ private:
 	void chkUntrunc(FrameInfo& fi, Codec& c, int i);
 	void addFrame(const FrameInfo& frame_info);
 	bool chkOffset(off_t& offset);  // updates offset
-	const uchar* loadFragment(off_t offset);
+	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;
 	int unknown_length_ = 0;
 	uint64_t pkt_idx_ = 0;
