@@ -12,6 +12,14 @@ H265NalInfo::H265NalInfo(const uchar* start, int max_size) {
 	is_ok = parseNal(start, max_size);
 }
 
+bool isSlice(int nal_type) {
+	return
+	    nal_type == NAL_TRAIL_N ||
+	    nal_type == NAL_TRAIL_R ||
+//	    nal_type == NAL_IDR_N_LP ||
+	    nal_type == NAL_IDR_W_RADL;
+}
+
 // see avc1/nal.cpp for more detailed comments
 bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
@@ -55,14 +63,14 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		return false;
 	}
 
-	//check size is reasonable:
-	if(len < 8) {
-		logg(W2, "Too short!\n");
-		return false;
+	if (isSlice(nal_type_)) {
+		//check size is reasonable:
+		if(len < 8) {
+			logg(W2, "Too short!\n");
+			return false;
+		}
+
+		data_ = buffer+2;
 	}
-
-	buffer++; //skip nal header
-
-	data_ = buffer;
 	return true;
 }

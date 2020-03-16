@@ -12,7 +12,7 @@ public:
 
 	H265SliceInfo() = default;
 	H265SliceInfo(const H265NalInfo&);
-	bool isInNewFrame(const H265SliceInfo&);
+	bool isInNewFrame();
 	bool decode(const H265NalInfo&);
 };
 
