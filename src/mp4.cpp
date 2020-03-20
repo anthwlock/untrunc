@@ -536,7 +536,7 @@ void Mp4::genChunkTransitions() {
 
 	vector<pair<int, int>> order;
 	bool order_finished = false;
-	size_t chunk_idx = 0, first_failed = 0;
+	size_t chunk_idx = 0, first_failed = 0, order_skipped = 0;
 
 	while (true) {
 		int track_idx = -1;
@@ -551,18 +551,23 @@ void Mp4::genChunkTransitions() {
 		}
 		if (track_idx < 0) break;
 
+
 		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
-		if (!order_finished && order.size() < 25) {
+		if (chunk_idx < 10 && tracks_[track_idx].codec_.name_ == "tmcd") {
+			order_skipped++;
+			goto loop_end;
+		}
+		if (!order_finished && order.size() < 25 && tracks_[track_idx].codec_.name_ != "tmcd") {
 			auto p = make_pair(track_idx, cur_chunk.n_samples_);
 			if (order.size() && order.front() == p) order_finished = true;
 			else order.emplace_back(p);
 		}
 		else if (order_finished && !first_failed) {
 			auto p = make_pair(track_idx, cur_chunk.n_samples_);
-			if (order[chunk_idx % order.size()] != p) first_failed = chunk_idx;
+			if (order[(chunk_idx - order_skipped) % order.size()] != p) first_failed = chunk_idx;
 		}
 
-		if (chunk_idx == 0) {
+		if (first_off_abs_ < 0) {
 			first_off_abs_ = cur_chunk.off_;
 			first_off_rel_ = first_off_abs_ - current_mdat_->contentStart();
 			orig_first_track_ = &tracks_[track_idx];
@@ -571,7 +576,10 @@ void Mp4::genChunkTransitions() {
 		if (last_track_idx >= 0) {
 			auto& last_chunk = tracks_[last_track_idx].chunks_[cur_chunk_idx[last_track_idx]-1];
 			auto last_end = last_chunk.off_ + last_chunk.size_;
-			assert(off - current_mdat_->contentStart() >= pat_size_ / 2);
+			if (off - current_mdat_->contentStart() < pat_size_ / 2) {
+				logg(W, "rel_off(cur_chunk) < pat_size/2 .. ", tracks_[track_idx].codec_.name_, " ", cur_chunk, "\n");
+				goto loop_end;
+			}
 			assert(off >= last_end);
 			if (off != last_end) {
 				chunk_transitions_[{last_track_idx, idx_free_}].emplace_back(last_end);
@@ -582,6 +590,8 @@ void Mp4::genChunkTransitions() {
 				chunk_transitions_[{last_track_idx, track_idx}].emplace_back(off);
 			}
 		}
+
+        loop_end:
 		last_track_idx = track_idx;
 		cur_chunk_idx[track_idx]++;
 		chunk_idx++;
