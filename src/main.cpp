@@ -43,7 +43,8 @@ void usage() {
 	     << "-dr - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
 	     << "-sm  - search mdat, even if no mp4-structure found\n"
-	     << "--dyn  - use dynamic stats\n"
+	     << "-dcc  - dont check if chunks are inside mdat\n"
+	     << "-dyn  - use dynamic stats\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -55,6 +56,7 @@ void usage() {
 	     << "\n"
 	     << "other options:\n"
 	     << "-ms  - make streamable\n"
+	     << "-u <mdat-file> <moov-file> - unite fragments\n"
 	     << "\n"
 	     << "logging options:\n"
 	     << "-q  - quiet, only errors\n"
@@ -82,6 +84,7 @@ int main(int argc, char *argv[]) {
 	bool dump_samples = false;
 	bool analyze_offset = false;
 	bool make_streamable = false;
+	bool unite = false;
 	off_t arg_offset = -1;
 	int arg_step = -1;
 
@@ -116,7 +119,9 @@ int main(int argc, char *argv[]) {
 			else if (a == "d") {dump_samples = true; g_log_mode = LogMode::E;}
 			else if (a == "m") {analyze_offset = true; arg_offset = kExpectArg; g_log_mode = LogMode::E;}
 			else if (a == "ms") make_streamable = true;
-			else if (a == "-dyn") g_use_chunk_stats = true;
+			else if (a == "u") unite = true;
+			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
+			else if (a == "dyn") g_use_chunk_stats = true;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}
@@ -147,8 +152,16 @@ int main(int argc, char *argv[]) {
 		logg(I, g_version_str, '\n');
 	}
 
+	auto chkC = [&]() {
+		if (!corrupt.size()) {
+			logg(E, "no second file specified\n");
+			exit(1);
+		}
+	};
+
 	try {
 		if (find_atoms) {Atom::findAtomNames(ok); return 0;}
+		if (unite) {chkC(); Mp4::unite(ok, corrupt); return 0;}
 
 		Mp4 mp4;
 		g_mp4 = &mp4;  // singleton is overkill, this is good enough

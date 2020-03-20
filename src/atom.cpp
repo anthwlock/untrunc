@@ -32,8 +32,8 @@ void Atom::parseHeader(FileRead &file, bool no_check) {
 	length_ = file.readInt();
 	name_ = file.getString(4);
 	if(length_ == 1) {
-		length_ = file.readInt64() - 8;
-		start_ += 8;  // dirty hack
+		length_ = file.readInt64();
+		header_length_ += 8;
 	}
 	else if(length_ == 0)
 		length_ = file.length() - start_;
@@ -79,10 +79,9 @@ void Atom::parse(FileRead& file) {
 
 	}
 	else if (name_ == "mdat") {  // don't read content of mdat
-		int64_t content_size = length_ - 8;
-		file.seekSafe(file.pos() + content_size);
+		file.seekSafe(start_ + length_);
 		if (!isPointingAtAtom(file))
-			throw ss("bad 'mdat' length = ", content_size, " new_pos = ", file.pos());
+			throw ss("bad 'mdat' length = ", length_, " new_pos = ", file.pos());
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
@@ -131,8 +130,8 @@ void Atom::findAtomNames(const string& filename) {
 			cout << ss(off, ": ", atom.name_, " (", atom.length_, ")");
 			off_t next_off = off + atom.length_;
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
-			else if (atom.length_ < 8) {  // 8bytes just for header
-				cout << " <-- negative length\n";
+			else if (atom.length_ < atom.header_length_) {
+				cout << " <-- negative content length\n";
 				next_off = next_off + 8;
 			}
 			else if (next_off < file.length() && !isValidAtomName(file.getPtrAt(next_off+4, 4)))
@@ -147,13 +146,11 @@ void Atom::findAtomNames(const string& filename) {
 }
 
 void Atom::write(FileWrite &file) {
-	//1 write length
 	int start = file.pos();
 
 	file.writeInt(length_);
 	file.writeChar(name_.data(), 4);
-	if(content_.size())
-		file.write(content_);
+	file.write(content_);
 	for (uint i=0; i < children_.size(); i++)
 		children_[i]->write(file);
 	int end = file.pos();
@@ -426,11 +423,11 @@ uint BufferedAtom::readInt(off_t offset) {
 	return *(uint*) file_read_.getPtr(sizeof(int));
 }
 
-bool BufferedAtom::is64bitVersion() {
+bool BufferedAtom::needs64bitVersion() {
 	return length_ - total_excluded_yet_ > 1LL<<32;
 }
 
-void BufferedAtom::write(FileWrite &output) {
+void BufferedAtom::write(FileWrite &output, bool force_64) {
 	off_t start = output.pos();
 
 	auto to_skip_it = sequences_to_exclude_.begin();
@@ -438,11 +435,12 @@ void BufferedAtom::write(FileWrite &output) {
 
 	int64_t new_length = length_ - total_excluded_yet_;
 
-	if (is64bitVersion()) {
+	if (needs64bitVersion() || force_64) {
 		new_length += 8;
 		output.writeInt(1);
 		output.writeChar(name_.data(), 4);
 		output.writeInt64(new_length);
+		cout << "written length: " << new_length << '\n';
 	}
 	else {
 		output.writeInt(new_length);

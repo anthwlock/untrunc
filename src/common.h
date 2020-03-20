@@ -27,7 +27,9 @@ extern uint
     g_max_buf_sz_needed;  // for determining part size
 extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks,
     g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
-    g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit;
+    g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
+    g_ignore_out_of_bound_chunks;
+
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings
@@ -153,8 +155,9 @@ std::string getMovExtension(const std::string& path);
 std::string getOutputSuffix();
 
 double calcEntropy(const std::vector<uchar>& in);
-
 int64_t gcd(int64_t a, int64_t b);
+
+void warnIfAlredyExists(const std::string&);
 
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd

@@ -132,8 +132,10 @@ void Mp4::parseTracksOk() {
 		track.parseOk();
 
 		assert(track.chunks_.size());
-		assert(track.chunks_.front().off_ >= mdats.front()->contentStart());
-		assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
+		if (!g_ignore_out_of_bound_chunks) {
+			assert(track.chunks_.front().off_ >= mdats.front()->contentStart());
+			assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
+		}
 	}
 
 	if (hasCodec("fdsc") && hasCodec("avc1"))
@@ -195,13 +197,30 @@ void Mp4::printDynStats() {
 	}
 }
 
+void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
+	string output = mdat_fn + "_united.mp4";
+	warnIfAlredyExists(output);
+
+	FileRead fmdat(mdat_fn), fmoov(moov_fn);
+
+	BufferedAtom mdat(fmdat), moov(fmoov);
+	assert(findAtom(fmdat, "mdat", mdat));
+	assert(findAtom(fmoov, "moov", moov));
+
+	bool force_64 = mdat.needs64bitVersion();
+	logg(V, "mdat.is64bit: ", force_64, '\n');
+
+	FileWrite fout(output);
+	fout.copyRange(fmdat, 0, mdat.start_);
+	mdat.file_end_ = fmdat.length();
+	moov.file_end_ = moov.start_ + moov.length_;
+	mdat.updateLength();
+	mdat.write(fout, force_64);
+	moov.write(fout);
+}
 
 void Mp4::makeStreamable(const string& ok, const string& output) {
-	if (FileRead::alredyExists(output)) {
-		logg(W, "destination '", output, "' alredy exists\n");
-		hitEnterToContinue();
-	}
-
+	warnIfAlredyExists(output);
 	parseOk(ok);
 	if (!current_mdat_) findMdat(*current_file_);
 
@@ -355,7 +374,7 @@ void Mp4::saveVideo(const string& filename) {
 	}
 
 	//fix offsets
-	off_t offset = mdat->headerSize() + moov->length_;
+	off_t offset = mdat->newHeaderSize() + moov->length_;
 	if(ftyp)
 		offset += ftyp->length_; //not all mov have a ftyp.
 
@@ -382,9 +401,7 @@ void Mp4::saveVideo(const string& filename) {
 
 	//save to file
 	logg(I, "saving ", filename, '\n');
-	FileWrite file;
-	if(!file.create(filename))
-		throw "Could not create file for writing: " + filename;
+	FileWrite file(filename);
 
 	if(ftyp)
 		ftyp->write(file);
@@ -744,7 +761,7 @@ void Mp4::genDynStats(bool force_patterns) {
 	if (is_enough && !force_patterns) return;
 	else if (track_order_.size()) {
 		// in theory this could probably still be used somehow..
-		logg(W, "track_order_ found, but not sufficient\n");
+		if (!is_enough) logg(W, "track_order_ found, but not sufficient\n");
 		track_order_.clear();
 	}
 
@@ -800,43 +817,50 @@ void Mp4::dumpSamples() {
 	}
 }
 
+bool Mp4::findAtom(FileRead& file_read, string atom_name, Atom& atom) {
+	while(atom.name_ != atom_name) {
+		off_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
+		if (new_pos >= file_read.length() || new_pos < 0) {
+			logg(W, "start of ", atom_name, " not found\n");
+			atom.start_ = -8;  // no header
+			file_read.seek(0);
+			return false;
+		}
+		file_read.seek(new_pos);
+		atom.parseHeader(file_read);
+	}
+	return true;
+}
+
 BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	delete current_mdat_;
-	auto& mdat = current_mdat_ = new BufferedAtom(file_read);
-	mdat->name_ = "mdat";
+	current_mdat_ = new BufferedAtom(file_read);
+	auto& mdat = *current_mdat_;
 
-	Atom atom;
+	if (file_read.filename_ == filename_ok_) {
+		Atom* p = root_atom_->atomByName("mdat", true);
+		if (p) mdat.Atom::operator=(*p);
+	}
 
 	if (!isPointingAtAtom(file_read)) {
 		logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");
 		if (ftyp_ == "XAVC") {
 			logg(V, "using orig_mdat_start_ (== ", orig_mdat_start_, ")\n");
-			atom.start_ = orig_mdat_start_;
-			atom.name_ = "mdat";
+			mdat.start_ = orig_mdat_start_;
+			mdat.name_ = "mdat";
 		}
 		else if (!g_search_mdat) {
 			logg(I, "assuming start_offset=0. \n",
 			     "      use '-sm' to search for 'mdat' atom instead (via brute-force)\n");
-			mdat->start_ = -8;
-			atom.name_ = "mdat";
+			mdat.start_ = -8;
+			mdat.name_ = "mdat";
 		}
 	}
 
-	while(atom.name_ != "mdat") {
-		off_t new_pos = Atom::findNextAtomOff(file_read, &atom, true);
-		if (new_pos >= file_read.length() || new_pos < 0) {
-			logg(W, "start of mdat not found\n");
-			atom.start_ = -8;  // no header
-			file_read.seek(0);
-			break;
-		}
-		file_read.seek(new_pos);
-		atom.parseHeader(file_read);
-	}
-	mdat->start_ = atom.start_;
-	mdat->file_end_ = file_read.length();
+	findAtom(file_read, "mdat", mdat);
+	mdat.file_end_ = file_read.length();
 
-	return mdat;
+	return &mdat;
 }
 
 void Mp4::addFrame(const FrameInfo& fi) {

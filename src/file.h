@@ -33,9 +33,8 @@ extern "C" {
 
 class FileRead {
 public:
-	FileRead() = default;
 	FileRead(const std::string& filename);
-	FileRead(const FileRead&) = delete;
+	explicit FileRead(const FileRead&) = delete;
 
 	~FileRead();
 	void open(const std::string& filename);
@@ -76,9 +75,8 @@ protected:
 
 class FileWrite {
 public:
-	FileWrite();
+	FileWrite(const std::string& filename);
 	~FileWrite();
-	bool create(std::string filename);
 
 	off_t pos();
 
@@ -87,6 +85,8 @@ public:
 	int writeChar(const uchar *source, size_t n);
 	int writeChar(const char *source, size_t n);
 	int write(std::vector<uchar> &v);
+
+	void copyRange(FileRead& fin, size_t a, size_t b);
 
 protected:
 	FILE *file_;

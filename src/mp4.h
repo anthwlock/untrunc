@@ -49,6 +49,7 @@ public:
 
 	void makeStreamable(const std::string& ok, const std::string& output);
 	void saveVideo(const std::string& filename);
+	static void unite(const std::string& mdat_fn, const std::string& moov_fn);
 
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);
@@ -74,6 +75,7 @@ public:
 	std::string ftyp_;
 	off_t orig_mdat_start_;
 
+	// Chunks with constant sample size
 	class Chunk : public Track::Chunk {
 	public:
 		Chunk() = default;
@@ -85,6 +87,7 @@ public:
 
 private:
 	Atom *root_atom_ = nullptr;
+	static bool findAtom(FileRead& file_read, std::string atom_name, Atom& atom);
 	BufferedAtom* findMdat(FileRead& file_read);
 	AVFormatContext *context_;
 

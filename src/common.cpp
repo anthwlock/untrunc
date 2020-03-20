@@ -43,6 +43,7 @@ bool g_strict_nal_frame_check = true;
 bool g_ignore_forbidden_nal_bit = true;
 bool g_dont_omit = false;
 bool g_noise_buffer_active = false;
+bool g_ignore_out_of_bound_chunks = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
@@ -348,4 +349,11 @@ void disableNoiseBuffer() {
 //	cout << "---end_buf\n";
 	noise_buffer.str("");
 	total_omited = 0;
+}
+
+void warnIfAlredyExists(const string& output) {
+	if (FileRead::alredyExists(output)) {
+		logg(W, "destination '", output, "' alredy exists\n");
+		hitEnterToContinue();
+	}
 }

@@ -11,8 +11,9 @@ extern "C" {
 
 class Atom {
 public:
-	int64_t start_ = -8;       //including 8 header bytes
-	int64_t length_ = -1;      //including 8 header bytes
+	int64_t start_ = -8;  // including 8 header bytes
+	int64_t length_ = -1;  // including 8 header bytes
+	int64_t header_length_ = 8;  // 8 or 16
 	std::string name_;
 	std::vector<uchar> content_;
 	std::vector<Atom *> children_;
@@ -35,7 +36,7 @@ public:
 	void updateLength();
 
 	virtual int64_t contentSize() const { return content_.size(); }
-	int64_t contentStart() const { return start_ + 8; }
+	int64_t contentStart() const { return start_ + header_length_; }
 
 	static bool isParent(const std::string& id);
 	static bool isDual(const std::string& id);  // not used
@@ -56,6 +57,7 @@ public:
 
 	size_t cursor_off_ = 0;  // for "stream like" read/write methods
 	void seek(size_t idx) {cursor_off_ = idx;}
+
 };
 
 class BufferedAtom: public Atom {
@@ -68,13 +70,13 @@ public:
 	int64_t contentSize() const { return file_end_ - contentStart(); }
 	const uchar *getFragment(off_t offset, int size);
 	uint readInt(off_t offset);
-	int headerSize() { return is64bitVersion() ? 16 : 8; }
-	bool is64bitVersion();
+	int newHeaderSize() { return needs64bitVersion() ? 16 : 8; }
+	bool needs64bitVersion();
 
 	std::vector<std::pair<off_t, uint64_t>> sequences_to_exclude_;  // from resulting mdat
 	int64_t total_excluded_yet_ = 0;
 
-	void write(FileWrite &file);
+	void write(FileWrite &file, bool force_64=false);
 
 };
 

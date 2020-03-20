@@ -26,6 +26,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cassert>
 
 #include "common.h"
 
@@ -39,15 +40,6 @@ FileRead::~FileRead() {
 	if(file_){
 		fclose(file_);
 		free(buffer_);
-	}
-}
-
-FileWrite::FileWrite(): file_(NULL) {
-}
-
-FileWrite::~FileWrite() {
-	if(file_){
-		fclose(file_);
 	}
 }
 
@@ -66,12 +58,6 @@ void FileRead::open(const string& filename) {
 	fread(buffer_, 1, buf_size_, file_);
 }
 
-bool FileWrite::create(string filename) {
-	file_ = fopen(filename.c_str(), "wb");
-	if(file_ == NULL) return false;
-	return true;
-}
-
 void FileRead::seek(off_t p) {
 	if (p < buf_begin_ || p >= buf_begin_ + buf_size_){
 		fillBuffer(p);
@@ -88,7 +74,7 @@ off_t FileRead::pos() {
 }
 
 bool FileRead::atEnd() {
-	return pos() == size_;
+	return pos() >= size_;
 }
 
 size_t FileRead::fillBuffer(off_t location) {
@@ -214,6 +200,17 @@ bool FileRead::alredyExists(const string& fn) {
 	return (stat(fn.c_str(), &fn_stat) == 0);
 }
 
+
+FileWrite::FileWrite(const string& filename) {
+	file_ = fopen(filename.c_str(), "wb");
+	if(!file_)
+		throw "Could not create file for writing: " + filename;
+}
+
+FileWrite::~FileWrite() {
+	if(file_) fclose(file_);
+}
+
 off_t FileWrite::pos() {
 	return ftello(file_);
 }
@@ -243,4 +240,17 @@ int FileWrite::writeChar(const uchar *source, size_t n) {
 int FileWrite::write(vector<uchar> &v) {
 	fwrite(&*v.begin(), 1, v.size(), file_);
 	return v.size();
+}
+
+void FileWrite::copyRange(FileRead& fin, size_t a, size_t b) {
+	fin.seek(a);
+	size_t n = b - a;
+	size_t buff_sz = 1<<16;
+	while (n) {
+		cout << n << '\n';
+		auto to_read = min(buff_sz, n);
+		auto p = fin.getPtr2(to_read);
+		assert(n == fwrite(p, 1, to_read, file_));
+		n -= to_read;
+	}
 }
