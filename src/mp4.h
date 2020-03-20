@@ -107,8 +107,9 @@ private:
 	std::map<off_t, Mp4::Chunk> off_to_chunk_;
 	void chkFrameDetectionAt(FrameInfo& detected, off_t off);
 	void chkChunkDetectionAt(Mp4::Chunk& detected, off_t off);
-	void dumpMatch(const FrameInfo& fi, int idx);
-	void dumpChunk(const Mp4::Chunk& chunk, int& idx);
+	void chkExpectedOff(off_t* expected_off, off_t real_off, uint sz, int idx);
+	void dumpMatch(const FrameInfo& fi, int idx, off_t* predicted_off=nullptr);
+	void dumpChunk(const Mp4::Chunk& chunk, int& idx, off_t* predicted_off=nullptr);
 	void dumpIdxAndOff(off_t off, int idx);
 	std::vector<FrameInfo> to_dump_;
 

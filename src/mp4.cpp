@@ -666,12 +666,23 @@ void Mp4::dumpIdxAndOff(off_t off, int idx) {
 	     << setw(8) << real_off << " : ";
 }
 
-void Mp4::dumpMatch(const FrameInfo& fi, int idx) {
+void Mp4::chkExpectedOff(off_t* expected_off, off_t real_off, uint sz, int idx) {
+	int v = real_off - *expected_off;
+	if (v) {
+		dumpIdxAndOff(*expected_off, --idx);
+		cout << "unknown " << v << "\n";
+	}
+	*expected_off = real_off + sz;
+}
+
+void Mp4::dumpMatch(const FrameInfo& fi, int idx, off_t* expected_off) {
+	if (expected_off) chkExpectedOff(expected_off, fi.offset_, fi.length_, idx);
 	dumpIdxAndOff(fi.offset_, idx);
 	cout << fi << '\n';
 }
 
-void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx) {
+void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx, off_t* expected_off) {
+	if (expected_off) chkExpectedOff(expected_off, chunk.off_, chunk.size_, idx);
 	dumpIdxAndOff(chunk.off_, idx);
 	cout << chunk << '\n';
 	idx += chunk.n_samples_;
@@ -771,17 +782,18 @@ void Mp4::dumpSamples() {
 		auto chunk_it = off_to_chunk_.begin();
 		auto frameItAtEnd = [&](){return frame_it == off_to_frame_.end();};
 		auto chunkItAtEnd = [&](){return chunk_it == off_to_chunk_.end();};
+		off_t expected_off = 0;
 		while (true) {
 			if (!chunkItAtEnd() && !frameItAtEnd()) {
 				if (frame_it->second.offset_ < chunk_it->second.off_)
-					dumpMatch((frame_it++)->second, i++);
+					dumpMatch((frame_it++)->second, i++, &expected_off);
 				else
-					dumpChunk((chunk_it++)->second, i);
+					dumpChunk((chunk_it++)->second, i, &expected_off);
 			}
 			else if (!frameItAtEnd())
-				dumpMatch((frame_it++)->second, i++);
+				dumpMatch((frame_it++)->second, i++, &expected_off);
 			else if (!chunkItAtEnd())
-				dumpChunk((chunk_it++)->second, i);
+				dumpChunk((chunk_it++)->second, i, &expected_off);
 			else
 				break;
 		}
