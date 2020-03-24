@@ -52,6 +52,11 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	nal_type_ = *buffer >> 1 ;
 	logg(V, "Nal type: ", nal_type_, "\n");
 
+	if(nal_type_ > 40) {
+		logg(V, "nal_type_ too big (> 40)\n");
+		return false;
+	}
+
 	nuh_layer_id_ = (*buffer & 1) << 6 | (*(buffer+1) >> 5);
 	logg(V, "nuh_layer_id: ", nuh_layer_id_, "\n");
 
