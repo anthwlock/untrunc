@@ -51,7 +51,12 @@ void Mp4::parseOk(const string& filename) {
 	root_atom_ = new Atom;
 	while (true) {
 		Atom *atom = new Atom;
-		atom->parse(file);
+		try {
+			atom->parse(file);
+		} catch (string e) {
+			logg(W, "failed decoding atom: ", e, "\n");
+			break;
+		}
 		root_atom_->children_.push_back(atom);
 		if(file.atEnd()) break;
 	}
