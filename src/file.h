@@ -87,6 +87,7 @@ public:
 	int write(std::vector<uchar> &v);
 
 	void copyRange(FileRead& fin, size_t a, size_t b);
+	void copyN(FileRead& fin, size_t start_off, size_t n);
 
 protected:
 	FILE *file_;

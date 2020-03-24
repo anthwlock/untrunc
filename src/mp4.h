@@ -50,6 +50,7 @@ public:
 	void makeStreamable(const std::string& ok, const std::string& output);
 	void saveVideo(const std::string& filename);
 	static void unite(const std::string& mdat_fn, const std::string& moov_fn);
+	static void shorten(const std::string& filename, int mega_bytes);
 
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);

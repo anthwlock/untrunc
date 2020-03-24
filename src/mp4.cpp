@@ -212,16 +212,46 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 	assert(findAtom(fmdat, "mdat", mdat));
 	assert(findAtom(fmoov, "moov", moov));
 
-	bool force_64 = mdat.needs64bitVersion();
-	logg(V, "mdat.is64bit: ", force_64, '\n');
+	bool force_64 = mdat.header_length_ > 8;
+	logg(V, "force_64: ", force_64, '\n');
 
 	FileWrite fout(output);
 	fout.copyRange(fmdat, 0, mdat.start_);
-	mdat.file_end_ = fmdat.length();
-	moov.file_end_ = moov.start_ + moov.length_;
-	mdat.updateLength();
+	mdat.updateFileEnd(fmdat.length());
+	moov.file_end_ = moov.start_ + moov.length_;  // otherwise uninitialized
 	mdat.write(fout, force_64);
 	moov.write(fout);
+}
+
+void Mp4::shorten(const string& filename, int mega_bytes) {
+	int64_t n_bytes = mega_bytes * 1e6;
+	string output = ss(filename + "_short-", mega_bytes, ".mp4");
+	warnIfAlredyExists(output);
+
+	FileRead f(filename);
+	BufferedAtom mdat(f), moov(f);
+	if (f.length() <= n_bytes) {
+		logg(E, "file too small\n");
+		return;
+	}
+
+	bool good_structure = isPointingAtAtom(f);
+	if (good_structure) assert(findAtom(f, "mdat", mdat));
+
+	FileWrite fout(output);
+	if (!good_structure || !findAtom(f, "moov", moov) || moov.start_ < mdat.start_) {
+		fout.copyN(f, 0, n_bytes);
+	}
+	else {
+		auto mdat_end_real = mdat.start_ + mdat.length_;
+		off_t n_after_mdat = f.length() - mdat_end_real;
+		assert(n_after_mdat < n_bytes);
+
+		fout.copyRange(f, 0, mdat.start_);
+		mdat.updateFileEnd(n_bytes - n_after_mdat);
+		mdat.write(fout, mdat.header_length_ > 8);
+		fout.copyN(f, mdat_end_real, n_after_mdat);
+	}
 }
 
 void Mp4::makeStreamable(const string& ok, const string& output) {

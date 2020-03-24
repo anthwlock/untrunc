@@ -247,10 +247,14 @@ void FileWrite::copyRange(FileRead& fin, size_t a, size_t b) {
 	size_t n = b - a;
 	size_t buff_sz = 1<<16;
 	while (n) {
-		cout << n << '\n';
+		cout << n << string(15, ' ') << '\r';
 		auto to_read = min(buff_sz, n);
 		auto p = fin.getPtr2(to_read);
-		assert(n == fwrite(p, 1, to_read, file_));
+		assert(to_read == fwrite(p, 1, to_read, file_));
 		n -= to_read;
 	}
+}
+
+void FileWrite::copyN(FileRead& fin, size_t start_off, size_t n) {
+	copyRange(fin, start_off, start_off + n);
 }

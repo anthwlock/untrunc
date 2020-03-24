@@ -427,6 +427,11 @@ bool BufferedAtom::needs64bitVersion() {
 	return length_ - total_excluded_yet_ > 1LL<<32;
 }
 
+void BufferedAtom::updateFileEnd(int64_t file_end) {
+	file_end_ = file_end;
+	updateLength();
+}
+
 void BufferedAtom::write(FileWrite &output, bool force_64) {
 	off_t start = output.pos();
 

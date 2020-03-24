@@ -78,6 +78,7 @@ public:
 
 	void write(FileWrite &file, bool force_64=false);
 
+	void updateFileEnd(int64_t file_end);
 };
 
 bool isPointingAtAtom(FileRead& file);
