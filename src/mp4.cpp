@@ -733,6 +733,7 @@ bool Mp4::dummyIsSkippable() {
 			return false;
 		}
 	}
+	last_track_idx_ = -1;
 	logg(V, "dumyIsSkippable = true\n");
 	return true;
 }
