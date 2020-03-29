@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
 		if (make_streamable) { mp4.makeStreamable(ok, ok + "_streamable" + ext); return 0; }
 
 		logg(I, "reading ", ok, '\n');
-		mp4.parseOk(ok);
+		mp4.parseOk(ok, (show_atoms || show_info));
 
 		if (show_tracks) mp4.printTracks();
 		else if (show_atoms) mp4.printAtoms();

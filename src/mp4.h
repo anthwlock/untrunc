@@ -40,7 +40,7 @@ public:
     Mp4() = default;
 	~Mp4();
 
-	void parseOk(const std::string& filename); // parse the healthy one
+	void parseOk(const std::string& filename, bool accept_unhealthy=false); // parse the first file
 
 	void printTracks();
 	void printAtoms();
@@ -73,6 +73,8 @@ public:
 	static const int pat_size_ = 32;
 	int idx_free_ = kDefaultFreeIdx;  // idx of dummy track
 
+	bool has_moov_ = false;
+
 	std::string ftyp_;
 	off_t orig_mdat_start_;
 
@@ -92,6 +94,7 @@ private:
 	BufferedAtom* findMdat(FileRead& file_read);
 	AVFormatContext *context_;
 
+	void parseHealthy();
 	void parseTracksOk();
 	void chkStrechFactor();
 	void setDuration();

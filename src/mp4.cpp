@@ -43,7 +43,49 @@ Mp4::~Mp4() {
 	delete root_atom_;
 }
 
-void Mp4::parseOk(const string& filename) {
+void Mp4::parseHealthy() {
+	header_atom_ = root_atom_->atomByNameSafe("mvhd");
+	readHeaderAtom();
+
+	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
+    #if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
+	av_register_all();
+    #endif
+
+	unmute(); // sets AV_LOG_LEVEL
+	context_ = avformat_alloc_context();
+	// Open video file
+	int error = avformat_open_input(&context_, filename_ok_.c_str(), NULL, NULL);
+
+	if(error != 0)
+		throw "Could not parse AV file (" + to_string(error) + "): " + filename_ok_;
+
+	if(avformat_find_stream_info(context_, NULL) < 0)
+		throw "Could not find stream info";
+
+	av_dump_format(context_, 0, filename_ok_.c_str(), 0);
+
+	parseTracksOk();
+
+//	if (g_show_tracks) return;  // show original track order
+
+	// reduce false positives when matching
+	map<string, int> certainty = {
+	    {"gpmd", 4},
+	    {"fdsc", 3},
+	    {"mp4a", 2},
+	    {"avc1", 1},
+	    // default is 0
+	};
+	sort(tracks_.begin(), tracks_.end(),  [&](const Track& a, const Track& b) -> bool {
+		return certainty[a.codec_.name_] > certainty[b.codec_.name_];
+	});
+
+	if (g_log_mode >= LogMode::I) cout << '\n';
+}
+
+
+void Mp4::parseOk(const string& filename, bool accept_unhealthy) {
 	filename_ok_ = filename;
 	auto& file = openFile(filename);
 
@@ -67,14 +109,6 @@ void Mp4::parseOk(const string& filename) {
 	if(root_atom_->atomByName("sdtp"))
 		cerr << "Sample dependency flag atom found. I and P frames might need to recover that info." << endl;
 
-	header_atom_ = root_atom_->atomByNameSafe("mvhd");
-	readHeaderAtom();
-
-	// https://github.com/FFmpeg/FFmpeg/blob/70d25268c21cbee5f08304da95be1f647c630c15/doc/APIchanges#L86
-    #if ( LIBAVFORMAT_VERSION_INT < AV_VERSION_INT(58,9,100) )
-	av_register_all();
-    #endif
-
 	auto ftyp = root_atom_->atomByName("ftyp", true);
 	if (ftyp) {
 		ftyp_ = ftyp->getString(0, 4);
@@ -90,36 +124,18 @@ void Mp4::parseOk(const string& filename) {
 		g_ignore_forbidden_nal_bit = false;
 	}
 
-	unmute(); // sets AV_LOG_LEVEL
-	context_ = avformat_alloc_context();
-	// Open video file
-	int error = avformat_open_input(&context_, filename.c_str(), NULL, NULL);
+	has_moov_ = root_atom_->atomByName("moov", true);
 
-	if(error != 0)
-		throw "Could not parse AV file (" + to_string(error) + "): " + filename;
-
-	if(avformat_find_stream_info(context_, NULL) < 0)
-		throw "Could not find stream info";
-
-	av_dump_format(context_, 0, filename.c_str(), 0);
-
-	parseTracksOk();
-
-//	if (g_show_tracks) return;  // show original track order
-
-	// reduce false positives when matching
-	map<string, int> certainty = {
-	    {"gpmd", 4},
-	    {"fdsc", 3},
-	    {"mp4a", 2},
-	    {"avc1", 1},
-	    // default is 0
-	};
-	sort(tracks_.begin(), tracks_.end(),  [&](const Track& a, const Track& b) -> bool {
-		return certainty[a.codec_.name_] > certainty[b.codec_.name_];
-	});
-
-	if (g_log_mode >= LogMode::I) cout << '\n';
+	if (has_moov_)
+		parseHealthy();
+	else
+		if (accept_unhealthy) {
+			logg(W, "no 'moov' atom found\n");
+		}
+		else {
+			logg(E, "no 'moov' atom found\n");
+			exit(1);
+		}
 }
 
 void Mp4::parseTracksOk() {
@@ -149,11 +165,16 @@ void Mp4::parseTracksOk() {
 
 
 void Mp4::printMediaInfo() {
-	printTracks();
-	cout << "\n\n";
-	printAtoms();
-	cout << "\n\n";
-	printDynStats();
+	if (has_moov_) {
+		printTracks();
+		cout << "\n\n";
+		printAtoms();
+		cout << "\n\n";
+		printDynStats();
+	}
+	else {
+		printAtoms();
+	}
 }
 
 void Mp4::printTracks() {
@@ -535,14 +556,16 @@ void Mp4::analyze(bool gen_off_map) {
 					k = track.keyframes_[ik];
 
 				auto sz = track.getSize(i);
-				if (cur_off > mdat->contentSize()) {
-					logg(W, "reched premature end of mdat\n");
-					break;
-				}
 				auto fi = FrameInfo(idx, is_keyframe, track.getTime(i), cur_off, sz);
 
 				if (gen_off_map) off_to_frame_[cur_off] = fi;
-				else chkUntrunc(fi, track.codec_, i);
+				else {
+					if (cur_off > mdat->contentSize()) {
+						logg(W, "reached premature end of mdat\n");
+						break;
+					}
+					chkUntrunc(fi, track.codec_, i);
+				}
 
 				if (++sample_idx_in_chunk >= to_uint(c_it->n_samples_)) {
 					cur_off = (++c_it)->off_ - mdat->contentStart();
