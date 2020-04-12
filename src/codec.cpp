@@ -298,15 +298,16 @@ inline int untr_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 
 map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("mp4a") {
+		maxlength = min(g_max_buf_sz_needed, maxlength);
+
 		static AVPacket* packet = av_packet_alloc();
 //		packet->size = g_max_partsize;
 		static AVFrame* frame = av_frame_alloc();
 
 		packet->data = const_cast<uchar*>(start);
-		if(!is_new_ffmpeg_api) packet->size = maxlength;
+		if (!is_new_ffmpeg_api) packet->size = maxlength;
 		int got_frame = 0;
 
-		maxlength = min(g_max_buf_sz_needed, maxlength);
 		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
 //		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
 
