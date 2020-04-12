@@ -913,8 +913,10 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 
 	if (!isPointingAtAtom(file_read)) {
 		logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");
-		if (ftyp_ == "XAVC") {
-			logg(V, "using orig_mdat_start_ (== ", orig_mdat_start_, ")\n");
+		auto moov = root_atom_->atomByNameSafe("moov");
+//		if (ftyp_ == "XAVC") {
+		if (orig_mdat_start_ < moov->start_) {
+			logg(I, "using orig_mdat_start_ (=", orig_mdat_start_, ")\n");
 			mdat.start_ = orig_mdat_start_;
 			mdat.name_ = "mdat";
 		}
