@@ -39,7 +39,7 @@ In certain cases a specific version of ffmpeg is needed. Untrunc works great wit
 
 Just use following commands, make will do the rest for you.
 
-	sudo apt-get install libva-dev liblzma-dev libx11-dev libbz2-dev zlib1g-dev yasm pkg-config wget
+	sudo apt-get install yasm wget
 	make FF_VER=3.3.9
 	sudo cp untrunc /usr/local/bin
 
@@ -49,6 +49,13 @@ The GUI is optional. It is included in the automated [windows builds](https://gi
 You will need [libui](https://github.com/andlabs/libui). After that, just do
 
 	make untrunc-gui
+
+#### CentOS 7
+
+	sudo yum -y install epel-release && sudo yum -y install git gcc-c++ yasm
+	git clone --depth 5 https://github.com/anthwlock/untrunc && cd untrunc
+	make FF_VER=3.3.9
+	sudo cp untrunc /usr/local/bin
 
 ## Docker container
 

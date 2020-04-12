@@ -29,7 +29,8 @@ else
   LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
   #LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
   #LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
-  LDFLAGS += -lpthread -lz -lbz2 -lX11 -ldl -lva -lva-drm -lva-x11 -llzma
+  #LDFLAGS += -lz -lbz2 -lX11 -lva -lva-drm -lva-x11 -llzma
+  LDFLAGS += -lpthread -ldl
 endif
 
 CXXFLAGS += -std=c++11 -D_FILE_OFFSET_BITS=64
@@ -80,6 +81,8 @@ endif
 $(shell mkdir -p $(dir $(OBJ_GUI)) 2>/dev/null)
 $(shell mkdir -p $(DIR)/src/avc1 $(DIR)/src/hvc1 2>/dev/null)
 
+CURL := $(shell command -v curl 2>/dev/null)
+
 .PHONY: all clean force
 
 
@@ -88,14 +91,19 @@ all: $(EXE)
 $(FFDIR)/configure:
 	@#read -p "Press [ENTER] if you agree to build ffmpeg-${FF_VER} now.. " input
 	@echo "(info) downloading $(FFDIR) ..."
+ifdef CURL
+	curl -o /tmp/$(FFDIR).tar.xz https://www.ffmpeg.org/releases/$(FFDIR).tar.xz
+else
 	wget -q --show-progress -O /tmp/$(FFDIR).tar.xz https://www.ffmpeg.org/releases/$(FFDIR).tar.xz
+endif
 	tar xf /tmp/$(FFDIR).tar.xz
 
 $(FFDIR)/config.asm: | $(FFDIR)/configure
 	@echo "(info) please wait ..."
 	cd $(FFDIR); ./configure --disable-doc --disable-programs \
 	--disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
-	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc
+	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc \
+	--disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma
 
 $(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
 	cat $(FFDIR)/Makefile

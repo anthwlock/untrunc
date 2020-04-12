@@ -6,8 +6,7 @@ ARG FF_VER=shared
 # install packaged dependencies
 RUN apt-get update && [ "$FF_VER" = 'shared' ] && \
 	apt-get -y install --no-install-recommends libavformat-dev libavcodec-dev libavutil-dev g++ make git || \
-	apt-get -y install --no-install-recommends libva-dev liblzma-dev libx11-dev libbz2-dev zlib1g-dev \
-		yasm pkg-config wget g++ make git ca-certificates && \
+	apt-get -y install --no-install-recommends yasm wget g++ make git ca-certificates xz-utils && \
 	rm -rf /var/lib/apt/lists/*
 
 # copy code

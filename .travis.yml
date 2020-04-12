@@ -1,5 +1,5 @@
-sudo: required
 services:
  - docker
 script:
- - docker build -t untrunc . 
+ - docker build --build-arg FF_VER=3.3.9 -t untrunc .
+ - docker build -t untrunc .

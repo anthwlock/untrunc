@@ -332,7 +332,7 @@ void Track::genPatternPerm() {
 		perm.emplace_back(i, max_e, max_size);
 	}
 
-	sort(perm.begin(), perm.end(), [](tuple_t& a, tuple_t& b) {
+	sort(perm.begin(), perm.end(), [](const tuple_t& a, const tuple_t& b) {
 		if (fabs(get<1>(a) - get<1>(b)) < 0.1) return get<1>(a) > get<1>(b);
 		return get<1>(a) > get<1>(b);
 	});
