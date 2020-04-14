@@ -730,8 +730,9 @@ void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 
 	if (start + length > to_uint(current_mdat_->contentSize())) {
 		logg(W, "addToExclude: sequence goes beyond EOF\n");
-		length = start - current_mdat_->contentSize();
+		length = current_mdat_->contentSize() - start;
 	}
+
 
 	current_mdat_->sequences_to_exclude_.emplace_back(start, length);
 	current_mdat_->total_excluded_yet_ += length;

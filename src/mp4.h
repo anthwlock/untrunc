@@ -103,10 +103,10 @@ private:
 	bool chkOffset(off_t& offset);  // updates offset
 	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;
-	int unknown_length_ = 0;
+	int64_t unknown_length_ = 0;
 	uint64_t pkt_idx_ = 0;
 	int last_track_idx_ = -1;  // 0th track is most relialbale
-	std::vector<int> unknown_lengths_;
+	std::vector<int64_t> unknown_lengths_;
 
 	std::string filename_ok_;
 	bool use_offset_map_ = false;
