@@ -27,7 +27,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	//        https://stackoverflow.com/a/24890903
 	uint32_t len = swap32(*(uint32_t *)buffer);
 	length_ = len + 4;
-	logg(V, "Length: ", length_, "\n");
+	logg(V, "Length: ", length_ - 4, "+4\n");
 
 	if (length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
@@ -54,8 +54,8 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 	//check size is reasonable:
 	if(len < 8) {
-		logg(W2, "Too short!\n");
-		return false;
+		logg(W2, "very short NAL-unit! (len=", len, ", type=", nal_type_, ")\n");
+//		return false;
 	}
 
 	buffer++; //skip nal header

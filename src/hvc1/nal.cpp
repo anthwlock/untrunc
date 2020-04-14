@@ -71,8 +71,8 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	if (isSlice(nal_type_)) {
 		//check size is reasonable:
 		if(len < 8) {
-			logg(W2, "Too short!\n");
-			return false;
+			logg(W2, "very short NAL-unit! (len=", len, ", type=", nal_type_, ")\n");
+//			return false;
 		}
 
 		data_ = buffer+2;
