@@ -1614,6 +1614,7 @@ void Mp4::repair(const string& filename) {
 			}
 			else if (!g_noise_buffer_active && g_log_mode >= LogMode::V && !g_dont_omit) {
 				logg(V, "unknown sequence -> enabling noise buffer ..\n");
+				enableNoiseBuffer();
 				mute();  // ffmpeg warnings are mostly noise and unhelpful without knowing file offset
 			}
 

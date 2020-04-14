@@ -198,7 +198,6 @@ void outProgress(double now, double all, const string& prefix) {
 void mute() {
 	g_muted = true;
 	av_log_set_level(AV_LOG_QUIET);
-	if (g_log_mode >= V) enableNoiseBuffer();
 }
 
 void unmute() {
