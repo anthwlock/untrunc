@@ -982,7 +982,7 @@ bool Mp4::pointsToZeros(off_t off) {
 	if (current_mdat_->contentSize() - off < 4) return false;
 	auto buff = current_mdat_->getFragment(off, 4);
 	if (*(int*)buff == 0) {
-		logg(V, "pointsToZeros: found 4 zero bytes at ", off, "\n");
+		logg(V, "pointsToZeros: found 4 zero bytes at ", offToStr(off), "\n");
 		return true;
 	}
 	return false;
@@ -1018,14 +1018,6 @@ bool Mp4::wouldMatch(off_t offset, const string& skip, bool force_strict, int la
 	};
 
 	auto start = loadFragment(offset);
-	if (idx_free_ >= 0 && pointsToZeros(offset)) {
-		if (tracks_[last_track_idx].doesMatchTransition(start, idx_free_)) {
-			logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes, ", getCodecName(last_track_idx), "_free\n");
-			return chkChunkOffOk(idx_free_);
-		}
-		return false;
-	}
-
 	for (uint i=0; i < tracks_.size(); i++) {
 		auto& c = tracks_[i].codec_;
 		bool be_strict = force_strict || shouldBeStrict(offset, i);
@@ -1188,7 +1180,6 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 		track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
 	}
 
-//	auto track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
 	if (track_idx >= 0 && !tracks_[track_idx].shouldUseChunkPrediction()) {
 		logg(V, "should not use chunk prediction for '", getCodecName(track_idx), "'\n");
 		return c;
@@ -1324,7 +1315,7 @@ bool Mp4::isAllZerosAt(off_t off, int n) {
 	if (current_mdat_->contentSize() - off < n) return false;
 	auto buff = current_mdat_->getFragment(off, 4);
 	if (isAllZeros(buff, n)) {
-		logg(V, "isAllZerosAt: found ", n, " zero bytes at ", off, "\n");
+		logg(V, "isAllZerosAt: found ", n, " zero bytes at ", offToStr(off), "\n");
 		return true;
 	}
 	return false;
@@ -1354,7 +1345,7 @@ start:
 					return true;
 				}
 			}
-			for (auto& cn : {"rtmd"}) {
+			for (auto& cn : {"rtmd", "ms"}) {
 				if (hasCodec(cn) && getChunkPrediction(offset, true)) {
 					logg(V, "won't skip zeros at: ", offToStr(offset), " (perfect chunk-match)\n");
 					return true;

@@ -321,8 +321,8 @@ void Track::genPatternPerm() {
 	using tuple_t = tuple<int, double, int>;
 	vector<tuple_t> perm;
 	for (uint i=0; i < dyn_patterns_.size(); i++) {
-		int max_size;
-		double max_e = 0;
+		int max_size = 0;
+		double max_e = -1;
 
 		for (auto& p : dyn_patterns_[i]) {
 			auto distinct = p.getDistinct();
@@ -333,7 +333,7 @@ void Track::genPatternPerm() {
 	}
 
 	sort(perm.begin(), perm.end(), [](const tuple_t& a, const tuple_t& b) {
-		if (fabs(get<1>(a) - get<1>(b)) < 0.1) return get<1>(a) > get<1>(b);
+		if (fabs(get<1>(a) - get<1>(b)) < 0.1) return get<2>(a) > get<2>(b);
 		return get<1>(a) > get<1>(b);
 	});
 
@@ -485,7 +485,7 @@ void Track::printDynPatterns(bool show_percentage) {
 		cout << ss(codec_.name_, "_", g_mp4->tracks_[idx].codec_.name_, " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
 		           (show_percentage ? ss(" (", n_total, ")") : ""), "\n");
 		for (auto& p : dyn_patterns_[idx]) {
-			if (n_total) cout << ss(fixed, setprecision(3), (double)p.cnt_ / (double)n_total, " ", p.cnt_, " ");
+			if (n_total) cout << ss(fixed, setprecision(3), p.successRate(), " ", p.cnt_, " ");
 			cout << p << '\n';
 		}
 	}
@@ -527,12 +527,12 @@ void Track::genLikely() {
 
 	assert(chunks_.size());
 
-	map<int, int> cnt;
-	for (auto& c : chunks_) cnt[c.n_samples_]++;
-	for (auto& kv : cnt) {
+	map<int, int> cnts;
+	for (size_t i=0; i < chunks_.size() - 1; i++) cnts[chunks_[i].n_samples_]++;
+	for (auto& kv : cnts) {
 		auto n_samples = kv.first, cnt = kv.second;
-		auto p = (double)cnt / chunks_.size();
-		if (p >= 0.2) {
+		auto p = (double)cnt / (chunks_.size()-1);
+		if (cnts.size() <= 3 || p >= 0.2) {
 			likely_n_samples_.push_back(n_samples);
 			likely_n_samples_p += p;
 		}

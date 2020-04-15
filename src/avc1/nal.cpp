@@ -47,6 +47,10 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 
 	nal_type_ = *buffer & 0x1f;
 	logg(V, "Nal type: ", nal_type_, "\n");
+	if (nal_type_ == 0) {
+		logg(W2, "0-type NAL-unit (len=", len, ", type=", nal_type_, ")\n");
+		if (len == 0) return false;
+	}
 	if(nal_type_ != NAL_SLICE
 	   && nal_type_ != NAL_IDR_SLICE
 	   && nal_type_ != NAL_SPS)
@@ -55,6 +59,7 @@ bool NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	//check size is reasonable:
 	if(len < 8) {
 		logg(W2, "very short NAL-unit! (len=", len, ", type=", nal_type_, ")\n");
+//		if (len == 0) { logg(V, "bad: zero length\n"); return false; }
 //		return false;
 	}
 
