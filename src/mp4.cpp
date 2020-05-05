@@ -129,13 +129,8 @@ void Mp4::parseOk(const string& filename, bool accept_unhealthy) {
 	if (has_moov_)
 		parseHealthy();
 	else
-		if (accept_unhealthy) {
-			logg(W, "no 'moov' atom found\n");
-		}
-		else {
-			logg(E, "no 'moov' atom found\n");
-			exit(1);
-		}
+		if (accept_unhealthy) logg(W, "no 'moov' atom found\n");
+		else logg(ET, "no 'moov' atom found\n");
 }
 
 void Mp4::parseTracksOk() {
@@ -251,10 +246,8 @@ void Mp4::shorten(const string& filename, int mega_bytes) {
 
 	FileRead f(filename);
 	BufferedAtom mdat(f), moov(f);
-	if (f.length() <= n_bytes) {
-		logg(E, "file too small\n");
-		return;
-	}
+	if (f.length() <= n_bytes)
+		logg(ET, "file too small\n");
 
 	bool good_structure = isPointingAtAtom(f);
 	if (good_structure) assert(findAtom(f, "mdat", mdat));
@@ -843,8 +836,7 @@ void Mp4::checkForBadTracks() {
 	if (track_order_.size()) return;  // we alredy checked via `isTrackOrderEnough()`
 	for (auto& t: tracks_) {
 		if (!t.hasPredictableChunks() && !t.codec_.isSupported()) {
-			logg(E, "bad track: '", t.codec_.name_, "'\n");
-			exit(1);
+			logg(ET, "bad track: '", t.codec_.name_, "'\n");
 		}
 	}
 }

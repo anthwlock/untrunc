@@ -138,10 +138,8 @@ int main(int argc, char *argv[]) {
 
 	g_show_tracks = show_tracks || show_info;
 
-	if (!g_ignore_unknown && arg_step > 0) {
-		cout << "setting step_size without using '-s'\n";
-		exit(1);
-	}
+	if (!g_ignore_unknown && arg_step > 0)
+		logg(ET, "setting step_size without using '-s'\n");
 
 	bool skip_info = find_atoms;
 	if (!skip_info) {
@@ -156,10 +154,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	auto chkC = [&]() {
-		if (!corrupt.size()) {
-			logg(E, "no second file specified\n");
-			exit(1);
-		}
+		if (!corrupt.size())
+			logg(ET, "no second file specified\n");
 	};
 
 	try {

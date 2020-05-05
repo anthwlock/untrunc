@@ -20,7 +20,7 @@ using offs_t = std::vector<off_t>;
 #define to_uint(a) static_cast<unsigned int>(a)
 #define to_size_t(a) static_cast<size_t>(a)
 
-enum LogMode { E, W, I, W2, V, VV };
+enum LogMode { ET, E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
 extern uint
     g_max_partsize,       // max theoretical part size
@@ -48,6 +48,13 @@ extern void (*g_onStatus)(const std::string&);
 void cutNoiseBuffer(bool force=false);
 
 template<class... Args>
+std::string ss(Args&&... args){
+	std::stringstream ss;
+	UNFOLD_PARAM_PACK(args, ss)
+	return ss.str();
+}
+
+template<class... Args>
 void logg(Args&&... args){
 //	(std::cout << ... << args); // Binary left fold (c++17)
 	UNFOLD_PARAM_PACK(args, std::cout);
@@ -65,16 +72,15 @@ void logg(LogMode m, Args&&... x){
 		std::cout << "Info: ";
 	else if (m == W || m == W2)
 		std::cout << "Warning: ";
-	else if (m == E)
+	else if (m <= E) {
 		std::cout << "Error: ";
+		if (m == ET) {
+			logg(std::forward<Args>(x)...);
+			if (g_onProgress) throw std::runtime_error(ss(std::forward<Args>(x)...));
+			else exit(1);
+		}
+	}
 	logg(std::forward<Args>(x)...);
-}
-
-template<class... Args>
-std::string ss(Args&&... args){
-	std::stringstream ss;
-	UNFOLD_PARAM_PACK(args, ss)
-	return ss.str();
 }
 
 bool contains(const std::initializer_list<std::string>& c, const std::string& v);
