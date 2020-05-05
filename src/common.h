@@ -29,6 +29,8 @@ extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tr
     g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
     g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
     g_ignore_out_of_bound_chunks;
+extern int64_t g_range_start, g_range_end;
+extern const int64_t kRangeUnset;
 
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;

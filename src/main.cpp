@@ -45,6 +45,7 @@ void usage() {
 	     << "-sm  - search mdat, even if no mp4-structure found\n"
 	     << "-dcc  - dont check if chunks are inside mdat\n"
 	     << "-dyn  - use dynamic stats\n"
+	     << "-range <A:B>  - raw data range\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -73,6 +74,16 @@ void printVersion() {
 	exit(0);
 }
 
+void parseRange(const string& s) {
+	auto pos = s.find(":");
+	if (pos == string::npos)
+		logg(ET, "use python slice notation\n");
+	auto s1 = s.substr(0, pos);
+	auto s2 = s.substr(pos+1);
+	g_range_start = s1.size() ? stoll(s1) : 0;
+	g_range_end = s2.size() ? stoll(s2) : numeric_limits<int64_t>::max();
+}
+
 int main(int argc, char *argv[]) {
 	const int kExpectArg = -22;
 
@@ -89,12 +100,14 @@ int main(int argc, char *argv[]) {
 	bool shorten = false;
 	off_t arg_offset = -1;
 	int arg_step = -1;
+	int arg_range = -1;
 
 	int i = 1;
 	for (; i < argc; i++) {
 		string arg = argv[i];
 		if (arg_offset == kExpectArg) {arg_offset = stoll(arg); continue;}
 		if (arg_step == kExpectArg) {arg_step = stoi(arg); continue;}
+		if (arg_range == kExpectArg) {parseRange(arg); arg_range = -1; continue;}
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
 			auto a = arg.substr(1);
@@ -125,6 +138,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "u") unite = true;
 			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
 			else if (a == "dyn") g_use_chunk_stats = true;
+			else if (a == "range") arg_range = kExpectArg;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}

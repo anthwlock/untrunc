@@ -225,14 +225,25 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 	FileRead fmdat(mdat_fn), fmoov(moov_fn);
 
 	BufferedAtom mdat(fmdat), moov(fmoov);
-	assert(findAtom(fmdat, "mdat", mdat));
+	if (g_range_start != kRangeUnset) mdatFromRange(fmdat, mdat);
+	else assert(findAtom(fmdat, "mdat", mdat));
 	assert(findAtom(fmoov, "moov", moov));
 
 	bool force_64 = mdat.header_length_ > 8;
 	logg(V, "force_64: ", force_64, '\n');
 
 	FileWrite fout(output);
-	fout.copyRange(fmdat, 0, mdat.start_);
+	if (g_range_start != kRangeUnset) {
+		Atom free;
+		free.name_ = "free";
+		free.start_ = - 8;
+		free.content_.resize(mdat.start_ - 8);
+		free.updateLength();
+		free.write(fout);
+	}
+	else {
+		fout.copyRange(fmdat, 0, mdat.start_);
+	}
 	mdat.updateFileEnd(fmdat.length());
 	moov.file_end_ = moov.start_ + moov.length_;  // otherwise uninitialized
 	mdat.write(fout, force_64);
@@ -722,6 +733,7 @@ void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 	       start > current_mdat_->sequences_to_exclude_.back().first);
 
 	if (start + length > to_uint(current_mdat_->contentSize())) {
+		logg(V, start, " + ", length, " > ", current_mdat_->contentSize(), "\n");
 		logg(W, "addToExclude: sequence goes beyond EOF\n");
 		length = current_mdat_->contentSize() - start;
 	}
@@ -894,6 +906,21 @@ bool Mp4::findAtom(FileRead& file_read, string atom_name, Atom& atom) {
 	return true;
 }
 
+BufferedAtom* Mp4::mdatFromRange(FileRead& file_read, BufferedAtom& mdat) {
+	mdat.start_ = g_range_start - 8;
+	mdat.name_ = "mdat";
+
+	auto len = file_read.length();
+	if (g_range_end > len) mdat.file_end_ = len;
+	else if (g_range_end < 0) mdat.file_end_ = len + g_range_end;
+	else mdat.file_end_ = g_range_end;
+
+	logg(I, "range: ", g_range_start, ":", g_range_end, " -> ", mdat.start_, ":", mdat.file_end_, " (", mdat.contentSize(), ")\n");
+	if (mdat.contentSize() <= 0)
+		logg(ET, "bad range, contentSize: ", mdat.contentSize(), "\n");
+	return &mdat;
+}
+
 BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 	delete current_mdat_;
 	current_mdat_ = new BufferedAtom(file_read);
@@ -903,6 +930,9 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		Atom* p = root_atom_->atomByName("mdat", true);
 		if (p) mdat.Atom::operator=(*p);
 	}
+
+	else if (g_range_start != kRangeUnset)
+		return mdatFromRange(file_read, mdat);
 
 	if (!isPointingAtAtom(file_read)) {
 		logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");

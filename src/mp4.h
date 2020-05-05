@@ -90,6 +90,7 @@ public:
 
 private:
 	Atom *root_atom_ = nullptr;
+	static BufferedAtom* mdatFromRange(FileRead& file_read, BufferedAtom& mdat);
 	static bool findAtom(FileRead& file_read, std::string atom_name, Atom& atom);
 	BufferedAtom* findMdat(FileRead& file_read);
 	AVFormatContext *context_;
@@ -184,6 +185,7 @@ private:
 
 	static const int kDefaultFreeIdx = -2;
 };
+
 
 class FrameInfo {
 public:

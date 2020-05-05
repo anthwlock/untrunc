@@ -48,6 +48,9 @@ uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
 void (*g_onStatus)(const string&) = nullptr;
+int64_t g_range_start = kRangeUnset;
+int64_t g_range_end = kRangeUnset;
+const int64_t kRangeUnset = numeric_limits<int64_t>::min();
 
 std::stringstream noise_buffer;
 std::streambuf *orig_cout, *orig_cerr;
