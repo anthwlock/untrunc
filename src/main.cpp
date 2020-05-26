@@ -46,6 +46,8 @@ void usage() {
 	     << "-dcc  - dont check if chunks are inside mdat\n"
 	     << "-dyn  - use dynamic stats\n"
 	     << "-range <A:B>  - raw data range\n"
+	     << "-dst <dir|file>  - set destination\n"
+	     << "-skip  - skip existing\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -101,6 +103,7 @@ int main(int argc, char *argv[]) {
 	off_t arg_offset = -1;
 	int arg_step = -1;
 	int arg_range = -1;
+	int arg_dst = -1;
 
 	int i = 1;
 	for (; i < argc; i++) {
@@ -108,6 +111,7 @@ int main(int argc, char *argv[]) {
 		if (arg_offset == kExpectArg) {arg_offset = stoll(arg); continue;}
 		if (arg_step == kExpectArg) {arg_step = stoi(arg); continue;}
 		if (arg_range == kExpectArg) {parseRange(arg); arg_range = -1; continue;}
+		if (arg_dst == kExpectArg) {g_dst_path = arg; arg_dst = -1; continue;}
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
 			auto a = arg.substr(1);
@@ -139,6 +143,8 @@ int main(int argc, char *argv[]) {
 			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
 			else if (a == "dyn") g_use_chunk_stats = true;
 			else if (a == "range") arg_range = kExpectArg;
+			else if (a == "dst") arg_dst = kExpectArg;
+			else if (a == "skip") g_skip_existing = true;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}
@@ -186,6 +192,7 @@ int main(int argc, char *argv[]) {
 
 		auto ext = getMovExtension(ok);
 		if (make_streamable) { mp4.makeStreamable(ok, ok + "_streamable" + ext); return 0; }
+		if (mp4.alreadyRepaired(ok, corrupt)) return 0;
 
 		logg(I, "reading ", ok, '\n');
 		mp4.parseOk(ok, (show_atoms || show_info));

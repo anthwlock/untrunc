@@ -44,13 +44,14 @@ bool g_ignore_forbidden_nal_bit = true;
 bool g_dont_omit = false;
 bool g_noise_buffer_active = false;
 bool g_ignore_out_of_bound_chunks = false;
+bool g_skip_existing = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
 void (*g_onStatus)(const string&) = nullptr;
 int64_t g_range_start = kRangeUnset;
 int64_t g_range_end = kRangeUnset;
-const int64_t kRangeUnset = numeric_limits<int64_t>::min();
+std::string g_dst_path;
 
 std::stringstream noise_buffer;
 std::streambuf *orig_cout, *orig_cerr;

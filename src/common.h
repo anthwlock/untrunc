@@ -28,9 +28,9 @@ extern uint
 extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks,
     g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
     g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
-    g_ignore_out_of_bound_chunks;
+    g_ignore_out_of_bound_chunks, g_skip_existing;
 extern int64_t g_range_start, g_range_end;
-extern const int64_t kRangeUnset;
+extern std::string g_dst_path;
 
 extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
@@ -39,6 +39,7 @@ extern Mp4* g_mp4;
 extern void (*g_onProgress)(int);
 extern void (*g_onStatus)(const std::string&);
 
+const int64_t kRangeUnset = std::numeric_limits<int64_t>::min();
 
 #define UNFOLD_PARAM_PACK(pack, os) \
 	_Pragma("GCC diagnostic push"); \

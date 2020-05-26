@@ -1557,6 +1557,26 @@ bool Mp4::tryMatch(off_t& offset ) {
 	return false;
 }
 
+string rewriteDestination(const std::string& dst) {
+	if (!g_dst_path.size()) return dst;
+	if (isdir(g_dst_path)) return g_dst_path + "/" + myBasename(dst);
+	else return g_dst_path;
+}
+
+string Mp4::getPathRepaired(const std::string& ok, const std::string& corrupt) {
+	auto filename_fixed = corrupt + "_fixed" + getOutputSuffix() + getMovExtension(ok);
+	return rewriteDestination(filename_fixed);
+}
+
+bool Mp4::alreadyRepaired(const std::string& ok, const std::string& corrupt) {
+	if (!g_skip_existing) return false;
+	auto dst = getPathRepaired(ok, corrupt);
+	if (FileRead::alreadyExists(dst)) {
+		if (g_log_mode > E) cout << "exists: " << dst << '\n';
+		return true;
+	}
+	return false;
+}
 
 void Mp4::repair(const string& filename) {
 	if (chkNeedOldApi()) {
@@ -1571,6 +1591,8 @@ void Mp4::repair(const string& filename) {
 		if (g_log_mode >= LogMode::V) printDynStats();
 		logg(I, "using dynamic stats, use '-is' to see them\n");
 	}
+
+	if (alreadyRepaired(filename_ok_, filename)) exit(0);
 
 	auto& file_read = openFile(filename);
 
@@ -1653,7 +1675,7 @@ void Mp4::repair(const string& filename) {
 
 	for (auto& track : tracks_) track.fixTimes();
 
-	auto filename_fixed = filename + "_fixed" + getOutputSuffix() + getMovExtension(filename_ok_);
+	auto filename_fixed = getPathRepaired(filename_ok_, filename);
 	saveVideo(filename_fixed);
 }
 

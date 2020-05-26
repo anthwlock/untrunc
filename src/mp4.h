@@ -66,6 +66,8 @@ public:
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
 	std::string offToStr(off_t offset);
+	std::string getPathRepaired(const std::string& ok, const std::string& corrupt);
+	bool alreadyRepaired(const std::string& ok, const std::string& corrupt);
 
 	static uint64_t step_;  // step_size in unknown sequence
 	std::vector<Track> tracks_;

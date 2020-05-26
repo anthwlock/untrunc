@@ -93,4 +93,7 @@ protected:
 	FILE *file_;
 };
 
+bool isdir(const std::string& path);
+std::string myBasename(std::string path);
+
 #endif // FILE_H

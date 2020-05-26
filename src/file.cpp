@@ -27,6 +27,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <cassert>
+#include <libgen.h>
 
 #include "common.h"
 
@@ -257,4 +258,14 @@ void FileWrite::copyRange(FileRead& fin, size_t a, size_t b) {
 
 void FileWrite::copyN(FileRead& fin, size_t start_off, size_t n) {
 	copyRange(fin, start_off, start_off + n);
+}
+
+bool isdir(const string& path) {
+	struct stat st;
+	return (stat(path.c_str(), &st) == 0) && (st.st_mode & S_IFDIR);
+}
+
+string myBasename(string path) {
+	// basename may modifies its argument
+	return basename(&path[0]);
 }
