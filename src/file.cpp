@@ -195,7 +195,7 @@ bool FileRead::isRegularFile(const string& path) {
 	return S_ISREG(path_stat.st_mode);
 }
 
-bool FileRead::alredyExists(const string& fn) {
+bool FileRead::alreadyExists(const string& fn) {
 	struct stat fn_stat;
 	return (stat(fn.c_str(), &fn_stat) == 0);
 }

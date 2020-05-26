@@ -353,9 +353,9 @@ void disableNoiseBuffer() {
 	total_omited = 0;
 }
 
-void warnIfAlredyExists(const string& output) {
-	if (FileRead::alredyExists(output)) {
-		logg(W, "destination '", output, "' alredy exists\n");
+void warnIfAlreadyExists(const string& output) {
+	if (FileRead::alreadyExists(output)) {
+		logg(W, "destination '", output, "' already exists\n");
 		hitEnterToContinue();
 	}
 }

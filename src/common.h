@@ -165,7 +165,7 @@ std::string getOutputSuffix();
 double calcEntropy(const std::vector<uchar>& in);
 int64_t gcd(int64_t a, int64_t b);
 
-void warnIfAlredyExists(const std::string&);
+void warnIfAlreadyExists(const std::string&);
 
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd

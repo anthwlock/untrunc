@@ -80,7 +80,7 @@ public:
 		Chunk() = default;
 		Chunk(off_t off, int64_t size, int ns);
 		off_t off_ = 0;  // absolute offset
-		int64_t alredy_excluded_ = 0;
+		int64_t already_excluded_ = 0;
 		int64_t size_ = 0;
 		int n_samples_ = 0;
 	};

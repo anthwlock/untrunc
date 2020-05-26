@@ -632,7 +632,7 @@ bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 
 void Track::applyExcludedToOffs() {
 	for (auto& c : chunks_)
-		c.off_ -= c.alredy_excluded_;
+		c.off_ -= c.already_excluded_;
 }
 
 int64_t Track::getDurationInTimescale()  {

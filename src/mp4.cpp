@@ -220,7 +220,7 @@ void Mp4::printDynStats() {
 
 void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 	string output = mdat_fn + "_united.mp4";
-	warnIfAlredyExists(output);
+	warnIfAlreadyExists(output);
 
 	FileRead fmdat(mdat_fn), fmoov(moov_fn);
 
@@ -253,7 +253,7 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 void Mp4::shorten(const string& filename, int mega_bytes) {
 	int64_t n_bytes = mega_bytes * 1e6;
 	string output = ss(filename + "_short-", mega_bytes, ".mp4");
-	warnIfAlredyExists(output);
+	warnIfAlreadyExists(output);
 
 	FileRead f(filename);
 	BufferedAtom mdat(f), moov(f);
@@ -280,14 +280,14 @@ void Mp4::shorten(const string& filename, int mega_bytes) {
 }
 
 void Mp4::makeStreamable(const string& ok, const string& output) {
-	warnIfAlredyExists(output);
+	warnIfAlreadyExists(output);
 	parseOk(ok);
 	if (!current_mdat_) findMdat(*current_file_);
 
 	auto moov = root_atom_->atomByName("moov");
 	auto mdat = root_atom_->atomByName("mdat");
 	if (moov->start_ < mdat->start_) {
-		logg(I, "alredy streamable!\n");
+		logg(I, "already streamable!\n");
 		return;
 	}
 
@@ -825,7 +825,7 @@ bool Mp4::isTrackOrderEnough() {
 }
 
 void Mp4::genDynStats(bool force_patterns) {
-	if (chunk_transitions_.size()) return;  // alredy generated
+	if (chunk_transitions_.size()) return;  // already generated
 	if (!current_mdat_) findMdat(*current_file_);
 	genChunks();
 
@@ -845,7 +845,7 @@ void Mp4::genDynStats(bool force_patterns) {
 }
 
 void Mp4::checkForBadTracks() {
-	if (track_order_.size()) return;  // we alredy checked via `isTrackOrderEnough()`
+	if (track_order_.size()) return;  // we already checked via `isTrackOrderEnough()`
 	for (auto& t: tracks_) {
 		if (!t.hasPredictableChunks() && !t.codec_.isSupported()) {
 			logg(ET, "bad track: '", t.codec_.name_, "'\n");
@@ -1494,7 +1494,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		if (chunk.track_idx_ != idx_free_) chunk_idx_++;
 
 		t.current_chunk_ = chunk;
-		t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
+		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 
 		if (!t.is_dummy_) {
 			FrameInfo match(chunk.track_idx_, 0, 0, offset, chunk.sample_size_);
@@ -1541,7 +1541,7 @@ bool Mp4::tryMatch(off_t& offset ) {
 			if (match.track_idx_ != idx_free_) chunk_idx_++;
 			if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
 			t.current_chunk_.off_ = offset;
-			t.current_chunk_.alredy_excluded_ = current_mdat_->total_excluded_yet_;
+			t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 		}
 
 		addFrame(match);

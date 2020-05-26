@@ -61,7 +61,7 @@ public:
 
 	std::string filename_;
 
-	static bool alredyExists(const std::string& fn);
+	static bool alreadyExists(const std::string& fn);
 	static bool isRegularFile(const std::string& fn);
 
 protected:
