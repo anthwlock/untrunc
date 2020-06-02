@@ -52,6 +52,8 @@ void Codec::initOnce() {
 
 	assert(dispatch_get_size.count("mp4a"));
 	dispatch_get_size["sawb"] = dispatch_get_size["mp4a"];
+	dispatch_get_size["hev1"] = dispatch_get_size["hvc1"];
+	dispatch_match["hev1"] = dispatch_match["hvc1"];
 }
 
 
@@ -232,6 +234,7 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	}},
 	MATCH_FN("hvc1") {
 		// no idea if this generalizes well..
+		// 00...... ..01....
 		int s2 = swap32(((int *)start)[1]);
 		return (s >> 24) == 0x00 && ((s2 >> 16) & 0x00ff) == 0x01;
 	}},
