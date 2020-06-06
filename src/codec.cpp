@@ -303,6 +303,7 @@ inline int untr_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_fr
 
 map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("mp4a") {
+		start_m4pa:
 		maxlength = min(g_max_buf_sz_needed, maxlength);
 
 		static AVPacket* packet = av_packet_alloc();
@@ -316,16 +317,27 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
 //		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
 
+		self->audio_duration_ = frame->nb_samples;
+		logg(V, "nb_samples: ", self->audio_duration_, '\n');
+
+		self->was_bad_ = (!got_frame || self->av_codec_params_->channels != frame->channels);
+		if (self->was_bad_) {
+			logg(V, "got_frame: ", got_frame, '\n');
+			logg(V, "channels: ", self->av_codec_params_->channels, ", ", frame->channels, '\n');
+
+			if (is_new_ffmpeg_api && to_uint(packet->size) != maxlength) {
+				logg(V, "avcodec_flush_buffers, then retry..\n");
+				avcodec_flush_buffers(self->av_codec_context_);
+				packet->size = maxlength;
+				goto start_m4pa;
+			}
+		}
+
 		// simulate state for new API
 		if (is_new_ffmpeg_api && consumed >= 0) {
 			packet->size -= consumed;
 			if (packet->size <= 0) packet->size = maxlength;
 		}
-
-		self->audio_duration_ = frame->nb_samples;
-		logg(V, "nb_samples: ", self->audio_duration_, '\n');
-
-		self->was_bad_ = (!got_frame || self->av_codec_params_->channels != frame->channels);
 
 		return consumed;
 	}},

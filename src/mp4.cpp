@@ -1103,7 +1103,10 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 			logg(E, "Invalid length: ", length, " - too big (track: ", i, ")\n");
 			continue;
 		}
-		if (c.was_bad_) continue;
+		if (c.was_bad_) {
+			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
+			continue;
+		}
 
 		return FrameInfo(i, c, offset, length);
 	}
