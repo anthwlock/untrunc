@@ -132,7 +132,9 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		//TODO use the first byte of the nal: forbidden bit and type!
 		int nal_type = (start[4] & 0x1f);
 		//the other values are really uncommon on cameras...
-		if(nal_type > 21) {
+		if(nal_type > 21
+		   && nal_type != 31  // sometimes used for metadata
+		   ) {
 			//		if(nal_type != 1 && nal_type != 5 && nal_type != 6 && nal_type != 7 &&
 			//				nal_type != 8 && nal_type != 9 && nal_type != 10 && nal_type != 11 && nal_type != 12) {
 			logg(V, "avc1: no match because of nal type: ", nal_type, '\n');
