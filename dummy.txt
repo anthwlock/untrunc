@@ -1,0 +1,5 @@
+please download latest src from:
+https://github.com/anthwlock/untrunc/archive/master.zip
+
+NOT from:
+https://github.com/anthwlock/untrunc/archive/latest.zip
