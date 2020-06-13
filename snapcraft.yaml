@@ -1,4 +1,4 @@
-name: anthwlock-untrunc
+name: michaelp-anthwlock-untrunc
 version: "1.0-git"
 summary: Restore a damaged (truncated) mp4, m4v, mov, 3gp video
 description: |
@@ -10,7 +10,7 @@ grade: stable
 confinement: strict
 
 apps:
-  anthwlock-untrunc: 
+  untrunc: 
     command: app/untrunc
     plugs: [home, removable-media]
 
