@@ -32,7 +32,11 @@ parts:
       - git
       - ca-certificates
       - xz-utils
-   
+      - libc6
+      - libavutil-dev
+      - libavformat-dev
+      - build-essential
+  
     stage-packages:
       - libx11-6
       - libva-drm2
