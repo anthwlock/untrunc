@@ -32,6 +32,7 @@ parts:
       - git
       - ca-certificates
       - xz-utils
+      - libc6
    
     stage-packages:
       - libx11-6
