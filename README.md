@@ -1,3 +1,5 @@
+[![michaelp-anthwlock-untrunc](https://snapcraft.io//michaelp-anthwlock-untrunc/badge.svg)](https://snapcraft.io/michaelp-anthwlock-untrunc)
+
 Untrunc
 =======
 
