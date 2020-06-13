@@ -1,4 +1,4 @@
-name: michaelp-anthwlock-untrunc
+name: anthwlock-untrunc
 version: "1.0-git"
 summary: Restore a damaged (truncated) mp4, m4v, mov, 3gp video
 description: |
@@ -10,7 +10,7 @@ grade: stable
 confinement: strict
 
 apps:
-  untrunc: 
+  anthwlock-untrunc: 
     command: app/untrunc
     plugs: [home, removable-media]
 
@@ -20,18 +20,23 @@ parts:
     plugin: make
     override-build: |
       echo "Running override-build script"
-      make FF_VER=shared
+      make FF_VER=3.3.9
       mkdir -p $SNAPCRAFT_PART_INSTALL/app
       rm -rf $SNAPCRAFT_PART_INSTALL/app/*
       mv untrunc $SNAPCRAFT_PART_INSTALL/app
     build-packages:
+      - yasm
+      - wget
       - g++
       - make
-      - libavutil-dev
-      - libavformat-dev
+      - git
+      - ca-certificates
+      - xz-utils
    
     stage-packages:
-      - libavformat58
-      - libavcodec58
-      - libavutil56
+      - libx11-6
+      - libva-drm2
+      - libva2
+      - libva-x11-2
+
       
