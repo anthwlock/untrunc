@@ -20,18 +20,23 @@ parts:
     plugin: make
     override-build: |
       echo "Running override-build script"
-      make FF_VER=shared
+      make FF_VER=3.3.9
       mkdir -p $SNAPCRAFT_PART_INSTALL/app
       rm -rf $SNAPCRAFT_PART_INSTALL/app/*
       mv untrunc $SNAPCRAFT_PART_INSTALL/app
     build-packages:
+      - yasm
+      - wget
       - g++
       - make
-      - libavutil-dev
-      - libavformat-dev
+      - git
+      - ca-certificates
+      - xz-utils
    
     stage-packages:
-      - libavformat58
-      - libavcodec58
-      - libavutil56
+      - libx11-6
+      - libva-drm2
+      - libva2
+      - libva-x11-2
+
       
