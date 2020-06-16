@@ -21,6 +21,7 @@ parts:
     override-build: |
       echo "Running override-build script"
       make FF_VER=3.3.9
+      strip untrunc
       mkdir -p $SNAPCRAFT_PART_INSTALL/app
       rm -rf $SNAPCRAFT_PART_INSTALL/app/*
       mv untrunc $SNAPCRAFT_PART_INSTALL/app
