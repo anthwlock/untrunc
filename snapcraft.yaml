@@ -4,7 +4,7 @@ summary: Restore a damaged (truncated) mp4, m4v, mov, 3gp video
 description: |
   Restore a damaged (truncated) mp4, m4v, mov, 3gp video. Provided you have a similar not broken video. And some luck.
 license: GPL-2.0
-base: core20
+base: core18
 
 grade: stable
 confinement: strict
