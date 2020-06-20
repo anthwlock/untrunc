@@ -1,0 +1,37 @@
+name: untrunc-anthwlock
+version: "git"
+summary: Restore a damaged (truncated) mp4, m4v, mov, 3gp video
+description: |
+  Restore a damaged (truncated) mp4, m4v, mov, 3gp video. Provided you have a similar not broken video. And some luck.
+  Improved version of ponchio/untrunc
+license: GPL-2.0
+base: core18
+#architectures: [amd64, i386]
+#architectures: amd64
+
+grade: stable
+confinement: strict
+
+apps:
+  untrunc-anthwlock: 
+    command: untrunc
+    plugs: [home, removable-media]
+
+parts:
+  untrunc-anthwlock:
+    source: .
+    plugin: make
+    override-build: |
+      echo "Running override-build script"
+      make FF_VER=3.3.9
+      strip untrunc
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/bin"
+      mv untrunc "$SNAPCRAFT_PART_INSTALL/bin"
+    build-packages:
+      - yasm
+      - wget
+      - g++
+      - make
+      - git
+      - ca-certificates
+      - xz-utils
