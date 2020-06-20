@@ -23,9 +23,8 @@ FROM ubuntu:bionic
 ARG FF_VER=shared
 
 RUN apt-get update && [ "$FF_VER" = 'shared' ] && \
-	apt-get -y install --no-install-recommends libavformat57 libavcodec57 libavutil55 || \
-	apt-get -y install --no-install-recommends libx11-6 libva-drm2 libva2 libva-x11-2 && \
-	rm -rf /var/lib/apt/lists/*
+	apt-get -y install --no-install-recommends libavformat57 libavcodec57 libavutil55 && \
+	rm -rf /var/lib/apt/lists/* || true
 COPY --from=build /untrunc-src/untrunc /bin/untrunc
 
 # non-root user
