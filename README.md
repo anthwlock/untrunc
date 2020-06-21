@@ -68,6 +68,12 @@ The optional argument 'FF_VER' will be passed to `make`.
 
 	docker run -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
 
+## Snapcraft
+
+If you have `snap`, you can use `sudo snap install --edge untrunc-anthwlock`.
+
+[![untrunc-anthwlock](https://snapcraft.io//untrunc-anthwlock/badge.svg)](https://snapcraft.io/untrunc-anthwlock)
+
 ## Using
 
 You need both the broken video and an example working video (ideally from the same camera, if not the chances to fix it are slim).
