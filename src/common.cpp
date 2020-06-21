@@ -360,3 +360,9 @@ void warnIfAlreadyExists(const string& output) {
 		hitEnterToContinue();
 	}
 }
+
+bool isAllZeros(const uchar* buf, int n) {
+//	for (int i=0; i < n; i+=4) if (*(int*)(buf+i)) return false;
+	for (int i=0; i < n; i++) if (*(buf+i)) return false;
+	return true;
+}

@@ -73,8 +73,8 @@ bool MutualPattern::doesMatch(const uchar* buf) {
 }
 
 bool MutualPattern::doesMatchHalf(const uchar* buf) {
-	auto r = intersectLenHalf(buf);
-	cout << r << " == " << size_mutual_ << '\n';
+//	auto r = intersectLenHalf(buf);
+//	cout << r << " == " << size_mutual_ << '\n';
 	return intersectLenHalf(buf) == size_mutual_half_;
 }
 

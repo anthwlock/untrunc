@@ -167,6 +167,7 @@ double calcEntropy(const std::vector<uchar>& in);
 int64_t gcd(int64_t a, int64_t b);
 
 void warnIfAlreadyExists(const std::string&);
+bool isAllZeros(const uchar* buf, int n);
 
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd

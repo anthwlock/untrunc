@@ -814,6 +814,16 @@ void Mp4::correctChunkIdx(int track_idx) {
 		logg(W, "correctChunkIdx(", track_idx, ") could be wrong");
 }
 
+int Mp4::skipNextZeroCave(off_t off, int max_sz, int n_zeros) {
+	// skip to cave + skip over cave
+
+	for (auto pos=off; max_sz > 0; pos+=n_zeros, max_sz-=n_zeros)
+		if (isAllZerosAt(pos, n_zeros))
+			for (; max_sz > 0; pos+=1, max_sz-=1)
+				if (!isAllZerosAt(pos, 1)) return pos-off;
+	return -1;
+}
+
 bool Mp4::isTrackOrderEnough() {
 	if (!track_order_.size()) return false;
 	for (auto& t : tracks_) {
@@ -1195,9 +1205,15 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 
 	if (last_track_idx_ == -1) {  // very first offset
 		track_idx = getTrackIdx(orig_first_track_->codec_.name_);
-		cout << "orig_trak:" << orig_first_track_->codec_.name_ << " " << track_idx << '\n';
+		logg(V, "orig_trak:", orig_first_track_->codec_.name_, " ", track_idx, '\n');
+		if (orig_first_track_->codec_.name_ == "priv") {  // FC7203 adds 241 zeros after second thumbnail
+			logg(V, "using skipNextZeroCave .. \n");
+			int sz = skipNextZeroCave(offset, 1<<21, 12) - 1;
+			logg(V, "skipNextZeroCave(", offset, ") -> ", sz, "\n");
+			if (sz >= 0) return Chunk(offset, 1, track_idx, sz);
+		}
 		if (!anyPatternMatchesHalf(offset, track_idx)) {
-			cout << "no pattern suggests this..\n";
+			cout << "no half-pattern suggests this ..\n";
 			return c;
 		}
 	}
@@ -1329,11 +1345,6 @@ int64_t Mp4::calcStep(off_t offset) {
 		step = Mp4::step_;
 	}
 	return step;
-}
-
-bool isAllZeros(const uchar* buf, int n) {
-	for (int i=0; i < n; i+=4) if (*(int*)(buf+i)) return false;
-	return true;
 }
 
 bool Mp4::isAllZerosAt(off_t off, int n) {

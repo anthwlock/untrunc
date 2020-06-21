@@ -185,6 +185,8 @@ private:
 	bool dummyIsSkippable();
 	void correctChunkIdx(int track_idx);
 
+	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
+
 	static const int kDefaultFreeIdx = -2;
 };
 
