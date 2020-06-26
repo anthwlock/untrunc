@@ -375,7 +375,12 @@ void Track::saveKeyframes() {
 		return;
 	}
 
-	Atom *stss = trak_->atomByNameSafe("stss");
+	Atom *stss = trak_->atomByName("stss");
+	if (!stss) {
+		stss = new Atom;
+		stss->name_ = "stss";
+		trak_->children_.push_back(stss);
+	}
 
 	stss->content_.resize(4 + //version
 						  4 + //entries
