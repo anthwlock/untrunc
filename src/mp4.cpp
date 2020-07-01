@@ -351,8 +351,7 @@ void Mp4::setDuration() {
 
 void Mp4::saveVideo(const string& filename) {
 	/* we save all atom except:
-	  ctts: composition offset ( we use sample to time)
-	  cslg: because it is used only when ctts is present
+	  cslg: would need to be recalculated (from ctts)
 	  stps: partial sync, same as sync
 
 	  movie is made by ftyp, moov, mdat (we need to know mdat begin, for absolute offsets)
@@ -417,7 +416,7 @@ void Mp4::saveVideo(const string& filename) {
 	Atom *ftyp = root_atom_->atomByName("ftyp");
 	Atom *moov = root_atom_->atomByName("moov");
 
-	moov->prune("ctts");
+//	moov->prune("ctts");
 	moov->prune("cslg");
 	moov->prune("stps");
 
@@ -754,7 +753,13 @@ void Mp4::chkExpectedOff(off_t* expected_off, off_t real_off, uint sz, int idx) 
 void Mp4::dumpMatch(const FrameInfo& fi, int idx, off_t* expected_off) {
 	if (expected_off) chkExpectedOff(expected_off, fi.offset_, fi.length_, idx);
 	dumpIdxAndOff(fi.offset_, idx);
-	cout << fi << '\n';
+//	cout << fi << '\n';
+	cout << fi;
+	int comp_off = 0;
+	auto& track = tracks_[fi.track_idx_];
+	if (track.orig_comp_offs_.size())
+		comp_off = track.orig_comp_offs_[track.dump_idx_++];
+	cout << ", " << comp_off << '\n';
 }
 
 void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx, off_t* expected_off) {

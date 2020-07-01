@@ -48,6 +48,7 @@ void usage() {
 	     << "-range <A:B>  - raw data range\n"
 	     << "-dst <dir|file>  - set destination\n"
 	     << "-skip  - skip existing\n"
+	     << "-noctts  - dont restore ctts\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -131,6 +132,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "v") g_log_mode = LogMode::V;
 			else if (a == "w") g_log_mode = LogMode::W2;
 			else if (a == "q") g_log_mode = LogMode::E;
+			else if (a == "noctts") g_no_ctts = true;
 			else if (a == "n") g_interactive = false;
 			else if (a == "f") find_atoms = true;
 			else if (a == "do") g_dont_omit = true;

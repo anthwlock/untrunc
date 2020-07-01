@@ -86,6 +86,8 @@ void Track::parseOk() {
 	getChunkOffsets();
 	parseSampleToChunk();
 
+	getCompositionOffsets();
+
 	if (constant_duration_ == -1 && !constant_size_ && times_.size() != sizes_.size()) {
 		cout << "Mismatch between time offsets and size offsets: \n";
 		cout << "Time offsets: " << times_.size() << " Size offsets: " << sizes_.size() << endl;
@@ -138,6 +140,7 @@ void Track::writeToAtoms(bool broken_is_64) {
 	saveSampleSizes();
 	saveSampleToChunk();
 	saveChunkOffsets();
+	saveCompositionOffsets();
 
 	editHeaderAtom();
 
@@ -298,6 +301,21 @@ void Track::getChunkOffsets() {
 	}
 }
 
+void Track::getCompositionOffsets() {
+	Atom* ctts = trak_->atomByName("ctts");
+	if (!ctts) return;
+
+	int entries = ctts->readInt(4);
+	for (int i = 0; i < entries; i++) {
+		int sample_cnt = ctts->readInt(8 + 8*i);
+		int comp_off = ctts->readInt(12 + 8*i);
+		orig_ctts_.emplace_back(sample_cnt, comp_off);
+
+		for (int j=0; j < sample_cnt; j++)  // for Mp4::dumpSamples -> Mp4::dumpMatch
+			orig_comp_offs_.emplace_back(comp_off);
+	}
+}
+
 void Track::parseSampleToChunk(){
 	Atom *stsc = trak_->atomByNameSafe("stsc");
 
@@ -357,7 +375,7 @@ void Track::saveSampleTimes() {
 			else vp.emplace_back(1, v);
 		}
 	}
-	stts->content_.resize(4 + //version
+	stts->content_.resize(4 + //version+flags
 	                      4 + //entries
 	                      8*vp.size()); //time table
 	stts->writeInt(vp.size(), 4);
@@ -382,9 +400,9 @@ void Track::saveKeyframes() {
 		trak_->children_.push_back(stss);
 	}
 
-	stss->content_.resize(4 + //version
-						  4 + //entries
-						  4*keyframes_.size()); //time table
+	stss->content_.resize(4 + //version+flags
+	                      4 + //entries
+	                      4*keyframes_.size()); //time table
 	stss->writeInt(keyframes_.size(), 4);
 	for (uint i=0; i < keyframes_.size(); i++)
 		stss->writeInt(keyframes_[i] + 1, 8 + 4*i);
@@ -445,6 +463,43 @@ void Track::saveChunkOffsets() {
 		stco->content_.resize(8 + 4*chunks_.size());
 		stco->writeInt(chunks_.size());
 		for (auto& c : chunks_) stco->writeInt(c.off_);
+	}
+}
+
+void Track::saveCompositionOffsets() {  // aka DisplayOffsets
+	if (orig_ctts_.size()) {
+		int orig_sz = orig_ctts_.size();
+//		auto r = findOrder(orig_ctts_, true);
+		auto r = findOrder(orig_ctts_);
+		logg(V, "reduced origt_ctts_: ", orig_sz, " -> ", orig_ctts_.size(), '\n');
+		if (!r) logg(V, "ctts values seem unpredictable..\n");
+	}
+
+	if (!orig_ctts_.size() || g_no_ctts) {
+		if (g_no_ctts) logg(I, "pruning ctts..\n");
+		trak_->prune("ctts");
+		return;
+	}
+
+	vector<pair<int, int>> vp;
+	for (size_t cnt=0; cnt < num_samples_;) {
+		for (auto p : orig_ctts_) {
+			vp.emplace_back(p);
+			cnt += p.first;
+			if (cnt >= num_samples_) break;
+		}
+	}
+
+	Atom *ctts = trak_->atomByNameSafe("ctts");
+
+	ctts->content_.resize(4 + //version+flags
+	                      4 + //entries
+	                      8*vp.size());
+	ctts->seek(4);
+	ctts->writeInt(vp.size());
+	for (auto p : vp) {
+		ctts->writeInt(p.first); // sample_count
+		ctts->writeInt(p.second); // composition_offset
 	}
 }
 

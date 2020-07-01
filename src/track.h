@@ -66,7 +66,9 @@ public:
 	void getSampleSizes();
 	void getChunkOffsets();
 	void parseSampleToChunk();
+	void getCompositionOffsets();
 	void genPatternPerm();
+
 
 	std::vector<off_t> getChunkOffsets64();
 
@@ -75,6 +77,7 @@ public:
 	void saveSampleToChunk();
 	void saveSampleSizes();
 	void saveChunkOffsets();
+	void saveCompositionOffsets();
 
 	struct Chunk {
 		Chunk() = default;
@@ -115,10 +118,13 @@ public:
 
 	void applyExcludedToOffs();
 
+	std::vector<int> orig_comp_offs_;  // from ctts
+	int dump_idx_ = 0;
 private:
 	// from healthy file
 	std::vector<int> orig_sizes_;
 	std::vector<int> orig_times_;
+	std::vector<std::pair<int, int>> orig_ctts_;
 
 	std::vector<uint> dyn_patterns_perm_;
 

@@ -45,6 +45,7 @@ bool g_dont_omit = false;
 bool g_noise_buffer_active = false;
 bool g_ignore_out_of_bound_chunks = false;
 bool g_skip_existing = false;
+bool g_no_ctts = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
