@@ -509,7 +509,7 @@ void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 	cout << '\n';
 
 	if (c.name_ == "mp4a") {
-		cout << "detected duration: " << duration << " true: " << fi.length_;
+		cout << "detected duration: " << duration << " true: " << fi.audio_duration_;
 		if (duration != fi.audio_duration_) cout << "  <- WRONG";
 		cout << '\n';
 		if (c.was_bad_) cout << "detected bad frame\n";
