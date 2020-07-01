@@ -169,6 +169,8 @@ int64_t gcd(int64_t a, int64_t b);
 void warnIfAlreadyExists(const std::string&);
 bool isAllZeros(const uchar* buf, int n);
 
+bool findOrder(std::vector<std::pair<int, int>>& data, bool ignore_first_failed=false);
+
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd
 class HasHeaderAtom {

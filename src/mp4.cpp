@@ -597,8 +597,7 @@ void Mp4::genChunkTransitions() {
 	logg(V, "created dummy track 'free'\n");
 
 	vector<pair<int, int>> order;
-	bool order_finished = false;
-	size_t chunk_idx = 0, first_failed = 0, order_skipped = 0;
+	size_t chunk_idx = 0;
 
 	while (true) {
 		int track_idx = -1;
@@ -613,21 +612,14 @@ void Mp4::genChunkTransitions() {
 		}
 		if (track_idx < 0) break;
 
-
 		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
 		if (chunk_idx < 10 && tracks_[track_idx].codec_.name_ == "tmcd") {
-			order_skipped++;
 			goto loop_end;
 		}
-		if (!order_finished && order.size() < 25 && tracks_[track_idx].codec_.name_ != "tmcd") {
-			auto p = make_pair(track_idx, cur_chunk.n_samples_);
-			if (order.size() && order.front() == p) order_finished = true;
-			else order.emplace_back(p);
-		}
-		else if (order_finished && !first_failed) {
-			auto p = make_pair(track_idx, cur_chunk.n_samples_);
-			if (order[(chunk_idx - order_skipped) % order.size()] != p) first_failed = chunk_idx;
-		}
+
+
+		if (order.size() < 100 && tracks_[track_idx].codec_.name_ != "tmcd")
+			order.emplace_back(make_pair(track_idx, cur_chunk.n_samples_));
 
 		if (first_off_abs_ < 0) {
 			first_off_abs_ = cur_chunk.off_;
@@ -665,14 +657,7 @@ void Mp4::genChunkTransitions() {
 		logg(V, "removed dummy track 'free'\n");
 	}
 
-	if (g_log_mode >= V) {
-		cout << "first_failed: " << first_failed << " of " << chunk_idx << '\n';
-		cout << "order_finished: " << order_finished << '\n';
-		cout << "order: ";
-		for (auto& p : order) cout << ss("(", p.first, ", ", p.second, ") ");
-		cout << '\n';
-	}
-	if (order_finished && (!first_failed || chunk_idx - first_failed <= order.size()))  // last chunks may be shorter
+	if (findOrder(order))
 		track_order_ = order;
 }
 

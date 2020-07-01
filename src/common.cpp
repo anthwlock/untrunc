@@ -366,3 +366,40 @@ bool isAllZeros(const uchar* buf, int n) {
 	for (int i=0; i < n; i++) if (*(buf+i)) return false;
 	return true;
 }
+
+bool findOrder(vector<pair<int, int>>& data, bool ignore_first_failed) {
+	int order_sz = -1;
+	for (uint i=1; i < data.size(); i++) {
+		if (data[i] == data[0]) {
+			order_sz = i;
+			break;
+		}
+	}
+	if (order_sz < 0) {
+		data.clear();
+		return false;
+	}
+
+	uint first_failed = 0;
+	for (uint i=1; i < data.size(); i++) {
+		if (data[i] != data[i%order_sz]) {
+			first_failed = i;
+			break;
+		}
+	}
+
+	if (first_failed == data.size() - 1)  // last value might be shorter
+		first_failed = 0;
+
+	int orig_sz = data.size();
+	data.resize(order_sz);
+	if (g_log_mode >= V) {
+		cout << "first_failed: " << first_failed << " of " << orig_sz << '\n';
+		cout << "order: ";
+		for (auto& p : data) cout << ss("(", p.first, ", ", p.second, ") ");
+		cout << '\n';
+	}
+
+	if (first_failed && !ignore_first_failed) data.clear();
+	return !first_failed;
+}
