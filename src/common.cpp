@@ -389,7 +389,8 @@ bool findOrder(vector<pair<int, int>>& data, bool ignore_first_failed) {
 		}
 	}
 
-	if (first_failed == data.size() - 1)  // last value might be shorter
+//	if (first_failed == data.size() - 1)  // last value might be shorter
+	if (first_failed == data.size() - order_sz && order_sz <= 4)  // last values might be shorter
 		first_failed = 0;
 
 	int orig_sz = data.size();
