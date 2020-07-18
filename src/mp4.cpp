@@ -1363,10 +1363,10 @@ start:
 	static uint loop_cnt = 0;
 	if (g_log_mode == I && loop_cnt++ % 2000 == 0) outProgress(offset, current_mdat_->file_end_);
 
-	auto shouldIgnoreZeros = [&]() {
+	auto shouldKeepZeros = [&]() {
 		if (g_use_chunk_stats) {
 			for (auto& cn : {"sowt", "twos"}) {
-				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset) && !isAllZeros(start+4, 32-4)) {
+				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset)) {
 					logg(V, "won't skip zeros at: ", offToStr(offset), "\n");
 					return true;
 				}
@@ -1381,7 +1381,7 @@ start:
 		return false;
 	};
 
-	if (*(int*)start == 0 && !shouldIgnoreZeros()) {
+	if (*(int*)start == 0 && !shouldKeepZeros()) {
 		logg(V, "skipping zeros at: ", offToStr(offset), "\n");
 		int64_t step = 4;
 		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
