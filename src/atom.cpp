@@ -104,13 +104,17 @@ off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searchi
 
 	if (searching_mdat && !--show_mdat_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
 
-	for (off_t off_start=start_atom->contentStart(), off=off_start; off < file.length();) {
-		auto buff = file.getPtrAt(off, 4);
+	off_t off_start = start_atom->contentStart(), off = off_start;
+	while (off < file.length()) {
+		auto buff = file.getPtrAt(off+4, 7);
 		if (g_log_mode == LogMode::I && off % (1<<16) == 0 && off > off_start) outProgress(off, file.length());
-		if (!isdigit(*buff) && !islower(*buff) && !isspace(*buff)) {off += 4; continue;}
-		for (int i=3; i >= 0; --i)
-			if (isValidAtomName(buff-i)) return off-4-i;
-		off += 7;
+
+		const char m = *(buff+3);
+		if (!isdigit(m) && !islower(m) && !isspace(m)) { off += 4; continue; }
+
+		for (int i=0; i < 4; i++)
+			if (isValidAtomName(buff+i)) return off+i;
+		off += 4;
 	}
 	return file.length();
 }
