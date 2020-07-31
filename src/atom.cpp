@@ -81,7 +81,7 @@ void Atom::parse(FileRead& file) {
 	else if (name_ == "mdat") {  // don't read content of mdat
 		file.seekSafe(start_ + length_);
 		if (!isPointingAtAtom(file))
-			throw ss("bad 'mdat' length = ", length_, " new_pos = ", file.pos());
+			logg(W, "bad 'mdat' length = ", length_, " new_pos = ", file.pos(), "\n");
 	}
 	else {
 		content_ = file.read(length_ -8); //lenght includes header
