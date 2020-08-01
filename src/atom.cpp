@@ -121,18 +121,12 @@ off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searchi
 
 void Atom::findAtomNames(const string& filename) {
 	FileRead file(filename);
-	Atom atom;
-
 	bool ignore_avc1 = 0;
-	off_t off = findNextAtomOff(file, &atom);
-	while (off < file.length()) {
-		file.seek(off);
-		atom.parseHeader(file, true);
-
+	for (Atom& atom : AllAtomsIn(file)) {
 		if (atom.name_ == "ftyp") ignore_avc1 = 1;
 		if (!ignore_avc1 || atom.name_ != "avc1") {
-			cout << ss(off, ": ", atom.name_, " (", atom.length_, ")");
-			off_t next_off = off + atom.length_;
+			cout << ss(atom.start_, ": ", atom.name_, " (", atom.length_, ")");
+			off_t next_off = atom.start_ + atom.length_;
 			if (atom.name_ == "avcC") cout << " <-- skipped\n";
 			else if (atom.length_ < atom.header_length_) {
 				cout << " <-- negative content length\n";
@@ -145,7 +139,6 @@ void Atom::findAtomNames(const string& filename) {
 			else
 				cout << "\n";
 		}
-		off = findNextAtomOff(file, &atom);
 	}
 }
 

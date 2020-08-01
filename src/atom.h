@@ -5,6 +5,7 @@ extern "C" {
 }
 #include <vector>
 #include <string>
+#include <cassert>
 
 #include "common.h"
 #include "file.h"
@@ -19,10 +20,11 @@ public:
 	std::vector<Atom *> children_;
 
 	Atom();
+	Atom(FileRead& f) {parse(f);}
 	virtual ~Atom();
 
 	void parseHeader(FileRead &file, bool no_check=false); //read just name and length
-	void parse(FileRead &file);
+	void parse(FileRead& file);
 	virtual void write(FileWrite &file);
 	void print(int offset);
 
@@ -58,6 +60,14 @@ public:
 	size_t cursor_off_ = 0;  // for "stream like" read/write methods
 	void seek(size_t idx) {cursor_off_ = idx;}
 
+	static const off_t kEndAtomStart = -55;
+	static Atom mkEndAtom() {
+		return Atom(kEndAtomStart);
+	}
+
+private:
+	Atom(off_t start) : start_(start) {}
+
 };
 
 class BufferedAtom: public Atom {
@@ -80,6 +90,40 @@ public:
 
 	void updateFileEnd(int64_t file_end);
 };
+
+
+class HiddenAtomIt {
+public:
+	FileRead& f_;
+	Atom atom_;
+	HiddenAtomIt(FileRead& f) : f_(f) { operator++(); }
+	HiddenAtomIt mkEndIt() { return HiddenAtomIt(f_, true); }
+
+	void operator++() {
+		off_t off = Atom::findNextAtomOff(f_, &atom_);
+		if (off >= f_.length()) {
+			atom_.start_ = Atom::kEndAtomStart;
+			return;
+		}
+		f_.seek(off);
+		atom_.parseHeader(f_, true);
+	}
+	Atom& operator*() {return atom_;}
+	bool operator!=(HiddenAtomIt rhs) {return atom_.start_ != rhs.atom_.start_;}
+
+private:
+	HiddenAtomIt(FileRead& f, bool is_end_it_) : f_(f), atom_(Atom::mkEndAtom()) { assert(is_end_it_); }
+};
+
+/* Iteratable, which also lists 'hidden' atoms */
+class AllAtomsIn {
+public:
+	HiddenAtomIt it_, end_it_;
+	AllAtomsIn(FileRead& f) : it_(f), end_it_(it_.mkEndIt()) {}
+	HiddenAtomIt begin() {return it_;}
+	HiddenAtomIt end() {return end_it_;}
+};
+
 
 bool isPointingAtAtom(FileRead& file);
 
