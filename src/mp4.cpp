@@ -1461,9 +1461,10 @@ start:
 	// skip free atoms
 	if (string(start+4, start+8) == "free") {
 		if (unknown_length_) noteUnknownSequence(offset);
-		if (last_track_idx_ >= 0)
+		if (idx_free_ >= 0 && last_track_idx_ >= 0 && last_track_idx_ != idx_free_) {
 			tracks_[last_track_idx_].pushBackLastChunk();
-		if (idx_free_ >= 0) last_track_idx_ = idx_free_;
+			last_track_idx_ = idx_free_;
+		}
 
 		uint atom_len = swap32(begin);
 		addToExclude(offset, atom_len);
@@ -1475,9 +1476,10 @@ start:
 	// skip 'mdat' headers
 	if (string(start+4, start+8) == "mdat") {
 		if (unknown_length_) noteUnknownSequence(offset);
-		if (last_track_idx_ >= 0)
+		if (idx_free_ >= 0 && last_track_idx_ >= 0 && last_track_idx_ != idx_free_) {
 			tracks_[last_track_idx_].pushBackLastChunk();
-		if (idx_free_ >= 0) last_track_idx_ = idx_free_;
+			last_track_idx_ = idx_free_;
+		}
 
 		addToExclude(offset, 8);
 		logg(V, "Skipping 'mdat' header: ", offToStr(offset), '\n');
