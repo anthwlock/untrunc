@@ -1156,6 +1156,10 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 			logg(E, "Invalid length: ", length, " - too big (track: ", i, ")\n");
 			continue;
 		}
+		if (length  <  6 && c.name_ == "avc1") {  // very short NALs are ok, short frames aren't
+			logg(W2, "Invalid length: ", length, " - too small (track: ", i, ")\n");
+			continue;
+		}
 		if (c.was_bad_) {
 			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
 			continue;
