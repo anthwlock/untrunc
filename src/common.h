@@ -117,6 +117,17 @@ C<T> choose100(const C<T>& in) {
 	return out;
 }
 
+template<class T>
+std::string vecToStr(std::vector<T> v) {
+	std::stringstream ss;
+	ss << "[";
+	for (size_t i = 0; i < v.size(); ++i) {
+		if (i != 0) ss << ", ";
+		ss << v[i];
+	}
+	ss << "]";
+	return ss.str();
+}
 
 const std::map<std::string, std::string> g_atom_names = {
     {"esds", "ES Descriptor"},

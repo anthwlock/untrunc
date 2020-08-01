@@ -218,6 +218,59 @@ void Mp4::printDynStats() {
 	}
 }
 
+void Mp4::listm(const string& filename) {
+	struct MoovStats {
+		off_t atom_start_;
+		off_t min_off_ = numeric_limits<off_t>::max(), max_off_ = -1;
+		int n_tracks = 0;
+		MoovStats(off_t start) : atom_start_(start) {}
+		explicit operator bool() { return n_tracks > 0; }
+
+	};
+
+	FileRead f(filename);
+	map<string, int> cnt;
+	vector<Atom*> moovs, mdats;
+
+	auto printMoov = [](Atom& moov) {
+		static int idx = 0;
+		vector<string> vc;
+		auto ms = MoovStats(moov.start_);
+
+		for (Atom* trak : moov.atomsByName("trak")) {
+			Track t (trak, NULL, 0);
+			vc.emplace_back(t.getCodecNameSlow());
+			t.getChunkOffsets();
+			ms.min_off_ = min(ms.min_off_, t.chunks_.front().off_);
+			ms.max_off_ = max(ms.max_off_, t.chunks_.back().off_);
+			ms.n_tracks++;
+		}
+		cout << ss(idx++, ": ", setw(12), ms.min_off_, " : ", setw(12), ms.max_off_,
+		       ", width=", setw(12), ms.max_off_ - ms.min_off_, ", ", setw(28), left, vecToStr(vc), right,
+		       " (start=", setw(13), ss(ms.atom_start_, ","), " moov_sz=", setw(12), moov.length_, ")\n");
+	};
+
+	auto printMdat = [](Atom& atom) {
+		static int idx = 0;
+		cout << ss(idx++, ": ", setw(85), " (start=", setw(13), ss(atom.start_, ","), " mdat_sz=", setw(12), atom.length_, ")\n");
+	};
+
+	for (Atom& atom : AllAtomsIn(f)) {
+		if (atom.name_ == "moov") {
+			f.seek(atom.start_);
+			moovs.emplace_back(new Atom(f));
+		} else if (atom.name_ == "mdat") {
+			f.seek(atom.start_);
+			mdats.emplace_back(new Atom(f));
+		}
+	}
+
+	cout << "moovs:\n";
+	for (Atom* atom : moovs) {printMoov(*atom); delete atom;}
+	cout << "mdats:\n";
+	for (Atom* atom : mdats) {printMdat(*atom); delete atom;}
+}
+
 void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 	string output = mdat_fn + "_united.mp4";
 	warnIfAlreadyExists(output);

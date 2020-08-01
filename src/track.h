@@ -69,15 +69,14 @@ public:
 	void getCompositionOffsets();
 	void genPatternPerm();
 
-
-	std::vector<off_t> getChunkOffsets64();
-
 	void saveSampleTimes();
 	void saveKeyframes();
 	void saveSampleToChunk();
 	void saveSampleSizes();
 	void saveChunkOffsets();
 	void saveCompositionOffsets();
+
+	std::string getCodecNameSlow();
 
 	struct Chunk {
 		Chunk() = default;

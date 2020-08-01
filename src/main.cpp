@@ -55,6 +55,7 @@ void usage() {
 	     << "-i[t|a|s] - info [tracks|atoms|stats]\n"
 	     << "-d  - dump samples\n"
 	     << "-f  - find all atoms and check their lenghts\n"
+	     << "-lsm - find all mdat,moov atoms\n"
 	     << "-m <offset> - match/analyze file offset\n"
 	     << "untrunc <ok.mp4> <ok.mp4> - report wrong values\n"
 	     << "\n"
@@ -100,6 +101,7 @@ int main(int argc, char *argv[]) {
 	bool analyze_offset = false;
 	bool make_streamable = false;
 	bool unite = false;
+	bool listm = false;
 	bool shorten = false;
 	off_t arg_offset = -1;
 	int arg_step = -1;
@@ -124,6 +126,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "sv") g_stretch_video = true;
 			else if (a == "st") arg_step = kExpectArg;
 			else if (a == "sh") shorten = true;
+			else if (a == "lsm") listm = true;
 			else if (a == "s") g_ignore_unknown = true;
 			else if (a == "k") g_dont_exclude = true;
 			else if (a == "a") analyze = true;
@@ -184,6 +187,7 @@ int main(int argc, char *argv[]) {
 		if (find_atoms) {Atom::findAtomNames(ok); return 0;}
 		if (unite) {chkC(); Mp4::unite(ok, corrupt); return 0;}
 		if (shorten) {Mp4::shorten(ok, corrupt.size() ? stoi(corrupt) : 200); return 0;}
+		if (listm) {Mp4::listm(ok); return 0;}
 
 		Mp4 mp4;
 		g_mp4 = &mp4;  // singleton is overkill, this is good enough

@@ -120,6 +120,12 @@ void Track::parseOk() {
 	}
 }
 
+string Track::getCodecNameSlow() {
+	Atom *stsd = trak_->atomByName("stsd");
+	string name = stsd->getString(12, 4);
+	return name.c_str();  // might be smaller than 4
+}
+
 void Track::writeToAtoms(bool broken_is_64) {
 	Atom *stbl = trak_->atomByName("stbl");
 	if (broken_is_64 && stbl->atomByName("stco")){
