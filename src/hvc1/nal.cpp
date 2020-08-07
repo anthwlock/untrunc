@@ -12,11 +12,20 @@ H265NalInfo::H265NalInfo(const uchar* start, int max_size) {
 	is_ok = parseNal(start, max_size);
 }
 
-bool isSlice(int nal_type) {
+bool h265IsSlice(int nal_type) {
 	return
 	    nal_type == NAL_TRAIL_N ||
 	    nal_type == NAL_TRAIL_R ||
+	    nal_type == NAL_CRA_NUT ||
+	    nal_type == NAL_RASL_N ||
+	    nal_type == NAL_RASL_R ||
 //	    nal_type == NAL_IDR_N_LP ||
+	    nal_type == NAL_IDR_W_RADL;
+}
+
+bool h265IsKeyframe(int nal_type) {
+	return
+	    nal_type == NAL_IDR_N_LP ||
 	    nal_type == NAL_IDR_W_RADL;
 }
 
@@ -39,7 +48,8 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 	if(length_ > maxlength) {
 //		cout << "maxlength = " << maxlength << '\n';
 //		cout << "length_ = " << length_ << '\n';
-		logg(W2, "buffer exceeded by: ", len-maxlength, '\n');
+		logg(W2, "buffer exceeded by: ", len-maxlength, " | ");
+		if (g_log_mode >= W2) printBuffer(buffer, 32);
 		return false;
 	}
 	buffer += 4;
@@ -68,7 +78,7 @@ bool H265NalInfo::parseNal(const uchar *buffer, uint32_t maxlength) {
 		return false;
 	}
 
-	if (isSlice(nal_type_)) {
+	if (h265IsSlice(nal_type_)) {
 		//check size is reasonable:
 		if(len < 8) {
 			logg(W2, "very short NAL-unit! (len=", len, ", type=", nal_type_, ")\n");

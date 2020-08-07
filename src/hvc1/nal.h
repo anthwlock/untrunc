@@ -7,8 +7,11 @@
 enum {
 	NAL_TRAIL_N     = 0, // non keyframe
 	NAL_TRAIL_R     = 1,
+	NAL_RASL_N      = 8,
+	NAL_RASL_R      = 9,
 	NAL_IDR_W_RADL  = 19, // keyframe
 	NAL_IDR_N_LP    = 20,
+	NAL_CRA_NUT     = 21,
 	NAL_AUD         = 35,  // Access unit delimiter
 	NAL_EOB_NUT     = 37,  // End of bitstream
 	NAL_FILLER_DATA = 38,
@@ -31,5 +34,7 @@ public:
 	bool parseNal(const uchar* start, uint32_t max_size);
 };
 
+bool h265IsSlice(int nal_type);
+bool h265IsKeyframe(int nal_type);
 
 #endif // H265_NAL_H
