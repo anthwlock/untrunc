@@ -205,14 +205,10 @@ void Track::clear() {
 void Track::fixTimes() {
 	const size_t len_offs = getNumSamples();
 
+	if (codec_.name_ == "mebx") constant_duration_ = 1;
+	if (codec_.name_ == "samr") assert(constant_duration_ == 160);
 	if (constant_duration_ != -1) {
 		duration_ = len_offs * constant_duration_;
-		return;
-	};
-
-	if (codec_.name_ == "samr") {
-		times_.clear();
-		times_.resize(len_offs, 160);
 		return;
 	}
 

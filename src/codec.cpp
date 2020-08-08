@@ -106,9 +106,8 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
 		return false;
 //		return (s>>16) == 0x210A;  // this needs to be improved
 	}},
-	MATCH_FN("tmcd") {
-		return false;
-	}}
+	MATCH_FN("tmcd") { return false; }},
+	MATCH_FN("mebx") { return false; }},
 };
 
 // only match if we are certain -> less false positives
@@ -239,6 +238,10 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		// 00...... ..01....
 		int s2 = swap32(((int *)start)[1]);
 		return (s >> 24) == 0x00 && ((s2 >> 16) & 0x00ff) == 0x01;
+	}},
+	MATCH_FN("mebx") {
+//		return s == 8 || s == 10 || s == 100;
+		return s < 200;
 	}},
 
 	/*
@@ -417,6 +420,9 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		self->was_bad_ = !got_frame;
 
 		return consumed;
+	}},
+	GET_SZ_FN("mebx") {
+		return swap32(*(int *)start);
 	}}
 
 	/* if codec is not found in map,
