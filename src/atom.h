@@ -126,5 +126,6 @@ public:
 
 
 bool isPointingAtAtom(FileRead& file);
+bool isValidAtomName(const uchar* buf);
 
 #endif // ATOM_H

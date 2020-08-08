@@ -1452,31 +1452,6 @@ start:
 		goto start;
 	}
 
-	// skip fake moov
-	if (string(start+4, start+8) == "moov") {
-		if (unknown_length_) noteUnknownSequence(offset);
-		uint moov_len = swap32(begin);
-		addToExclude(offset, moov_len, true);
-		logg(V, "Skipping moov atom: ", moov_len, '\n');
-		offset += moov_len;
-		goto start;
-	}
-
-	// skip free atoms
-	if (string(start+4, start+8) == "free") {
-		if (unknown_length_) noteUnknownSequence(offset);
-		if (idx_free_ >= 0 && last_track_idx_ >= 0 && last_track_idx_ != idx_free_) {
-			tracks_[last_track_idx_].pushBackLastChunk();
-			last_track_idx_ = idx_free_;
-		}
-
-		uint atom_len = swap32(begin);
-		addToExclude(offset, atom_len);
-		logg(V, "Skipping 'free' atom: ", atom_len, " at: ", offToStr(offset), '\n');
-		offset += atom_len;
-		goto start;
-	}
-
 	// skip 'mdat' headers
 	if (string(start+4, start+8) == "mdat") {
 		if (unknown_length_) noteUnknownSequence(offset);
@@ -1490,6 +1465,17 @@ start:
 		offset += 8;
 		goto start;
 	}
+
+	// skip atoms (e.g. moov, free)
+	if (isValidAtomName(start+4)) {
+		if (unknown_length_) noteUnknownSequence(offset);
+		uint moov_len = swap32(begin);
+		addToExclude(offset, moov_len, true);
+		logg(W, "Skipping ", string(start+4, start+8), " atom: ", moov_len, '\n');
+		offset += moov_len;
+		goto start;
+	}
+
 
 	if (g_log_mode >= LogMode::V) {
 		logg(V, "\n(reading element from mdat)\n");
