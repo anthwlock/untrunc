@@ -66,6 +66,7 @@ public:
 	uint getTrackIdx(const std::string& codec_name);
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
+	off_t toAbsOff(off_t offset);
 	std::string offToStr(off_t offset);
 	std::string getPathRepaired(const std::string& ok, const std::string& corrupt);
 	bool alreadyRepaired(const std::string& ok, const std::string& corrupt);

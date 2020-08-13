@@ -515,7 +515,7 @@ bool Track::shouldUseChunkPrediction() {
 
 bool Track::isChunkOffsetOk(off_t off) {
 	// chunk-offsets might be regular in respect to absolute file begin, not mdat begin
-	if (!current_chunk_.off_ && (g_mp4->current_mdat_->contentStart() + off) % chunk_distance_gcd_ == 0)
+	if (!current_chunk_.off_ && g_mp4->toAbsOff(off) % chunk_distance_gcd_ == 0)
 		return true;
 
 	return (off - current_chunk_.off_) % chunk_distance_gcd_ == 0;
@@ -524,7 +524,7 @@ bool Track::isChunkOffsetOk(off_t off) {
 int64_t Track::stepToNextChunkOff(off_t off) {
 	auto step = chunk_distance_gcd_ - ((off - current_chunk_.off_) % chunk_distance_gcd_);
 	if (!current_chunk_.off_) {
-		auto abs_off = off + g_mp4->current_mdat_->contentStart();
+		auto abs_off = g_mp4->toAbsOff(off);
 		auto step_abs = chunk_distance_gcd_ - ((abs_off - current_chunk_.off_) % chunk_distance_gcd_);
 		step = min(step, step_abs);
 	}
@@ -607,6 +607,9 @@ void Track::genLikely() {
 		}
 	}
 	else chunk_distance_gcd_ = 1;
+
+	if (is_dummy_ && likely_n_samples_.empty() && g_mp4->hasCodec("icod"))
+		likely_n_samples_.push_back(kSkipChunkPrediction);
 }
 
 int Track::useDynPatterns(off_t offset) {

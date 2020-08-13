@@ -242,6 +242,10 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 //		return s == 8 || s == 10 || s == 100;
 		return s < 200;
 	}},
+	MATCH_FN("icod") {
+		// 0016....
+		return start[0] == 1 && start[1] == 22;
+	}},
 
 	/*
 	MATCH_FN("twos") {
@@ -422,7 +426,10 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	}},
 	GET_SZ_FN("mebx") {
 		return swap32(*(int *)start);
-	}}
+	}},
+	GET_SZ_FN("icod") {
+		return swap32(*(int *)(start+2));
+	}},
 
 	/* if codec is not found in map,
 	 * untrunc will try to generate common features (chunk_size, sample_size, patterns) per track.

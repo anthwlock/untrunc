@@ -129,6 +129,8 @@ private:
 
 };
 
+const int kSkipChunkPrediction = -23;
+
 std::ostream& operator<<(std::ostream& out, const Track::Chunk& fi);
 
 

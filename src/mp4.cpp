@@ -1168,6 +1168,11 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 		return FrameInfo(i, c, offset, length);
 	}
 
+	if (idx_free_ > 0 && hasCodec("icod")) {  // next chunk is probably padded with random data..
+		int len = getTrack("icod").stepToNextChunkOff(offset);
+		return FrameInfo(idx_free_, false, 0, offset, len);
+	}
+
 	return FrameInfo();
 }
 
@@ -1291,6 +1296,7 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 	// we boldly assume that track_idx was correct
 	auto s_sz = t.likely_sample_sizes_[0];
 	auto n_samples = t.likely_n_samples_[0];  // smallest sample_size
+	if (n_samples == kSkipChunkPrediction) return c;
 	if (t.likely_n_samples_p < 0.9) {
 		const int min_sz = 64;  // min assumed chunk size
 		int new_n_samples = max(1, min_sz / s_sz);
@@ -1471,7 +1477,8 @@ start:
 		if (unknown_length_) noteUnknownSequence(offset);
 		uint moov_len = swap32(begin);
 		addToExclude(offset, moov_len, true);
-		logg(W, "Skipping ", string(start+4, start+8), " atom: ", moov_len, '\n');
+		string s = string(start+4, start+8);
+		logg(s != "free" ? W : V, "Skipping ", s, " atom: ", moov_len, '\n');
 		offset += moov_len;
 		goto start;
 	}
@@ -1569,8 +1576,12 @@ bool Mp4::shouldPreferChunkPrediction() {
 	            );
 }
 
+off_t Mp4::toAbsOff(off_t offset) {
+	return current_mdat_->contentStart() + offset;
+}
+
 string Mp4::offToStr(off_t offset) {
-	return ss(offset, " / " , current_mdat_->contentStart() + offset);
+	return ss(offset, " / " , toAbsOff(offset));
 }
 
 bool Mp4::tryMatch(off_t& offset ) {
@@ -1710,7 +1721,7 @@ void Mp4::repair(const string& filename) {
 		else {
 			if (g_muted) unmute();
 			double percentage = (double)100 * offset / mdat->contentSize();
-			mdat->file_end_ = mdat->contentStart() + offset;
+			mdat->file_end_ = toAbsOff(offset);
 			mdat->length_ = offset + 8;
 
 			logg(E, "unable to find correct codec -> premature end", " (~", setprecision(4), percentage, "%)\n",
