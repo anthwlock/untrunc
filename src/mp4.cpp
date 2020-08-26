@@ -650,6 +650,7 @@ void Mp4::genChunkTransitions() {
 
 	vector<pair<int, int>> order;
 	size_t chunk_idx = 0;
+	off_t mdat_end = current_mdat_->start_ + current_mdat_->length_;
 
 	while (true) {
 		int track_idx = -1;
@@ -663,6 +664,11 @@ void Mp4::genChunkTransitions() {
 			}
 		}
 		if (track_idx < 0) break;
+		if (off >= mdat_end) {
+			assert(g_ignore_out_of_bound_chunks);
+			logg(W, "reached premature end of mdat\n");
+			break;
+		}
 
 		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
 		if (chunk_idx < 10 && tracks_[track_idx].codec_.name_ == "tmcd") {
@@ -1024,6 +1030,14 @@ void Mp4::addFrame(const FrameInfo& fi) {
 	if (!track.constant_size_) track.sizes_.push_back(fi.length_);
 }
 
+void Mp4::addChunk(const Mp4::Chunk& chunk) {
+	FrameInfo match(chunk.track_idx_, 0, 0, chunk.off_, chunk.sample_size_);
+	for (uint n=chunk.n_samples_; n--;) {
+		addFrame(match);
+		match.offset_ += chunk.sample_size_;
+	}
+}
+
 const uchar* Mp4::loadFragment(off_t offset, bool update_cur_maxlen) {
 	if (update_cur_maxlen)
 		current_maxlength_ = min((int64_t) g_max_partsize, current_mdat_->contentSize() - offset);
@@ -1117,16 +1131,24 @@ bool Mp4::wouldMatch(off_t offset, const string& skip, bool force_strict, int la
 	return false;
 }
 
+bool Mp4::wouldMatch2(const uchar *start) {
+	for (auto& t : tracks_) if (t.codec_.matchSample(start)) return true;
+	return false;
+}
+
 
 FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 	auto start = loadFragment(offset);
 
 	// hardcoded match
 	if (pkt_idx_ == 4 && hasCodec("tmcd")) {
-		logg(V, "using hardcoded 'tmcd' packet (len=4)");
-		if (wouldMatch(offset, "", true))
-			logg(W, "Unexpected 4th packet..\n");
-		return FrameInfo(getTrackIdx("tmcd"), false, 0, offset, 4);
+		if (!wouldMatch(offset, "", true, last_track_idx_)) {
+			logg(V, "using hardcoded 'tmcd' packet (len=4)\n");
+			return FrameInfo(getTrackIdx("tmcd"), false, 0, offset, 4);
+		}
+		else {
+			logg(W2, "hardcoded tmcd as 4th packet seems wrong..\n");
+		}
 	}
 
 	for (uint i=0; i < tracks_.size(); i++) {
@@ -1304,14 +1326,15 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 		n_samples = new_n_samples;
 	}
 	n_samples = min(n_samples, int((current_mdat_->contentSize() - offset) / s_sz));
-	c = Chunk(offset, n_samples, track_idx, s_sz);
-
-	assert(c.track_idx_ >= 0 && to_size_t(c.track_idx_) < tracks_.size());
 
 	bool at_end = n_samples < t.likely_n_samples_[0];
-	if (!at_end)
+	if (!at_end) {
 		logg(W2, "found chunk has no future: ", c, " at ", offToStr(c.off_ + c.size_), "\n");
+		return c;
+	}
 
+	c = Chunk(offset, n_samples, track_idx, s_sz);
+	assert(0 <= c.track_idx_ && to_size_t(c.track_idx_) < tracks_.size());
 	return c;
 }
 
@@ -1552,13 +1575,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		t.current_chunk_ = chunk;
 		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 
-		if (!t.is_dummy_) {
-			FrameInfo match(chunk.track_idx_, 0, 0, offset, chunk.sample_size_);
-			for (uint n=chunk.n_samples_; n--;) {
-				addFrame(match);
-				match.offset_ += chunk.sample_size_;
-			}
-		}
+		if (!t.is_dummy_) addChunk(chunk);
 
 		last_track_idx_ = chunk.track_idx_;
 		pkt_idx_ += chunk.n_samples_;
@@ -1584,7 +1601,7 @@ string Mp4::offToStr(off_t offset) {
 	return ss(offset, " / " , toAbsOff(offset));
 }
 
-bool Mp4::tryMatch(off_t& offset ) {
+bool Mp4::tryMatch(off_t& offset) {
 	FrameInfo match = getMatch(offset);
 	if (match) {
 		auto& t = tracks_[match.track_idx_];

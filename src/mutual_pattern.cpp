@@ -172,4 +172,9 @@ void filterBySuccessRate(patterns_t& patterns, const string& label) {
 		logg(V, "ignoring all ", patterns.size(), " patterns for ", label, ".. they overlap too much (", total_p, ")\n");
 		patterns.clear();
 	}
+
+	if (total_p < 0.8 && patterns.size()) {  // probably just random noise
+		logg(V, "ignoring all ", patterns.size(), " patterns for ", label, ".. total_p=", total_p, " too small\n");
+		patterns.clear();
+	}
 }

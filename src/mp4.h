@@ -58,6 +58,7 @@ public:
 	void repair(const std::string& filename);
 
 	bool wouldMatch(off_t offset, const std::string& skip = "", bool force_strict=false, int last_track_idx=-1);
+	bool wouldMatch2(const uchar* start);
 	bool wouldMatchDyn(off_t offset, int last_idx);
 	FrameInfo getMatch(off_t offset, bool force_strict=false);
 	void analyzeOffset(const std::string& filename, off_t offset);
@@ -81,6 +82,7 @@ public:
 
 	std::string ftyp_;
 	off_t orig_mdat_start_;
+	off_t orig_mdat_end_;
 
 	// Chunks with constant sample size
 	class Chunk : public Track::Chunk {
@@ -105,6 +107,7 @@ private:
 	void setDuration();
 	void chkUntrunc(FrameInfo& fi, Codec& c, int i);
 	void addFrame(const FrameInfo& frame_info);
+	void addChunk(const Mp4::Chunk& chunk);
 	bool chkOffset(off_t& offset);  // updates offset
 	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;

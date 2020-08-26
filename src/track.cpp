@@ -544,7 +544,7 @@ void Track::printDynPatterns(bool show_percentage) {
 		auto idx = dyn_patterns_perm_[j];
 		auto n_total = show_percentage ? g_mp4->chunk_transitions_[{own_idx, idx}].size() : 0;
 		if (own_idx == idx) continue;
-		cout << ss(codec_.name_, "_", g_mp4->tracks_[idx].codec_.name_, " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
+		cout << ss(codec_.name_, "_", g_mp4->getCodecName(idx), " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
 		           (show_percentage ? ss(" (", n_total, ")") : ""), "\n");
 		for (auto& p : dyn_patterns_[idx]) {
 			if (n_total) cout << ss(fixed, setprecision(3), p.successRate(), " ", p.cnt_, " ");
@@ -682,6 +682,16 @@ void Track::pushBackLastChunk() {
 
 bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 //	logg(V, codec_.name_, "_", g_mp4->getCodecName(track_idx), '\n');
+
+	if (dyn_patterns_[track_idx].empty()) {
+		int own_idx = g_mp4->getTrackIdx(codec_.name_);
+		if (g_mp4->chunk_transitions_[{own_idx, track_idx}].size() > 5 &&
+		        !g_mp4->wouldMatch2(buff)) {
+			logg(V, "allowing ", codec_.name_, "_", g_mp4->getCodecName(track_idx ), " transition without pattern\n");
+			return 1;
+		}
+	}
+
 	for (auto& p : dyn_patterns_[track_idx]) {
 //		if (g_log_mode >= LogMode::V) {
 //			printBuffer(buff, Mp4::pat_size_);

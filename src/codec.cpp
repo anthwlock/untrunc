@@ -243,7 +243,7 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		return s < 200;
 	}},
 	MATCH_FN("icod") {
-		// 0016....
+		// 0116....
 		return start[0] == 1 && start[1] == 22;
 	}},
 
