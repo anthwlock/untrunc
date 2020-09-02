@@ -1498,12 +1498,17 @@ start:
 	// skip atoms (e.g. moov, free)
 	if (isValidAtomName(start+4)) {
 		if (unknown_length_) noteUnknownSequence(offset);
-		uint moov_len = swap32(begin);
-		addToExclude(offset, moov_len, true);
+		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
-		logg(s != "free" ? W : V, "Skipping ", s, " atom: ", moov_len, '\n');
-		offset += moov_len;
-		goto start;
+		if (offset + atom_len < current_mdat_->contentSize()) {
+			logg(s != "free" ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
+			addToExclude(offset, atom_len, true);
+			offset += atom_len;
+			goto start;
+		}
+		else {
+			logg(W, "NOT skipping ", s, " atom: ", atom_len, '\n');
+		}
 	}
 
 
