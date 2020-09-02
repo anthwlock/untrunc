@@ -94,13 +94,18 @@ bool Codec::isSupported() {
 
 map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
 	MATCH_FN("avc1") {
+		int s2 = swap32(((int *)start)[1]);
 		if (self->strictness_lvl_ > 0) {
-			int s2 = swap32(((int *)start)[1]);
 			return s == 0x00000002 && (s2 == 0x09300000 || s2 == 0x09100000);
 		}
 		int s1 = s;
 //		return s1 == 0x01 || s1 == 0x02 || s1 == 0x03;
-		return s1 == 0x01 || (s1>>8) == 0x01 || s1 == 0x02 || s1 == 0x03;
+		if (s1 == 0x01 || (s1>>8) == 0x01 || s1 == 0x02 || s1 == 0x03) return true;
+
+		// vlc 2.1.5 stream output
+		if (s1 >> 16 == 0 && s2 >> 16 == 0x619a) return true;
+		if (s1 == 0x00000017 && s2 == 0x674d0020) return true;
+		return false;
 	}},
     MATCH_FN("mp4a") {
 		return false;
