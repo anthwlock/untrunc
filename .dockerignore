@@ -4,3 +4,5 @@ untrunc
 untrunc-*
 ffmpeg-*
 .build_*
+build
+old
