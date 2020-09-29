@@ -25,6 +25,7 @@ extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match;
 extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match;
 extern map<string, int(*) (Codec*, const uchar*, uint)> dispatch_get_size;
 
+bool Codec::twos_is_sowt = false;
 Codec::Codec(AVCodecParameters* c) : av_codec_params_(c) {}
 
 void Codec::initAVCodec() {
@@ -72,9 +73,6 @@ void Codec::parseOk(Atom *trak) {
 	match_strict_fn_ = dispatch_strict_match[name_];
 	get_size_fn_ = dispatch_get_size[name_];
 
-	// if null gen dynamic patterns, if no good pattern exit  // REMOVE ME
-	// otherwise use matchDyn etc.
-
 	if (name_ == "avc1") {
 		avc_config_ = new AvcConfig(stsd);
 		if (!avc_config_->is_ok)
@@ -82,6 +80,8 @@ void Codec::parseOk(Atom *trak) {
 		else
 			logg(V, "avcC got decoded\n");
 	}
+	else if (name_ == "sowt")
+		Codec::twos_is_sowt = true;
 }
 
 bool Codec::isSupported() {
@@ -123,6 +123,32 @@ bool Codec::matchSampleStrict(const uchar *start) {
 	return match_strict_fn_(this, start, s);
 }
 
+bool Codec::looksLikeTwosOrSowt(const uchar* start) {
+	if (Codec::twos_is_sowt) start += 1;
+	int
+	    d1 = abs(start[4]  - start[2]),
+	    d2 = abs(start[6]  - start[4]),
+	    d3 = abs(start[8]  - start[6]),
+	    d4 = abs(start[10]  - start[8]),
+	    d5 = abs(start[12]  - start[10]);
+	int cnt =
+	    (8 < d1 && d1 < 0xf0) +
+	    (8 < d2 && d2 < 0xf0) +
+	    (8 < d3 && d3 < 0xf0) +
+	    (8 < d4 && d4 < 0xf0) +
+	    (8 < d5 && d5 < 0xf0);
+//	if (cnt <= 1) {
+	if (cnt == 0) {
+		if (g_log_mode >= LogMode::V) {
+			if (Codec::twos_is_sowt) start -= 1;
+			printBuffer(start, 16);
+			cout << "avc1: detected sowt..\n";
+		}
+		return true;
+	}
+	return false;
+}
+
 map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("avc1") {
 		//this works only for a very specific kind of video
@@ -132,6 +158,8 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		return (s != 0x00000002 || (s2 != 0x09300000 && s2 != 0x09100000)) return false;
 		return true;
 #endif
+
+		if (self->chk_for_twos_ && Codec::looksLikeTwosOrSowt(start)) return false;
 
 		//TODO use the first byte of the nal: forbidden bit and type!
 		int nal_type = (start[4] & 0x1f);

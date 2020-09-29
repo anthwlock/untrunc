@@ -114,7 +114,8 @@ void Track::parseOk() {
 		int expected_size = 2 * nc;
 
 		if (constant_size_ != expected_size) {
-			logg(W2, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size, ", instead of ", constant_size_, " as found in stsz\n");
+			logg(W2, "using expected ", codec_.name_, " frame size of ", nc, "*", expected_size,
+			     ", instead of ", constant_size_, " as found in stsz\n");
 			constant_size_ = expected_size;
 		}
 	}
@@ -340,6 +341,8 @@ void Track::parseSampleToChunk(){
 void Track::genPatternPerm() {
 	using tuple_t = tuple<int, double, int>;
 	vector<tuple_t> perm;
+	logg(V, "genPatternPerm of: ", codec_.name_, "\n");
+	bool has_twos_transition = false;
 	for (uint i=0; i < dyn_patterns_.size(); i++) {
 		int max_size = 0;
 		double max_e = -1;
@@ -349,6 +352,8 @@ void Track::genPatternPerm() {
 			auto e = calcEntropy(distinct);
 			if (e > max_e) {max_e = e; max_size = distinct.size();}
 		}
+		if (i == to_uint(g_mp4->twos_track_idx_)) has_twos_transition = true;
+		logg(V, i, " ", g_mp4->getCodecName(i), " ", max_e, " ", max_size, "\n");
 		perm.emplace_back(i, max_e, max_size);
 	}
 
@@ -356,6 +361,11 @@ void Track::genPatternPerm() {
 		if (fabs(get<1>(a) - get<1>(b)) < 0.1) return get<2>(a) > get<2>(b);
 		return get<1>(a) > get<1>(b);
 	});
+
+	for (uint i=0; has_twos_transition && i < perm.size(); i++) {
+		if (get<1>(perm[i]) < 2) {use_looks_like_twos_idx_ = i; break;}
+		else if (get<0>(perm[i]) == g_mp4->twos_track_idx_) break;
+	}
 
 	dyn_patterns_perm_.clear();
 	for (uint i=0; i < perm.size(); i++)
@@ -617,6 +627,10 @@ int Track::useDynPatterns(off_t offset) {
 	if (!buff) return -1;
 
 	for (uint i=0; i < dyn_patterns_perm_.size(); i++) {
+		if (i == to_uint(use_looks_like_twos_idx_) && Codec::looksLikeTwosOrSowt(buff + Mp4::pat_size_ / 2)) {
+			logg(V, "looksLikeTwos: ", codec_.name_, "_", g_mp4->getCodecName(g_mp4->twos_track_idx_), "\n");
+			return g_mp4->twos_track_idx_;
+		}
 		auto idx = dyn_patterns_perm_[i];
 		if (!g_mp4->tracks_[idx].isChunkOffsetOk(offset)) continue;
 		if (doesMatchTransition(buff, idx)) return idx;

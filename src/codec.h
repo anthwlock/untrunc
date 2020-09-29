@@ -33,6 +33,7 @@ public:
 	bool was_bad_ = false;
 	int audio_duration_ = 0;
 	bool should_dump_ = false;  // for debug
+	bool chk_for_twos_ = false;
 
 	bool matchSampleStrict(const uchar* start);
 	uint strictness_lvl_ = 0;
@@ -40,6 +41,9 @@ public:
 
 	bool isSupported();
 	const uchar* loadAfter(off_t offset);
+
+	static bool looksLikeTwosOrSowt(const uchar* start);
+	static bool twos_is_sowt;  // used in looksLikeTwosOrSowt
 
 private:
 	bool (*match_fn_)(Codec*, const uchar* start, int s) = nullptr;

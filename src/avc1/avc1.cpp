@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "../codec.h"
+#include "../mp4.h"
 
 #include "sps-info.h"
 #include "avc-config.h"
@@ -40,6 +41,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 
 	while(1) {
 		logg(V, "---\n");
+		if (self->chk_for_twos_ && Codec::looksLikeTwosOrSowt(pos)) return length;
 		NalInfo nal_info(pos, maxlength);
 		if(!nal_info.is_ok){
 			logg(V, "failed parsing nal-header\n");

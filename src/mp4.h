@@ -193,6 +193,8 @@ private:
 
 	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
 
+	int twos_track_idx_ = -1;
+
 	static const int kDefaultFreeIdx = -2;
 };
 

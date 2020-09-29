@@ -81,6 +81,15 @@ void Mp4::parseHealthy() {
 		return certainty[a.codec_.name_] > certainty[b.codec_.name_];
 	});
 
+	if (hasCodec("fdsc") && hasCodec("avc1"))
+		getTrack("avc1").codec_.strictness_lvl_ = 1;
+
+	for (uint i=0; i < tracks_.size(); i++)
+		if (contains({"twos", "sowt"}, tracks_[i].codec_.name_)) twos_track_idx_ = i;
+	if (twos_track_idx_ >= 0 && hasCodec("avc1")) {
+		getTrack("avc1").codec_.chk_for_twos_ = true;
+	}
+
 	if (g_log_mode >= LogMode::I) cout << '\n';
 }
 
@@ -153,9 +162,6 @@ void Mp4::parseTracksOk() {
 			assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
 		}
 	}
-
-	if (hasCodec("fdsc") && hasCodec("avc1"))
-		getTrack("avc1").codec_.strictness_lvl_ = 1;
 }
 
 
