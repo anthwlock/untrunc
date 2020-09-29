@@ -1373,7 +1373,7 @@ FrameInfo::FrameInfo(int track_idx, bool was_keyframe, uint audio_duration, off_
     : track_idx_(track_idx), keyframe_(was_keyframe), audio_duration_(audio_duration),
       offset_(offset), length_(length), should_dump_(false) {}
 
-FrameInfo::operator bool() {
+FrameInfo::operator bool() const {
 	return length_;
 }
 
@@ -1386,7 +1386,6 @@ bool operator==(const FrameInfo& a, const FrameInfo& b) {
 bool operator!=(const FrameInfo& a, const FrameInfo& b) { return !(a == b); }
 
 ostream& operator<<(ostream& out, const FrameInfo& fi) {
-	if (!fi.length_) return out << "(none)";
 	auto cn = g_mp4->getCodecName(fi.track_idx_);
 	return out << ss("'", cn, "', ", fi.length_, ", ", fi.keyframe_, ", ", fi.audio_duration_);
 }
@@ -1528,31 +1527,55 @@ void Mp4::printOffset(off_t offset) {
 	logg(V, "Offset: ", offToStr(offset), " : ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
 }
 
+void Mp4::chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedChunkPtr, off_t off) {
+	auto correctFrameIt = off_to_frame_.end();
+	auto correctChunkIt = off_to_chunk_.end();
+	if (detectedFramePtr) {
+		if ((correctFrameIt = off_to_frame_.find(off)) == off_to_frame_.end())
+			correctChunkIt = off_to_chunk_.find(off);
+	}
+	else {
+		if ((correctChunkIt = off_to_chunk_.find(off)) == off_to_chunk_.end())
+			correctFrameIt = off_to_frame_.find(off);
+	}
 
-void Mp4::chkFrameDetectionAt(FrameInfo& detected, off_t off) {
-	auto& correct = off_to_frame_[off];
-	if (correct != detected) {
-		cout << "bad detection (at " << offToStr(off) << ", pkt " << pkt_idx_
-		     << ", chunk " << tracks_[correct.track_idx_].chunks_.size()
-		     << ", pkt_in_chunk " << tracks_[correct.track_idx_].current_chunk_.n_samples_
-		     << "):\n"
-		     << "detected: " << detected << '\n'
-		     << "correct : " << correct << '\n';
+	bool correct,
+	    correctFrameFound = correctFrameIt != off_to_frame_.end(),
+	    correctChunkFound = correctChunkIt != off_to_chunk_.end();
+
+	if (detectedFramePtr) correct = correctFrameFound && *detectedFramePtr == correctFrameIt->second;
+	else if (detectedChunkPtr) correct = correctChunkFound && *detectedChunkPtr == correctChunkIt->second;
+	else correct = !correctFrameFound && !correctChunkFound;
+
+	auto coutExtraInfo = [&]() {
+		if (detectedFramePtr) {
+			cout << ", chunk " << tracks_[correctFrameIt->second.track_idx_].chunks_.size()
+			 << ", pkt_in_chunk " << tracks_[correctFrameIt->second.track_idx_].current_chunk_.n_samples_;
+		}
+		else if (detectedChunkPtr) {
+			 cout << ", chunk " << tracks_[correctChunkIt->second.track_idx_].chunks_.size();
+		}
+		cout << "):\n";
+	};
+
+	if (!correct) {
+		cout << "bad detection (at " << offToStr(off) << ", pkt " << pkt_idx_;
+		coutExtraInfo();
+
+		if (detectedFramePtr) cout << "  detected: " << *detectedFramePtr << '\n';
+		else if (detectedChunkPtr) cout << "  detected: " << *detectedChunkPtr << '\n';
+		else cout << "  detected: (none)\n";
+
+		if (correctFrameFound) cout << "  correct: " << correctFrameIt->second << '\n';
+		else if (correctChunkFound) cout << "  correct: " << correctChunkIt->second << '\n';
+		else cout << "  correct: (none)\n";
+
 		hitEnterToContinue();
 	}
 }
 
-void Mp4::chkChunkDetectionAt(Mp4::Chunk& detected, off_t off) {
-	auto& correct = off_to_chunk_[off];
-	if (correct != detected) {
-		cout << "bad chunk detection (at " << offToStr(off) << ", pkt " << pkt_idx_
-		     << ", chunk " << tracks_[correct.track_idx_].chunks_.size()
-		     << "):\n"
-		     << "detected: " << detected << '\n'
-		     << "correct : " << correct << '\n';
-		hitEnterToContinue();
-	}
-}
+void Mp4::chkFrameDetectionAt(FrameInfo& detected, off_t off) { chkDetectionAtImpl(&detected, nullptr, off); }
+void Mp4::chkChunkDetectionAt(Mp4::Chunk& detected, off_t off) { chkDetectionAtImpl(nullptr, &detected, off); }
 
 bool Mp4::tryChunkPrediction(off_t& offset) {
 	if (!g_use_chunk_stats) return false;
@@ -1725,6 +1748,8 @@ void Mp4::repair(const string& filename) {
 				tracks_[last_track_idx_].pushBackLastChunk();
 			last_track_idx_ = idx_free_;  // negative is fine
 		}
+
+		chkDetectionAtImpl(nullptr, nullptr, offset);
 
 		if (g_ignore_unknown) {
 			if (!g_muted && g_log_mode < LogMode::V) {

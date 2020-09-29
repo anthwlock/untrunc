@@ -120,6 +120,7 @@ private:
 	bool use_offset_map_ = false;
 	std::map<off_t, FrameInfo> off_to_frame_;
 	std::map<off_t, Mp4::Chunk> off_to_chunk_;
+	void chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedChunkPtr, off_t off);
 	void chkFrameDetectionAt(FrameInfo& detected, off_t off);
 	void chkChunkDetectionAt(Mp4::Chunk& detected, off_t off);
 	void chkExpectedOff(off_t* expected_off, off_t real_off, uint sz, int idx);
@@ -201,7 +202,7 @@ public:
 	FrameInfo() = default;
 	FrameInfo(int track_idx, Codec& c, off_t offset, uint length);
 	FrameInfo(int track_idx, bool was_keyframe, uint audio_duration, off_t offset, uint length);
-	explicit operator bool();
+	explicit operator bool() const;
 	int track_idx_;
 
 	bool keyframe_;
