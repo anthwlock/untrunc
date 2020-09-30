@@ -311,7 +311,7 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 
 void Mp4::shorten(const string& filename, int mega_bytes) {
 	int64_t n_bytes = mega_bytes * 1e6;
-	string output = ss(filename + "_short-", mega_bytes, ".mp4");
+	string output = ss(filename + "_short-", mega_bytes, getMovExtension(filename));
 	warnIfAlreadyExists(output);
 
 	FileRead f(filename);
@@ -1556,16 +1556,18 @@ start:
 	// skip atoms (e.g. moov, free)
 	if (isValidAtomName(start+4)) {
 		if (unknown_length_) noteUnknownSequence(offset);
+		pushBackLastChunk();
+		last_track_idx_ = idx_free_;
 		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
-		if (offset + atom_len < current_mdat_->contentSize()) {
+		if (offset + atom_len <= current_mdat_->contentSize()) {
 			logg(s != "free" ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
 			addToExclude(offset, atom_len, true);
 			offset += atom_len;
 			goto start;
 		}
 		else {
-			logg(W, "NOT skipping ", s, " atom: ", atom_len, '\n');
+			logg(W, "NOT skipping ", s, " atom: ", atom_len, " (at ", offToStr(offset), ")\n");
 		}
 	}
 
