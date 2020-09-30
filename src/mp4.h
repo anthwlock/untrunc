@@ -194,6 +194,7 @@ private:
 	void correctChunkIdx(int track_idx);
 	bool dummy_is_skippable_ = false;
 	int dummy_do_padding_skip_ = false;
+	bool has_zero_transitions_ = false;
 
 	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
 

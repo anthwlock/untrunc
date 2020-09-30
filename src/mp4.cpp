@@ -760,6 +760,12 @@ void Mp4::genDynPatterns() {
 
 		patterns = offsToPatterns(kv.second, prefix);
 	}
+
+	for (auto& t: tracks_) {
+		t.genPatternPerm();
+		if (!has_zero_transitions_ && t.hasZeroTransitions()) has_zero_transitions_ = true;
+	}
+	logg(V, "has_zero_transitions_: ", has_zero_transitions_, '\n');
 }
 
 
@@ -931,7 +937,6 @@ void Mp4::genDynStats(bool force_patterns) {
 	if (isTrackOrderEnough() && !force_patterns) return;
 
 	genDynPatterns();
-	for (auto& t: tracks_) t.genPatternPerm();
 }
 
 void Mp4::checkForBadTracks() {
@@ -1504,8 +1509,10 @@ start:
 					return true;
 				}
 			}
-			for (auto& cn : {"rtmd", "ms"}) {
-				if (hasCodec(cn) && getChunkPrediction(offset, true)) {
+
+			if (has_zero_transitions_) {
+				auto c = getChunkPrediction(offset, true);
+				if (c) {
 					logg(V, "won't skip zeros at: ", offToStr(offset), " (perfect chunk-match)\n");
 					return true;
 				}

@@ -371,7 +371,15 @@ void Track::genPatternPerm() {
 	dyn_patterns_perm_.clear();
 	for (uint i=0; i < perm.size(); i++)
 		dyn_patterns_perm_.push_back(get<0>(perm[i]));
+}
 
+bool Track::hasZeroTransitions() {
+	vector<uchar> b(4, 0x00);
+	for (auto& l : dyn_patterns_)
+		for (auto& p : l) {
+			if (p.hasPattern(Mp4::pat_size_ / 2, b)) return true;
+		}
+	return false;
 }
 
 void Track::saveSampleTimes() {

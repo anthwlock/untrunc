@@ -91,6 +91,14 @@ bool MutualPattern::doesMatchApprox(const uchar* buf) {
 	return calcEntropy(mutual) > 0.75;
 }
 
+bool MutualPattern::hasPattern(int off, const ByteArr& buf) {
+	for (uint i=0; i < buf.size(); i++) {
+		if (!is_mutual_[i]) return false;
+		if (data_[off+i] != buf[i]) return false;
+	}
+	return true;
+}
+
 vector<uchar> MutualPattern::getDistinct() const {
 	vector<uchar> r;
 	for (uint i=first_mutual_; i < mutual_till_; i++) {

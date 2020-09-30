@@ -17,14 +17,15 @@ public:
 	bool doesMatch(const uchar* buf);
 	bool doesMatchHalf(const uchar* buf);  // second half
 	bool doesMatchApprox(const uchar* buf);
+	bool hasPattern(int off, const ByteArr& pat);
 
-	std::vector<uchar> getDistinct() const;
+	ByteArr getDistinct() const;
 
 	double successRate();
 
 private:
 	std::vector<bool> is_mutual_;
-	std::vector<uchar> data_;
+	ByteArr data_;
 
 	void intersectBuf(const ByteArr& buf);
 	uint intersectLen(const ByteArr& buf);

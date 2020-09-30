@@ -111,6 +111,7 @@ public:
 	void printDynPatterns(bool show_percentage=false);
 	void genLikely();
 	bool isSupported() { return codec_.isSupported(); }
+	bool hasZeroTransitions();
 
 	int useDynPatterns(off_t offset);
 	void genChunkSizes();
