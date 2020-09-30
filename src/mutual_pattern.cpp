@@ -176,7 +176,7 @@ void filterBySuccessRate(patterns_t& patterns, const string& label) {
 		}
 	}
 
-	if (total_p > 1.1) {  // probably just random noise
+	if (total_p > 1.001) {  // probably just random noise
 		logg(V, "ignoring all ", patterns.size(), " patterns for ", label, ".. they overlap too much (", total_p, ")\n");
 		patterns.clear();
 	}
