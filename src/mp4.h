@@ -197,6 +197,7 @@ private:
 	bool has_zero_transitions_ = false;
 
 	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
+	void pushBackLastChunk();
 
 	int twos_track_idx_ = -1;
 

@@ -900,6 +900,11 @@ int Mp4::skipNextZeroCave(off_t off, int max_sz, int n_zeros) {
 	return -1;
 }
 
+void Mp4::pushBackLastChunk() {
+	if (last_track_idx_ >= 0)
+		tracks_[last_track_idx_].pushBackLastChunk();
+}
+
 bool Mp4::isTrackOrderEnough() {
 	auto isEnough = [&]() {
 	if (!track_order_.size()) return false;
@@ -1488,8 +1493,7 @@ bool Mp4::isAllZerosAt(off_t off, int n) {
 bool Mp4::chkOffset(off_t& offset) {
 start:
 	if (offset >= current_mdat_->contentSize()) {  // at end?
-		if (last_track_idx_ >= 0)
-			tracks_[last_track_idx_].pushBackLastChunk();
+		pushBackLastChunk();
 		if (unknown_length_) noteUnknownSequence(offset);
 		return false;
 	}
@@ -1538,8 +1542,8 @@ start:
 	// skip 'mdat' headers
 	if (string(start+4, start+8) == "mdat") {
 		if (unknown_length_) noteUnknownSequence(offset);
-		if (idx_free_ >= 0 && last_track_idx_ >= 0 && last_track_idx_ != idx_free_) {
-			tracks_[last_track_idx_].pushBackLastChunk();
+		if (idx_free_ >= 0 && last_track_idx_ != idx_free_) {
+			pushBackLastChunk();
 			last_track_idx_ = idx_free_;
 		}
 
@@ -1652,7 +1656,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			disableNoiseBuffer();
 		}
 
-		if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
+		pushBackLastChunk();
 		if (chunk.track_idx_ != idx_free_) chunk_idx_++;
 
 		t.current_chunk_ = chunk;
@@ -1699,7 +1703,7 @@ bool Mp4::tryMatch(off_t& offset) {
 		}
 		if (last_track_idx_ != match.track_idx_) {
 			if (match.track_idx_ != idx_free_) chunk_idx_++;
-			if (last_track_idx_ >= 0) tracks_[last_track_idx_].pushBackLastChunk();
+			pushBackLastChunk();
 			t.current_chunk_.off_ = offset;
 			t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 		}
@@ -1799,8 +1803,7 @@ void Mp4::repair(const string& filename) {
 		}
 
 		if (!unknown_length_) {
-			if (last_track_idx_ >= 0)
-				tracks_[last_track_idx_].pushBackLastChunk();
+			pushBackLastChunk();
 			last_track_idx_ = idx_free_;  // negative is fine
 		}
 
