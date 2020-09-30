@@ -66,6 +66,8 @@ AtomDefinition knownAtoms[] = {
     {"frea",	{"FILE_LEVEL"},			CHILD_ATOM,				REQUIRED_ONCE,				SIMPLE_ATOM },  // gps
     {"moov",	{"FILE_LEVEL"},			PARENT_ATOM,			REQUIRED_ONCE,				SIMPLE_ATOM },
     {"mdat",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_MANY,				SIMPLE_ATOM },
+    {"ibak",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_MANY,				SIMPLE_ATOM },  // iCatch: (often empty) moov-backup, embedded in mdat
+    {"iidx",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_MANY,				SIMPLE_ATOM },  // iCatch: embedded in mdat
     {"pdin",	{"FILE_LEVEL"},			CHILD_ATOM,				OPTIONAL_ONCE,				VERSIONED_ATOM },
     {"moof",	{"FILE_LEVEL"},			PARENT_ATOM,			OPTIONAL_MANY,				SIMPLE_ATOM },
     {"mfhd",	{"moof"},						CHILD_ATOM,				REQUIRED_ONE,					VERSIONED_ATOM },

@@ -1561,7 +1561,7 @@ start:
 		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
 		if (offset + atom_len <= current_mdat_->contentSize()) {
-			logg(s != "free" ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
+			logg(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
 			addToExclude(offset, atom_len, true);
 			offset += atom_len;
 			goto start;
