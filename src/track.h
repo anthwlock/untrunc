@@ -131,6 +131,8 @@ private:
 	std::vector<uint> dyn_patterns_perm_;
 
 	int use_looks_like_twos_idx_ = -1;
+
+	uint ownTrackIdx();
 };
 
 std::ostream& operator<<(std::ostream& out, const Track::Chunk& fi);

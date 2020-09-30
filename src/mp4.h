@@ -140,6 +140,8 @@ private:
 	buffs_t offsToBuffs(const offs_t& offs, const std::string& load_prefix);
 	patterns_t offsToPatterns(const offs_t& offs, const std::string& load_prefix);
 
+	bool transitionIsUnclear(int track_idx_a, int track_idx_b);
+	bool hasUnclearTransitions(int track_idx_a);
 	bool anyPatternMatchesHalf(off_t offset, uint track_idx_to_try);
 	Mp4::Chunk fitChunk(off_t offset, uint track_idx, uint known_n_samples=0);
 

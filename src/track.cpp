@@ -550,6 +550,12 @@ int64_t Track::stepToNextOtherChunk(off_t off) {
 	auto abs_off = g_mp4->toAbsOff(off);
 	auto step = end_off_gcd_ - (abs_off % end_off_gcd_);
 
+	if (g_mp4->hasUnclearTransitions(ownTrackIdx())) {
+		logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
+		     ", step: ", step, ", next: ", off + step, "  // unclear transition!\n");
+		return step;
+	}
+
 	for (int i=0; i < 5; i++) {
 		logg(V, "step:", step, "\n");
 		if (g_mp4->wouldMatch(off + step)) {
@@ -728,15 +734,6 @@ void Track::pushBackLastChunk() {
 bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 //	logg(V, codec_.name_, "_", g_mp4->getCodecName(track_idx), '\n');
 
-	if (dyn_patterns_[track_idx].empty()) {
-		int own_idx = g_mp4->getTrackIdx(codec_.name_);
-		if (g_mp4->chunk_transitions_[{own_idx, track_idx}].size() > 5 &&
-		        !g_mp4->wouldMatch2(buff)) {
-			logg(V, "allowing ", codec_.name_, "_", g_mp4->getCodecName(track_idx ), " transition without pattern\n");
-			return 1;
-		}
-	}
-
 	for (auto& p : dyn_patterns_[track_idx]) {
 //		if (g_log_mode >= LogMode::V) {
 //			printBuffer(buff, Mp4::pat_size_);
@@ -746,13 +743,22 @@ bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 			return true;
 		}
 	}
-	return false;
 
+	if (g_mp4->transitionIsUnclear(ownTrackIdx(), track_idx) && !g_mp4->wouldMatch2(buff + Mp4::pat_size_ / 2)) {
+		logg(V, "inverted chunk match: ", codec_.name_, "_", g_mp4->getCodecName(track_idx), "\n");
+		return true;
+	}
+
+	return false;
 }
 
 void Track::applyExcludedToOffs() {
 	for (auto& c : chunks_)
 		c.off_ -= c.already_excluded_;
+}
+
+uint Track::ownTrackIdx() {
+	return g_mp4->getTrackIdx(codec_.name_);
 }
 
 int64_t Track::getDurationInTimescale()  {

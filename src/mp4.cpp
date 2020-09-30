@@ -1230,13 +1230,29 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 	return FrameInfo();
 }
 
+bool Mp4::transitionIsUnclear(int track_idx_a, int track_idx_b) {
+	auto& ta = tracks_[track_idx_a], tb = tracks_[track_idx_b];
+	if (tb.isSupported()) return false;
+	if (ta.dyn_patterns_[track_idx_b].empty() &&
+	    chunk_transitions_[{track_idx_a, track_idx_b}].size() > 5) {
+		return true;
+	}
+	return false;
+}
+
+bool Mp4::hasUnclearTransitions(int track_idx_a) {
+	for (uint i=0; i < tracks_.size(); i++)
+		if (transitionIsUnclear(track_idx_a, i)) return true;
+	return false;
+}
+
 bool Mp4::wouldMatchDyn(off_t offset, int last_idx) {
 	auto new_track = tracks_[last_idx].useDynPatterns(offset);
 	if (new_track >= 0) {
 		logg(V, "wouldMatchDyn(", offset, ", ", last_idx, ") -> yes (", getCodecName(last_idx), "_", getCodecName(new_track), ")\n");
 		return true;
 	}
-	logg(V, "wouldMatchDyn(", offset, ", ", last_idx, ") -> no\n");
+	logg(V, "wouldMatchDyn(", offToStr(offset), ", ", last_idx, ") -> no\n");
 	return false;
 }
 
@@ -1306,7 +1322,6 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 			logg(V, "chunk derived from track_order_:", c, "\n");
 			return c;
 		}
-
 	}
 
 	if (last_track_idx_ == -1) {  // very first offset
@@ -1325,6 +1340,7 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 	}
 	else {
 		track_idx = tracks_[last_track_idx_].useDynPatterns(offset);
+//		logg(V, "found track_idx: ", track_idx, "\n");
 	}
 
 	if (track_idx >= 0 && !tracks_[track_idx].shouldUseChunkPrediction()) {
