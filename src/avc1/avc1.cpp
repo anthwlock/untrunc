@@ -43,6 +43,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 		logg(V, "---\n");
 		if (self->chk_for_twos_ && Codec::looksLikeTwosOrSowt(pos)) return length;
 		NalInfo nal_info(pos, maxlength);
+		bool was_keyframe = false;
 		if(!nal_info.is_ok){
 			logg(V, "failed parsing nal-header\n");
 			return length;
@@ -62,7 +63,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 				break;
 			return length;
 		case NAL_IDR_SLICE:
-			self->was_keyframe_ = true;
+			was_keyframe = true;
 			[[fallthrough]];
 		case NAL_SLICE:
 		{
@@ -80,6 +81,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 					return length;
 				}
 			}
+			self->was_keyframe_ = self->was_keyframe_ || was_keyframe;
 			break;
 		}
 		case NAL_FILLER_DATA:
