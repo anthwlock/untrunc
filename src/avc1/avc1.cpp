@@ -92,10 +92,8 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 			break;
 		default:
 			if(previous_slice.is_ok) {
-				if(!nal_info.is_forbidden_set_) {
-					logg(W2, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
-					return length;
-				} // otherwise it's malformed, don't produce an isolated malformed unit
+				logg(W2, "New access unit since seen picture (type: ", nal_info.nal_type_, ")\n");
+				return length;
 			}
 			break;
 		}
