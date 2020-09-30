@@ -584,11 +584,11 @@ bool Track::chunkMightBeAtAnd() {
 }
 
 void Track::printDynPatterns(bool show_percentage) {
-	auto own_idx = g_mp4->getTrackIdx(codec_.name_);
+	auto own_idx = ownTrackIdx();
 	for (uint j=0; j < dyn_patterns_perm_.size(); j++) {
 		auto idx = dyn_patterns_perm_[j];
 		auto n_total = show_percentage ? g_mp4->chunk_transitions_[{own_idx, idx}].size() : 0;
-		if (own_idx == idx) continue;
+		if (own_idx == idx && !n_total) continue;
 		cout << ss(codec_.name_, "_", g_mp4->getCodecName(idx), " (", own_idx, "->", idx, ") [", dyn_patterns_[idx].size(), "]",
 		           (show_percentage ? ss(" (", n_total, ")") : ""), "\n");
 		for (auto& p : dyn_patterns_[idx]) {
