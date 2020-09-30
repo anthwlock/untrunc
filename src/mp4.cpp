@@ -650,7 +650,6 @@ void Mp4::genChunkTransitions() {
 	int last_track_idx = -1;
 
 	tracks_.emplace_back("free");
-	tracks_.back().constant_size_ = 1;  // for genLikely
 	idx_free_ = tracks_.size()-1;
 	logg(V, "created dummy track 'free'\n");
 
@@ -834,27 +833,43 @@ void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx, off_t* expected_off) {
 	idx += chunk.n_samples_;
 }
 
-bool Mp4::dummyIsSkippable() {
+void Mp4::setDummyIsSkippable() {
+	if (idx_free_ < 0) return;
 	auto& t = tracks_[idx_free_];
-	logg(V, "running dummyIsSkippable() ... \n");
-//	offs_t all_offs;
-	vector<pair<off_t, off_t>> tests;
-//	for (auto& c : t.chunks_) tests.emplace_back(c.off_, c.off_+c.size_);
-	for (auto& c : t.chunks_) tests.emplace_back(c.off_ - current_mdat_->contentStart(), c.off_+c.size_ - current_mdat_->contentStart());
-	auto chosen_tests = choose100(tests);
-	logg(V, "chosen_tests.size(): ", chosen_tests.size(), '\n');
-	for (auto& kv : tests) {
-		off_t off = kv.first, off_end = kv.second;
-		chkOffset(off);
-//		if (off != off_end) return false;
-		if (off != off_end) {
-			logg(V, "dumyIsSkippable = false\n");
-			return false;
+	logg(V, "running setDummyIsSkippable() ... \n");
+
+	auto offsetChkWorks = [&]() {
+		vector<pair<off_t, off_t>> tests;
+	//	for (auto& c : t.chunks_) tests.emplace_back(c.off_, c.off_+c.size_);
+		for (auto& c : t.chunks_) tests.emplace_back(c.off_ - current_mdat_->contentStart(), c.off_+c.size_ - current_mdat_->contentStart());
+		auto chosen_tests = choose100(tests);
+		logg(V, "chosen_tests.size(): ", chosen_tests.size(), '\n');
+		for (auto& kv : tests) {
+			off_t off = kv.first, off_end = kv.second;
+			chkOffset(off);
+			last_track_idx_ = -1;
+	//		if (off != off_end) return false;
+			if (off != off_end) {
+				logg(V, "chkOffset failed: '", offToStr(off), "' != '", offToStr(off_end), "'\n");
+				return false;
+			}
 		}
+		return true;
+	};
+
+	if (offsetChkWorks()) {
+		logg(V, "yes, via chkOffset\n");
+		dummy_is_skippable_ = true;
 	}
-	last_track_idx_ = -1;
-	logg(V, "dumyIsSkippable = true\n");
-	return true;
+	else if (t.dummyIsUsedAsPadding()) {
+		logg(V, "yes, by using padding-skip strategy\n");
+		dummy_is_skippable_ = true;
+		dummy_do_padding_skip_ = true;
+	}
+	else {
+		logg(V, "no, seems not to be skippable\n");
+		dummy_is_skippable_ = false;
+	}
 }
 
 void Mp4::correctChunkIdx(int track_idx) {
@@ -880,13 +895,28 @@ int Mp4::skipNextZeroCave(off_t off, int max_sz, int n_zeros) {
 }
 
 bool Mp4::isTrackOrderEnough() {
+	auto isEnough = [&]() {
 	if (!track_order_.size()) return false;
-	for (auto& t : tracks_) {
-		if (t.isSupported()) continue;
-		if (t.is_dummy_ && dummyIsSkippable()) continue;
-		if (!t.is_dummy_ && t.likely_sample_sizes_.size() == 1) continue;
+	    for (auto& t : tracks_) {
+			if (t.isSupported()) continue;
+			if (t.is_dummy_ && dummy_is_skippable_) continue;  // not included in track_order_
+			if (!t.is_dummy_ && t.likely_sample_sizes_.size() == 1) continue;
+
+			logg(W, "track_order_ found, but not sufficient\n");
+			track_order_.clear();
+			return false;
+		}
+		return true;
+	};
+
+	bool is_enough = isEnough();
+	logg(V, "isTrackOrderEnough: ", is_enough, "  (sz=", track_order_.size(), ")\n");
+	if (!is_enough && track_order_.size()) {
+		// in theory this could probably still be used somehow..
+		logg(W, "track_order_ found, but not sufficient\n");
+		track_order_.clear();
 	}
-	return true;
+	return is_enough;
 }
 
 void Mp4::genDynStats(bool force_patterns) {
@@ -896,14 +926,9 @@ void Mp4::genDynStats(bool force_patterns) {
 
 	genChunkTransitions();
 	for (auto& t: tracks_) t.genLikely();
-	bool is_enough = isTrackOrderEnough();
-	logg(force_patterns ? I : V, "isTrackOrderEnough: ", is_enough, "  (sz=", track_order_.size(), ")\n");
-	if (is_enough && !force_patterns) return;
-	else if (track_order_.size()) {
-		// in theory this could probably still be used somehow..
-		if (!is_enough) logg(W, "track_order_ found, but not sufficient\n");
-		track_order_.clear();
-	}
+
+	setDummyIsSkippable(); // note: genDynPatterns could (indirectly) change this outcome, via Mp4::has_zero_transitions_
+	if (isTrackOrderEnough() && !force_patterns) return;
 
 	genDynPatterns();
 	for (auto& t: tracks_) t.genPatternPerm();
@@ -912,7 +937,8 @@ void Mp4::genDynStats(bool force_patterns) {
 void Mp4::checkForBadTracks() {
 	if (track_order_.size()) return;  // we already checked via `isTrackOrderEnough()`
 	for (auto& t: tracks_) {
-		if (!t.hasPredictableChunks() && !t.codec_.isSupported()) {
+		if (!t.codec_.isSupported() && !t.hasPredictableChunks() &&
+		    !(t.is_dummy_ && dummy_is_skippable_)) {
 			logg(ET, "bad track: '", t.codec_.name_, "'\n");
 		}
 	}
@@ -1196,8 +1222,8 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 		return FrameInfo(i, c, offset, length);
 	}
 
-	if (idx_free_ > 0 && hasCodec("icod")) {  // next chunk is probably padded with random data..
-		int len = getTrack("icod").stepToNextChunkOff(offset);
+	if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
+		int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
 		return FrameInfo(idx_free_, false, 0, offset, len);
 	}
 
@@ -1323,8 +1349,8 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 
 	// we boldly assume that track_idx was correct
 	auto s_sz = t.likely_sample_sizes_[0];
+	if (t.likely_n_samples_.empty()) {assert(false); return c;}
 	auto n_samples = t.likely_n_samples_[0];  // smallest sample_size
-	if (n_samples == kSkipChunkPrediction) return c;
 	if (t.likely_n_samples_p < 0.9) {
 		const int min_sz = 64;  // min assumed chunk size
 		int new_n_samples = max(1, min_sz / s_sz);
@@ -1417,7 +1443,7 @@ int64_t Mp4::calcStep(off_t offset) {
 		step = numeric_limits<int64_t>::max();
 		for (auto& t : tracks_) {
 			if (t.is_dummy_) continue;
-			step = min(step, t.stepToNextChunkOff(offset));
+			step = min(step, t.stepToNextOwnChunk(offset));
 		}
 
 		step = min(step, current_mdat_->contentSize() - offset);

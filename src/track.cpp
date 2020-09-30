@@ -46,6 +46,7 @@ Track::Track(Atom *trak, AVCodecParameters *c, int ts) : trak_(trak), codec_(c),
 Track::Track(const string& codec_name) {
 	codec_.name_ = codec_name;
 	is_dummy_ = true;
+	constant_size_ = 1;  // for genLikely
 }
 
 int64_t Track::getNumSamples() const {
@@ -531,15 +532,35 @@ bool Track::isChunkOffsetOk(off_t off) {
 	return (off - current_chunk_.off_) % chunk_distance_gcd_ == 0;
 }
 
-int64_t Track::stepToNextChunkOff(off_t off) {
+int64_t Track::stepToNextOwnChunk(off_t off) {
 	auto step = chunk_distance_gcd_ - ((off - current_chunk_.off_) % chunk_distance_gcd_);
 	if (!current_chunk_.off_) {
 		auto abs_off = g_mp4->toAbsOff(off);
 		auto step_abs = chunk_distance_gcd_ - ((abs_off - current_chunk_.off_) % chunk_distance_gcd_);
 		step = min(step, step_abs);
 	}
-	logg(V, "stepToNextChunkOff(", off, "): ", codec_.name_,  " last chunk_off: ", current_chunk_.off_, " next: ", off + step, "\n");
+	logg(V, "stepToNextOwnChunkOff(", off, "): to: ", codec_.name_,
+	     " last chunk_off: ", current_chunk_.off_, " next: ", off + step, "\n");
 	return step;
+}
+
+// currently only used for the (dummy) "free" track
+int64_t Track::stepToNextOtherChunk(off_t off) {
+	if (end_off_gcd_ <= 1) return 0;
+	auto abs_off = g_mp4->toAbsOff(off);
+	auto step = end_off_gcd_ - (abs_off % end_off_gcd_);
+
+	for (int i=0; i < 5; i++) {
+		logg(V, "step:", step, "\n");
+		if (g_mp4->wouldMatch(off + step)) {
+			logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
+			     ", step: ", step, ", next: ", off + step, "\n");
+			return step;
+		}
+		step += end_off_gcd_;
+	}
+	logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,  " next: <nothing found>\n");
+	return 0;
 }
 
 bool Track::chunkMightBeAtAnd() {
@@ -561,6 +582,10 @@ void Track::printDynPatterns(bool show_percentage) {
 			cout << p << '\n';
 		}
 	}
+}
+
+bool Track::dummyIsUsedAsPadding() {
+	return end_off_gcd_ >= 8;
 }
 
 void Track::genLikely() {
@@ -611,15 +636,21 @@ void Track::genLikely() {
 	}
 
 	if (chunks_.size() > 1) {
-		chunk_distance_gcd_ = chunks_[1].off_ - chunks_[0].off_;
+		chunk_distance_gcd_ = chunks_[1].off_ - chunks_[0].off_;  // difference makes it independent of "global" offset
 		for (uint i=1; i < chunks_.size(); i++) {
 			chunk_distance_gcd_ = gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
 		}
-	}
-	else chunk_distance_gcd_ = 1;
 
-	if (is_dummy_ && likely_n_samples_.empty() && g_mp4->hasCodec("icod"))
-		likely_n_samples_.push_back(kSkipChunkPrediction);
+		end_off_gcd_ = chunks_[0].off_ + chunks_[0].size_;  // offsets are absolute (to file begin)
+		for (auto& c : chunks_) {
+			off_t end_off = c.off_ + c.size_;
+			end_off_gcd_ = gcd(end_off_gcd_, end_off);
+		}
+	}
+	else {
+		chunk_distance_gcd_ = 1;
+		end_off_gcd_ = 1;
+	}
 }
 
 int Track::useDynPatterns(off_t offset) {

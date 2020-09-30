@@ -188,8 +188,10 @@ private:
 	uint64_t chunk_idx_ = 0;
 	int getLikelyNextTrackIdx(int* n_samples=nullptr);
 	bool isTrackOrderEnough();
-	bool dummyIsSkippable();
+	void setDummyIsSkippable();
 	void correctChunkIdx(int track_idx);
+	bool dummy_is_skippable_ = false;
+	int dummy_do_padding_skip_ = false;
 
 	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
 

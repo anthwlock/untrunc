@@ -98,9 +98,12 @@ public:
 	bool hasPredictableChunks();
 	bool shouldUseChunkPrediction();
 	int64_t chunk_distance_gcd_;
+	int64_t end_off_gcd_;  // e.g. after free sequence
 	bool isChunkOffsetOk(off_t off);
-	int64_t stepToNextChunkOff(off_t off);
+	int64_t stepToNextOwnChunk(off_t off);
+	int64_t stepToNextOtherChunk(off_t off);
 	bool is_dummy_ = false;
+	bool dummyIsUsedAsPadding();
 
 	Track::Chunk current_chunk_;
 	bool chunkMightBeAtAnd();
@@ -129,8 +132,6 @@ private:
 
 	int use_looks_like_twos_idx_ = -1;
 };
-
-const int kSkipChunkPrediction = -23;
 
 std::ostream& operator<<(std::ostream& out, const Track::Chunk& fi);
 
