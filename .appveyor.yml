@@ -41,12 +41,12 @@ build_script:
   #- curl -L https://www.ffmpeg.org/releases/ffmpeg-%FFMPEG_VER%.tar.xz -o ffmpeg-%FFMPEG_VER%.tar.xz
   #- tar xf ffmpeg-%FFMPEG_VER%.tar.xz
 
-  - curl -s -L https://ffmpeg.zeranoe.com/builds/%_ARCH%/dev/ffmpeg-%_FF_VER%-%_ARCH%-dev.zip -o ffmpeg-dev.zip
+  - curl -s -L https://web.archive.org/https://ffmpeg.zeranoe.com/builds/%_ARCH%/dev/ffmpeg-%_FF_VER%-%_ARCH%-dev.zip -o ffmpeg-dev.zip
   - unzip -q ffmpeg-dev.zip
   - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-dev\include %_INCLUDE%
   - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-dev\lib %_LIB%
 
-  - curl -s -L https://ffmpeg.zeranoe.com/builds/%_ARCH%/shared/ffmpeg-%_FF_VER%-%_ARCH%-shared.zip -o ffmpeg-shared.zip
+  - curl -s -L https://web.archive.org/https://ffmpeg.zeranoe.com/builds/%_ARCH%/shared/ffmpeg-%_FF_VER%-%_ARCH%-shared.zip -o ffmpeg-shared.zip
   - unzip -q ffmpeg-shared.zip
   - xcopy /s /q ffmpeg-%_FF_VER%-%_ARCH%-shared\bin %_BIN%
 
