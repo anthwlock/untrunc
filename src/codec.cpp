@@ -447,6 +447,7 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		static AVFrame* frame = av_frame_alloc();
 
 		packet->data = const_cast<uchar*>(start);
+		maxlength = min(g_max_buf_sz_needed, maxlength);
 		packet->size = maxlength;
 		int got_frame = 0;
 
