@@ -65,6 +65,7 @@ public:
 
 	bool hasCodec(const std::string& codec_name);
 	uint getTrackIdx(const std::string& codec_name);
+	int getTrackIdx2(const std::string& codec_name);
 	std::string getCodecName(uint track_idx);
 	Track& getTrack(const std::string& codec_name);
 	off_t toAbsOff(off_t offset);

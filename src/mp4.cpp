@@ -658,6 +658,10 @@ void Mp4::genChunkTransitions() {
 	size_t chunk_idx = 0;
 	off_t mdat_end = current_mdat_->start_ + current_mdat_->length_;
 
+	int bad_tmcd_idx = getTrackIdx2("tmcd");
+	if (bad_tmcd_idx >= 0 && tracks_[bad_tmcd_idx].chunks_[0].size_ > 4)  // seems legit, reset bad_tmcd_idx
+		bad_tmcd_idx = -1;
+
 	while (true) {
 		int track_idx = -1;
 		auto off = numeric_limits<off_t>::max();
@@ -677,12 +681,12 @@ void Mp4::genChunkTransitions() {
 		}
 
 		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
-		if (chunk_idx < 10 && tracks_[track_idx].codec_.name_ == "tmcd") {
+		if (chunk_idx < 10 && track_idx == bad_tmcd_idx) {
 			goto loop_end;
 		}
 
 
-		if (order.size() < 100 && tracks_[track_idx].codec_.name_ != "tmcd")
+		if (order.size() < 100 && track_idx != bad_tmcd_idx)
 			order.emplace_back(make_pair(track_idx, cur_chunk.n_samples_));
 
 		if (first_off_abs_ < 0) {
@@ -721,6 +725,12 @@ void Mp4::genChunkTransitions() {
 		logg(V, "removed dummy track 'free'\n");
 	}
 
+	if (g_log_mode >= LogMode::V) {
+		logg("order ( ", order.size(), "): ");
+		for (auto& p : order)
+			logg("(", p.first, ", ", p.second, ") ");
+		logg("\n");
+	}
 	if (findOrder(order))
 		track_order_ = order;
 }
@@ -1093,9 +1103,15 @@ bool Mp4::hasCodec(const string& codec_name) {
 }
 
 uint Mp4::getTrackIdx(const string& codec_name) {
+	int r = getTrackIdx2(codec_name);
+	if (r < 0) throw "asked for nonexistent track";
+	return r;
+}
+
+int Mp4::getTrackIdx2(const string& codec_name) {
 	for (uint i=0; i < tracks_.size(); i++)
 		if (tracks_[i].codec_.name_ == codec_name) return i;
-	throw "asked for nonexistent track";
+	return -1;
 }
 
 string Mp4::getCodecName(uint track_idx) {
