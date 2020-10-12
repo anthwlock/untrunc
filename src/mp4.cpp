@@ -595,7 +595,7 @@ void Mp4::analyze(bool gen_off_map) {
 		Track& track = tracks_[idx];
 		if (!gen_off_map) cout << "\nTrack " << idx << " codec: " << track.codec_.name_ << endl;
 
-		if (track.shouldUseChunkPrediction()) {
+		if (track.num_samples_ && !track.sizes_.size()) {
 			track.genChunkSizes();
 			for (uint i=0; i < track.chunks_.size(); i++) {
 				auto& c = track.chunks_[i];
@@ -605,6 +605,7 @@ void Mp4::analyze(bool gen_off_map) {
 			}
 		}
 		else {
+			if (track.num_samples_) assert(track.sizes_.size());
 			if (!track.isSupported() && !gen_off_map) continue;
 			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
@@ -960,8 +961,6 @@ void Mp4::dumpSamples() {
 		auto& file = openFile(filename_ok_);
 		findMdat(file);
 	}
-	if (needDynStats())
-		for (auto& t : tracks_) t.genLikely();
 	analyze(true);
 	cout << filename_ok_ << '\n';
 
