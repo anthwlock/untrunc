@@ -245,12 +245,6 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("apcn") {
 		return memcmp(start, "icpf", 4) == 0;
 	}},
-	MATCH_FN("lpcm") {
-		// This is not trivial to detect because it is just
-		// the audio waveform encoded as signed 16-bit integers.
-		// For now, just test that it is not "apcn" video:
-		return memcmp(start, "icpf", 4) != 0;
-	}},
 	MATCH_FN("sawb") {
 		return start[0] == 0x44;
 	}},
@@ -292,6 +286,12 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("sowt") {
 		cerr << "Sowt is just  raw data, no way to guess length (unless reliably detecting the other codec start)\n";
 		return false;
+	}},
+	MATCH_FN("lpcm") {
+		// This is not trivial to detect because it is just
+		// the audio waveform encoded as signed 16-bit integers.
+		// For now, just test that it is not "apcn" video:
+		return memcmp(start, "icpf", 4) != 0;
 	}},
 	*/
 };
@@ -413,13 +413,6 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("apcn") {
 		return swap32(*(int *)start);
 	}},
-	GET_SZ_FN("lpcm") {
-		// Use hard-coded values for now....
-		const int num_samples      = 4096; // Empirical
-		const int num_channels     =    2; // Stereo
-		const int bytes_per_sample =    2; // 16-bit
-		return num_samples * num_channels * bytes_per_sample;
-	}},
 	GET_SZ_FN("tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
 //		tmcd_seen_ = true;
 		return 4;
@@ -474,6 +467,13 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	}},
 	GET_SZ_FN("in24") {
 		return -1;
+	}},
+	GET_SZ_FN("lpcm") {
+		// Use hard-coded values for now....
+		const int num_samples      = 4096; // Empirical
+		const int num_channels     =    2; // Stereo
+		const int bytes_per_sample =    2; // 16-bit
+		return num_samples * num_channels * bytes_per_sample;
 	}},
 	*/
 };
