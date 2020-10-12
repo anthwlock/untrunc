@@ -201,6 +201,7 @@ private:
 	void pushBackLastChunk();
 
 	int twos_track_idx_ = -1;
+	bool using_dyn_patterns_ = false;
 
 	static const int kDefaultFreeIdx = -2;
 };

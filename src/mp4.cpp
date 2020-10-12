@@ -777,6 +777,7 @@ void Mp4::genDynPatterns() {
 		if (!has_zero_transitions_ && t.hasZeroTransitions()) has_zero_transitions_ = true;
 	}
 	logg(V, "has_zero_transitions_: ", has_zero_transitions_, '\n');
+	using_dyn_patterns_ = true;
 }
 
 

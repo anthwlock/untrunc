@@ -558,6 +558,8 @@ int64_t Track::stepToNextOtherChunk(off_t off) {
 	auto abs_off = g_mp4->toAbsOff(off);
 	auto step = end_off_gcd_ - (abs_off % end_off_gcd_);
 
+	if (!g_mp4->using_dyn_patterns_) return step;
+
 	if (g_mp4->hasUnclearTransitions(ownTrackIdx())) {
 		logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
 		     ", step: ", step, ", next: ", off + step, "  // unclear transition!\n");
