@@ -1607,31 +1607,32 @@ void Mp4::chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedCh
 	else if (detectedChunkPtr) correct = correctChunkFound && *detectedChunkPtr == correctChunkIt->second;
 	else correct = !correctFrameFound && !correctChunkFound;
 
+	if (correct) return;
+//	if (correctFrameFound && detectedFramePtr && detectedFramePtr->keyframe_) return;
+
 	auto coutExtraInfo = [&]() {
-		if (detectedFramePtr) {
+		if (correctFrameFound) {
 			cout << ", chunk " << tracks_[correctFrameIt->second.track_idx_].chunks_.size()
 			 << ", pkt_in_chunk " << tracks_[correctFrameIt->second.track_idx_].current_chunk_.n_samples_;
 		}
-		else if (detectedChunkPtr) {
+		else if (correctChunkFound) {
 			 cout << ", chunk " << tracks_[correctChunkIt->second.track_idx_].chunks_.size();
 		}
 		cout << "):\n";
 	};
 
-	if (!correct) {
-		cout << "bad detection (at " << offToStr(off) << ", pkt " << pkt_idx_;
-		coutExtraInfo();
+	cout << "bad detection (at " << offToStr(off) << ", chunk " << chunk_idx_ << ", pkt " << pkt_idx_;
+	coutExtraInfo();
 
-		if (detectedFramePtr) cout << "  detected: " << *detectedFramePtr << '\n';
-		else if (detectedChunkPtr) cout << "  detected: " << *detectedChunkPtr << '\n';
-		else cout << "  detected: (none)\n";
+	if (detectedFramePtr) cout << "  detected: " << *detectedFramePtr << '\n';
+	else if (detectedChunkPtr) cout << "  detected: " << *detectedChunkPtr << '\n';
+	else cout << "  detected: (none)\n";
 
-		if (correctFrameFound) cout << "  correct: " << correctFrameIt->second << '\n';
-		else if (correctChunkFound) cout << "  correct: " << correctChunkIt->second << '\n';
-		else cout << "  correct: (none)\n";
+	if (correctFrameFound) cout << "  correct: " << correctFrameIt->second << '\n';
+	else if (correctChunkFound) cout << "  correct: " << correctChunkIt->second << '\n';
+	else cout << "  correct: (none)\n";
 
-		hitEnterToContinue();
-	}
+	hitEnterToContinue();
 }
 
 void Mp4::chkFrameDetectionAt(FrameInfo& detected, off_t off) { chkDetectionAtImpl(&detected, nullptr, off); }
