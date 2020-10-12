@@ -206,6 +206,8 @@ void Mp4::printDynStats() {
 	for (auto& t : tracks_) {
 		cout << t.codec_.name_ << '\n';
 		cout << "chunk_distance_gcd_: " << t.chunk_distance_gcd_ << '\n';
+		cout << "start_off_gcd_: " << t.start_off_gcd_ << '\n';
+		cout << "end_off_gcd_: " << t.end_off_gcd_ << '\n';
 
 		cout << "likely n_samples/chunk (p=" << t.likely_n_samples_p << "): ";
 		for (uint i=0; i < min(to_size_t(100), t.likely_n_samples_.size()); i++)
@@ -1345,7 +1347,7 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 			auto s_sz = track.likely_sample_sizes_[0];
 			if (n_samples * s_sz > current_mdat_->contentSize() - offset) return c;
 			c = Chunk(offset, n_samples, track_idx, s_sz);
-			logg(V, "chunk derived from track_order_:", c, "\n");
+			logg(V, "chunk derived from track_order_: ", c, "\n");
 			return c;
 		}
 	}
@@ -1543,6 +1545,22 @@ start:
 
 	if (*(int*)start == 0 && !shouldKeepZeros()) {
 		logg(V, "skipping zeros at: ", offToStr(offset), "\n");
+		if (track_order_.size()) {
+			int idx = getLikelyNextTrackIdx(nullptr);
+			int step = tracks_[idx].stepToNextOwnChunkAbs(offset);
+			logg(V, "used stepToNextOwnChunkAbs of likelyNextTrack -> ", step, "\n");
+			if (step > 4) {
+				offset += step;
+				return true;
+			}
+		}
+		if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
+			int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
+			logg(V, "used free's end_off_gcd -> ", len, "\n");
+			offset += len;
+			if (len) return true;
+			else logg(W, "end_off_gcd method failed..\n");
+		}
 		int64_t step = 4;
 		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
 		if (unknown_length_) unknown_length_ += step;

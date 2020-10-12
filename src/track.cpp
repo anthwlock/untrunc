@@ -533,10 +533,9 @@ bool Track::shouldUseChunkPrediction() {
 }
 
 bool Track::isChunkOffsetOk(off_t off) {
-	// chunk-offsets might be regular in respect to absolute file begin, not mdat begin
-	if (!current_chunk_.off_ && g_mp4->toAbsOff(off) % chunk_distance_gcd_ == 0)
-		return true;
+	if (g_mp4->toAbsOff(off) % start_off_gcd_ != 0) return false;
 
+	if (!current_chunk_.off_) return true;
 	return (off - current_chunk_.off_) % chunk_distance_gcd_ == 0;
 }
 
@@ -549,6 +548,15 @@ int64_t Track::stepToNextOwnChunk(off_t off) {
 	}
 	logg(V, "stepToNextOwnChunkOff(", off, "): to: ", codec_.name_,
 	     " last chunk_off: ", current_chunk_.off_, " next: ", off + step, "\n");
+	return step;
+}
+
+int64_t Track::stepToNextOwnChunkAbs(off_t off) {
+	if (start_off_gcd_ <= 1) return 0;
+	auto abs_off = g_mp4->toAbsOff(off);
+	auto step = start_off_gcd_ - (abs_off % start_off_gcd_);
+
+	logg(V, __func__, "(", off, "): from: ", codec_.name_,  " step: ", step, "\n");
 	return step;
 }
 
@@ -657,14 +665,22 @@ void Track::genLikely() {
 			chunk_distance_gcd_ = gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
 		}
 
-		end_off_gcd_ = chunks_[0].off_ + chunks_[0].size_;  // offsets are absolute (to file begin)
 		for (auto& c : chunks_) {
 			off_t end_off = c.off_ + c.size_;
+			end_off_gcd_ = gcd(end_off_gcd_, end_off);
+		}
+
+		start_off_gcd_ = chunks_[0].off_;  // these offsets are absolute (to file begin)
+		end_off_gcd_ = chunks_[0].off_ + chunks_[0].size_;
+		for (auto& c : chunks_) {
+			off_t end_off = c.off_ + c.size_;
+			start_off_gcd_ = gcd(start_off_gcd_, c.off_);
 			end_off_gcd_ = gcd(end_off_gcd_, end_off);
 		}
 	}
 	else {
 		chunk_distance_gcd_ = 1;
+		start_off_gcd_ = 1;
 		end_off_gcd_ = 1;
 	}
 }

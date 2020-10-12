@@ -98,9 +98,11 @@ public:
 	bool hasPredictableChunks();
 	bool shouldUseChunkPrediction();
 	int64_t chunk_distance_gcd_;
+	int64_t start_off_gcd_;
 	int64_t end_off_gcd_;  // e.g. after free sequence
 	bool isChunkOffsetOk(off_t off);
 	int64_t stepToNextOwnChunk(off_t off);
+	int64_t stepToNextOwnChunkAbs(off_t off);
 	int64_t stepToNextOtherChunk(off_t off);
 	bool is_dummy_ = false;
 	bool dummyIsUsedAsPadding();
