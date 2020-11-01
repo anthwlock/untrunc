@@ -27,7 +27,7 @@ using namespace std;
 
 LogMode g_log_mode = LogMode::I;
 //uint g_max_partsize = 1600000;  // 1.6MB
-uint g_max_partsize = 1<<23;  // 8MiB
+uint g_max_partsize = 1<<24;  // 16MiB
 uint g_max_buf_sz_needed = 1<<19;  // 512kiB
 bool g_interactive = true;
 bool g_muted = false;

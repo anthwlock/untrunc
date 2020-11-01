@@ -53,8 +53,16 @@ void Codec::initOnce() {
 
 	assert(dispatch_get_size.count("mp4a"));
 	dispatch_get_size["sawb"] = dispatch_get_size["mp4a"];
-	dispatch_get_size["hev1"] = dispatch_get_size["hvc1"];
-	dispatch_match["hev1"] = dispatch_match["hvc1"];
+	map<string, vector<string>> alias = {
+	    {"hvc1", {"hev1"}},
+	    {"ap4x", {"apch", "apcn", "apcs", "apco", "ap4h"}},  // Apple ProRes
+	};
+	for (auto& p : alias) {
+		for (auto& alias : p.second) {
+			dispatch_get_size[alias] = dispatch_get_size[p.first];
+			dispatch_match[alias] = dispatch_match[p.first];
+		}
+	}
 }
 
 
@@ -273,6 +281,9 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		// 0116....
 		return start[0] == 1 && start[1] == 22;
 	}},
+	MATCH_FN("ap4x") {
+		return string((char*)start+4, 4) == "icpf";
+	}},
 
 	/*
 	MATCH_FN("twos") {
@@ -456,6 +467,9 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	}},
 	GET_SZ_FN("icod") {
 		return swap32(*(int *)(start+2));
+	}},
+	GET_SZ_FN("ap4x") {
+		return swap32(*(int *)start);
 	}},
 
 	/* if codec is not found in map,
