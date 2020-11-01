@@ -1546,7 +1546,7 @@ start:
 	if (*(int*)start == 0 && !shouldKeepZeros()) {
 		logg(V, "skipping zeros at: ", offToStr(offset), "\n");
 		if (track_order_.size()) {
-			int idx = getLikelyNextTrackIdx(nullptr);
+			int idx = getLikelyNextTrackIdx();
 			int step = tracks_[idx].stepToNextOwnChunkAbs(offset);
 			logg(V, "used stepToNextOwnChunkAbs of likelyNextTrack -> ", step, "\n");
 			if (step > 4) {
