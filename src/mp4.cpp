@@ -608,7 +608,6 @@ void Mp4::analyze(bool gen_off_map) {
 		}
 		else {
 			if (track.num_samples_) assert(track.sizes_.size());
-			if (!track.isSupported() && !gen_off_map) continue;
 			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
 			auto c_it = track.chunks_.begin();
