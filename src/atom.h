@@ -55,7 +55,7 @@ public:
 	void writeInt64(int64_t value, off_t offset);
 
 	static void findAtomNames(const std::string& filename);
-	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat=false);
+	static off_t findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_rootlvl=false);
 
 	size_t cursor_off_ = 0;  // for "stream like" read/write methods
 	void seek(size_t idx) {cursor_off_ = idx;}

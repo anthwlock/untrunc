@@ -91,18 +91,19 @@ void Atom::parse(FileRead& file) {
 	}
 }
 
-off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_mdat) {
-	static int show_mdat_msg_in = 2;  // first start_atom is not initialized
+off_t Atom::findNextAtomOff(FileRead& file, const Atom* start_atom, bool searching_rootlvl) {
+	static int show_bad_msg_in = 2;  // first start_atom is not initialized
 	off_t next_off = start_atom->start_ + start_atom->length_;
-	bool skip_nested = ((searching_mdat && start_atom->name_ != "avcC" ) || start_atom->name_ == "mdat") &&
-	                   next_off > start_atom->start_;
+	bool skip_nested = start_atom->length_ > 0 &&
+	                   ((searching_rootlvl && start_atom->name_ != "avcC" && next_off < file.length()) ||
+	                    start_atom->name_ == "mdat");
 
 	if (skip_nested) {
 		if (next_off >= file.length()) return file.length();
 		if (isValidAtomName(file.getPtrAt(next_off+4, 4))) return next_off;
 	}
 
-	if (searching_mdat && !--show_mdat_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
+	if (searching_rootlvl && !--show_bad_msg_in) logg(I, "'", file.filename_, "' has invalid atom lenghts, see '-f'\n");
 
 	off_t off_start = start_atom->contentStart(), off = off_start;
 	while (off < file.length()) {
