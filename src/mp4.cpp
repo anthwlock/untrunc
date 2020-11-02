@@ -545,7 +545,7 @@ void Mp4::chkUntrunc(FrameInfo& fi, Codec& c, int i) {
 	cout << "\n(" << i << ") Size: " << fi.length_ << " offset: " << offToStr(offset)
 	     << "  begin: " << mkHexStr(start, 4) << " " << mkHexStr(start+4, 4);
 	auto end_off = offset + fi.length_ - 4;
-	auto sz = min(8L, current_mdat_->contentSize() - end_off);
+	auto sz = min(to_int64(8), current_mdat_->contentSize() - end_off);
 	auto end = current_mdat_->getFragment(end_off, sz);
 	cout << " end: " << mkHexStr(end, sz) << '\n';
 	start = loadFragment(offset);
