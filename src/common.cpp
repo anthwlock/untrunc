@@ -47,6 +47,7 @@ bool g_noise_buffer_active = false;
 bool g_ignore_out_of_bound_chunks = false;
 bool g_skip_existing = false;
 bool g_no_ctts = false;
+bool g_is_gui = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
@@ -405,4 +406,24 @@ bool findOrder(vector<pair<int, int>>& data, bool ignore_first_failed) {
 
 	if (first_failed && !ignore_first_failed) data.clear();
 	return !first_failed;
+}
+
+int parseByteStr(string& s) {
+	if (s.back() == 'b') s.pop_back();
+
+	char c = s.back();
+	int f;
+	if (isdigit(c)) f = 1;
+	else if (c == 'k') f = 1<<10;
+	else if (c == 'm') f = 1<<20;
+	else { logg(ET, "Error: unkown suffix: ", c, '\n'); }
+
+	if (f > 1) s.pop_back();
+	return f * stoi(s);
+}
+
+void parseMaxPartsize(string& s) {
+	g_max_partsize_default = 0;  // disable default
+	if (s == "f") return; // just force dynamic max_partsize, no default
+	g_max_partsize = parseByteStr(s);
 }

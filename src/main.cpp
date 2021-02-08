@@ -89,25 +89,6 @@ void parseRange(const string& s) {
 	g_range_end = s2.size() ? stoll(s2) : numeric_limits<int64_t>::max();
 }
 
-int parseByteStr(const string& s) {
-	char c = s.back();
-	c = std::tolower(c);
-	map<char, int> m = {
-	    {'b', 1},
-	    {'k', 1<<10},
-	    {'m', 1<<20},
-	};
-	int f = m[c];
-	if (f) return f * stoi(s.substr(0, s.size()-1));
-	else return stoi(s);
-}
-
-void parseMaxPartsize(const string& s) {
-	g_max_partsize_default = 0;  // disable default
-	if (s == "f") return;
-	g_max_partsize = parseByteStr(s);
-}
-
 int main(int argc, char *argv[]) {
 	const int kExpectArg = -22;
 

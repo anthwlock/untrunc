@@ -144,6 +144,11 @@ uiControl* Gui::repairTab() {
 	return uiControl(v_box);
 }
 
+#define CATCH_THEM(R) \
+	catch (const char* e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
+	catch (string e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
+	catch (const std::exception& e) {cerr << e.what() << '\n'; msgBoxError(e.what(), true); R;}
+
 uiControl* Gui::settingsTab() {
 	auto v_box = newVerticalBox();
 
@@ -164,19 +169,29 @@ uiControl* Gui::settingsTab() {
 	auto group_repair = newGroup("repair");
 	auto v_box_repair = newVerticalBox();
 	auto chk_skip = uiNewCheckbox("skip unknown (-s)");
+
 	auto h_box_step_size = newHorizontalBox();
 	auto label_step_size = uiNewLabel("       step_size (-st)");
 	auto num_step_size = uiNewSpinbox(1, 1<<16);
 	uiBoxAppend(h_box_step_size, uiControl(label_step_size), 0);
 	uiBoxAppend(h_box_step_size, uiControl(num_step_size), 0);
+
 	auto chk_stretch = uiNewCheckbox("stretch video to match audio (-sv)");
 	auto chk_keep_unknown = uiNewCheckbox("keep unknown sequences (-k)");
-	auto chk_use_dyn = uiNewCheckbox("use dynamic stats (--dyn)");
+	auto chk_use_dyn = uiNewCheckbox("use dynamic stats (-dyn)");
+
+	auto h_box_max_partsize = newHorizontalBox();
+	auto label_max_partsize = uiNewLabel("      max partsize (-mp)");
+	auto num_max_partsize = uiNewEntry();
+	uiBoxAppend(h_box_max_partsize, uiControl(label_max_partsize), 0);
+	uiBoxAppend(h_box_max_partsize, uiControl(num_max_partsize), 0);
+
 	uiBoxAppend(v_box_repair, uiControl(chk_skip), 0);
 	uiBoxAppend(v_box_repair, uiControl(h_box_step_size), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_stretch), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_keep_unknown), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_use_dyn), 0);
+	uiBoxAppend(v_box_repair, uiControl(h_box_max_partsize), 0);
 	uiGroupSetChild(group_repair, uiControl(v_box_repair));
 	uiBoxAppend(v_box, uiControl(group_repair), 0);
 
@@ -225,6 +240,17 @@ uiControl* Gui::settingsTab() {
 
 	}, nullptr);
 
+	string s_max_partsize = to_string(g_max_partsize);
+	uiEntrySetText(num_max_partsize, s_max_partsize.c_str());
+	uiEntryOnChanged(num_max_partsize, [](uiEntry *entry, void *data){
+		try {
+			string s = uiEntryText(entry);
+			if (s.empty()) s = "0";
+			parseMaxPartsize(s);
+		}
+		CATCH_THEM(uiEntrySetText(entry, "0"));
+	}, nullptr);
+
 	return uiControl(v_box);
 }
 
@@ -239,11 +265,6 @@ uiControl* Gui::settingsTab() {
 	} \
 
 #define ASYNC(fn, data) uiQueueMain((void (*)(void*))fn, (void*)data)
-
-#define CATCH_THEM(R) \
-	catch (const char* e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
-	catch (string e) {cerr << e << '\n'; msgBoxError(e, true); R;} \
-	catch (const std::exception& e) {cerr << e.what() << '\n'; msgBoxError(e.what(), true); R;}
 
 #define defineMp4ForAnalyze() \
 	defineFileForAnalyze(); \

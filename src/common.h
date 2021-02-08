@@ -30,7 +30,7 @@ extern uint
 extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks,
     g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
     g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
-    g_ignore_out_of_bound_chunks, g_skip_existing, g_no_ctts;
+    g_ignore_out_of_bound_chunks, g_skip_existing, g_no_ctts, g_is_gui;
 extern int64_t g_range_start, g_range_end;
 extern std::string g_dst_path;
 
@@ -81,7 +81,7 @@ void logg(LogMode m, Args&&... x){
 		std::cout << "Error: ";
 		if (m == ET) {
 			logg(std::forward<Args>(x)...);
-			if (g_onProgress) throw std::runtime_error(ss(std::forward<Args>(x)...));
+			if (g_is_gui) throw std::runtime_error(ss(std::forward<Args>(x)...));
 			else exit(1);
 		}
 	}
@@ -183,6 +183,9 @@ void warnIfAlreadyExists(const std::string&);
 bool isAllZeros(const uchar* buf, int n);
 
 bool findOrder(std::vector<std::pair<int, int>>& data, bool ignore_first_failed=false);
+
+int parseByteStr(std::string& s);
+void parseMaxPartsize(std::string& s);
 
 class Atom;
 // this class is meant for reading/writing mvhd and mdhd

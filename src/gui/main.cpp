@@ -10,6 +10,7 @@ using namespace std;
 int main(int argc, char* argv[]) {
 	g_ignore_unknown = true;
 	g_interactive = false;
+	g_is_gui = true;
 
 	Gui::init();
 	if (argc > 1) uiEntrySetText(Gui::Repair::entry_ok_, argv[1]);
