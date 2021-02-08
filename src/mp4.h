@@ -203,6 +203,8 @@ private:
 	int twos_track_idx_ = -1;
 	bool using_dyn_patterns_ = false;
 
+	uint max_part_size_ = 0;
+
 	static const int kDefaultFreeIdx = -2;
 };
 

@@ -161,6 +161,13 @@ void Mp4::parseTracksOk() {
 			assert(track.chunks_.front().off_ >= mdats.front()->contentStart());
 			assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
 		}
+
+		max_part_size_ = max(max_part_size_, track.max_allowed_ss_);
+	}
+
+	if (g_max_partsize > 0) {
+		logg(V, "ss: using manually specified: ", g_max_partsize, "\n");
+		max_part_size_ = g_max_partsize;
 	}
 }
 
@@ -201,29 +208,11 @@ void Mp4::printAtoms() {
 void Mp4::printDynStats() {
 	if (first_off_abs_ < 0) genDynStats(true);
 	cout << "\ndynamic stats:";
-	cout << "\nfirst_off_: " << first_off_abs_;
-	cout << "\nfirst_off_rel_: " << first_off_rel_ << '\n';
-	for (auto& t : tracks_) {
-		cout << t.codec_.name_ << '\n';
-		cout << "chunk_distance_gcd_: " << t.chunk_distance_gcd_ << '\n';
-		cout << "start_off_gcd_: " << t.start_off_gcd_ << '\n';
-		cout << "end_off_gcd_: " << t.end_off_gcd_ << '\n';
-
-		cout << "likely n_samples/chunk (p=" << t.likely_n_samples_p << "): ";
-		for (uint i=0; i < min(to_size_t(100), t.likely_n_samples_.size()); i++)
-			cout << t.likely_n_samples_[i] << ' ';
-
-		cout << "\nlikely sample_sizes (p=" << t.likely_samples_sizes_p << "): ";
-		for (uint i=0; i < min(to_size_t(100), t.likely_sample_sizes_.size()); i++)
-			cout << t.likely_sample_sizes_[i] << ' ';
-
-		int sum = 0;
-		for (auto& v : t.dyn_patterns_) sum += v.size();
-		cout << '\n' << "n_mutual_patterns: " << sum << '\n';
-		t.printDynPatterns(true);
-
-		cout << "\n";
-	}
+	cout << "first_off_: " << first_off_abs_ << '\n';
+	cout << "first_off_rel_: " << first_off_rel_ << '\n';
+	cout << "max_part_size_: " << max_part_size_ << '\n';
+	for (auto& t : tracks_)
+		t.printDynStats();
 }
 
 void Mp4::listm(const string& filename) {
@@ -1097,7 +1086,7 @@ void Mp4::addChunk(const Mp4::Chunk& chunk) {
 
 const uchar* Mp4::loadFragment(off_t offset, bool update_cur_maxlen) {
 	if (update_cur_maxlen)
-		current_maxlength_ = min((int64_t) g_max_partsize, current_mdat_->contentSize() - offset);
+		current_maxlength_ = min((int64_t) max_part_size_, current_mdat_->contentSize() - offset);
 	auto buf_sz = min((int64_t) g_max_buf_sz_needed, current_mdat_->contentSize() - offset);
 	return current_fragment_ = current_mdat_->getFragment(offset, buf_sz);
 }
@@ -1243,7 +1232,7 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 			continue;
 		}
 		if(length > current_maxlength_) {
-			logg(V, "limit: ", min(g_max_partsize, current_maxlength_), "\n");
+			logg(V, "limit: ", min(max_part_size_, current_maxlength_), "\n");
 			logg(E, "Invalid length: ", length, " - too big (track: ", i, ")\n");
 			continue;
 		}
@@ -1803,6 +1792,13 @@ void Mp4::repair(const string& filename) {
 		if (g_log_mode >= LogMode::V) printDynStats();
 		logg(I, "using dynamic stats, use '-is' to see them\n");
 	}
+
+	if (!g_ignore_unknown && max_part_size_ < g_max_partsize_default) {
+		double x = (double)max_part_size_ / g_max_partsize_default;
+		logg(V, "ss: reset to default (from ",  max_part_size_, " ~= ", setprecision(2), x, "*default)\n");
+		max_part_size_ = g_max_partsize_default;
+	}
+	logg(V, "ss: max_part_size_: ", max_part_size_, "\n");
 
 	if (alreadyRepaired(filename_ok_, filename)) exit(0);
 

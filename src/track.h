@@ -78,6 +78,13 @@ public:
 
 	std::string getCodecNameSlow();
 
+	// sample size stats
+	uint avg_ss_normal_ = 0, min_ss_normal_ = 0, max_ss_normal_ = 0,
+	    avg_ss_keyframe_ = 0, min_ss_keyframe_ = 0, max_ss_keyframe_ = 0,
+	    avg_ss_total_ = 0, min_ss_total_ = 0, max_ss_total_ = 0;
+	bool be_strict_maxpart_ = false;
+	uint max_allowed_ss_ = 0;
+
 	struct Chunk {
 		Chunk() = default;
 		Chunk(off_t off, int64_t size, int ns);
@@ -110,6 +117,7 @@ public:
 	Track::Chunk current_chunk_;
 	bool chunkMightBeAtAnd();
 
+	void printDynStats();
 	void printDynPatterns(bool show_percentage=false);
 	void genLikely();
 	bool isSupported() { return codec_.isSupported(); }
@@ -136,6 +144,8 @@ private:
 	int use_looks_like_twos_idx_ = -1;
 
 	uint ownTrackIdx();
+	void calcAvgSampleSize();
+	void setMaxAllowedSampleSize();
 };
 
 std::ostream& operator<<(std::ostream& out, const Track::Chunk& fi);

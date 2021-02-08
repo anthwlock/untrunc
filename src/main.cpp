@@ -49,6 +49,7 @@ void usage() {
 	     << "-dst <dir|file>  - set destination\n"
 	     << "-skip  - skip existing\n"
 	     << "-noctts  - dont restore ctts\n"
+	     << "-mp <bytes>  - set max partsize\n"
 	     << "\n"
 	     << "analyze options:\n"
 	     << "-a  - analyze\n"
@@ -88,6 +89,25 @@ void parseRange(const string& s) {
 	g_range_end = s2.size() ? stoll(s2) : numeric_limits<int64_t>::max();
 }
 
+int parseByteStr(const string& s) {
+	char c = s.back();
+	c = std::tolower(c);
+	map<char, int> m = {
+	    {'b', 1},
+	    {'k', 1<<10},
+	    {'m', 1<<20},
+	};
+	int f = m[c];
+	if (f) return f * stoi(s.substr(0, s.size()-1));
+	else return stoi(s);
+}
+
+void parseMaxPartsize(const string& s) {
+	g_max_partsize_default = 0;  // disable default
+	if (s == "f") return;
+	g_max_partsize = parseByteStr(s);
+}
+
 int main(int argc, char *argv[]) {
 	const int kExpectArg = -22;
 
@@ -107,6 +127,7 @@ int main(int argc, char *argv[]) {
 	int arg_step = -1;
 	int arg_range = -1;
 	int arg_dst = -1;
+	int arg_mp = -1;
 
 	int i = 1;
 	for (; i < argc; i++) {
@@ -115,6 +136,7 @@ int main(int argc, char *argv[]) {
 		if (arg_step == kExpectArg) {arg_step = stoi(arg); continue;}
 		if (arg_range == kExpectArg) {parseRange(arg); arg_range = -1; continue;}
 		if (arg_dst == kExpectArg) {g_dst_path = arg; arg_dst = -1; continue;}
+		if (arg_mp == kExpectArg) {parseMaxPartsize(arg); arg_mp = -1; continue;}
 		if (arg == "--version") printVersion();
 		if (arg[0] == '-') {
 			auto a = arg.substr(1);
@@ -150,6 +172,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "range") arg_range = kExpectArg;
 			else if (a == "dst") arg_dst = kExpectArg;
 			else if (a == "skip") g_skip_existing = true;
+			else if (a == "mp") arg_mp = kExpectArg;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}
