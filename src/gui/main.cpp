@@ -8,7 +8,6 @@
 using namespace std;
 
 int main(int argc, char* argv[]) {
-	g_ignore_unknown = true;
 	g_interactive = false;
 	g_is_gui = true;
 

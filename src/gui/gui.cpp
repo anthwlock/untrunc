@@ -408,6 +408,10 @@ void Gui::startRepair(uiButton* b, void* data) {
 			chkHiddenWarnings();
 			Repair::onProgress(100);
 			cout << "\ndone!";
+
+			if (mp4.premature_end_ && mp4.premature_percentage_ < 0.9) {
+				ASYNC(msgBox, "Encountered premature end, please try '-s' in the \"Settings\" Tab.");
+			}
 		}
 		CATCH_THEM();
 		ASYNC(setDisabled, false);

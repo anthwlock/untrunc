@@ -1876,6 +1876,8 @@ void Mp4::repair(const string& filename) {
 			logg(E, "unable to find correct codec -> premature end", " (~", setprecision(4), percentage, "%)\n",
 			"       try '-s' to skip unknown sequences\n\n");
 			logg(V, "mdat->file_end: ", mdat->file_end_, '\n');
+
+			premature_percentage_ = percentage; premature_end_ = true;
 			break;
 		}
 	}

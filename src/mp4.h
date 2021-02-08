@@ -85,6 +85,9 @@ public:
 	off_t orig_mdat_start_;
 	off_t orig_mdat_end_;
 
+	bool premature_end_ = false;
+	double premature_percentage_ = 0;
+
 	// Chunks with constant sample size
 	class Chunk : public Track::Chunk {
 	public:
