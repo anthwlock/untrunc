@@ -635,53 +635,22 @@ void Mp4::analyze(bool gen_off_map) {
 	}
 }
 
-
 void Mp4::genChunks() {
 	for (auto& t : tracks_) t.genChunkSizes();
 }
 
 void Mp4::genChunkTransitions() {
-	vector<uint> cur_chunk_idx(tracks_.size());
-	int last_track_idx = -1;
+	ChunkIt::Chunk last_chunk;
 
 	tracks_.emplace_back("free");
 	idx_free_ = tracks_.size()-1;
 	logg(V, "created dummy track 'free'\n");
 
-	vector<pair<int, int>> order;
-	size_t chunk_idx = 0;
-	off_t mdat_end = current_mdat_->start_ + current_mdat_->length_;
+	for (auto& cur_chunk : AllChunksIn(this, false)) {
+		auto track_idx = cur_chunk.track_idx_;
+		auto off = cur_chunk.off_;
 
-	int bad_tmcd_idx = getTrackIdx2("tmcd");
-	if (bad_tmcd_idx >= 0 && tracks_[bad_tmcd_idx].chunks_[0].size_ > 4)  // seems legit, reset bad_tmcd_idx
-		bad_tmcd_idx = -1;
-
-	while (true) {
-		int track_idx = -1;
-		auto off = numeric_limits<off_t>::max();
-		for (uint i=0; i < cur_chunk_idx.size(); i++) {
-			if (cur_chunk_idx[i] >= tracks_[i].chunks_.size()) continue;
-			auto toff = tracks_[i].chunks_[cur_chunk_idx[i]].off_;
-			if (toff < off) {
-				track_idx = i;
-				off = toff;
-			}
-		}
-		if (track_idx < 0) break;
-		if (off >= mdat_end) {
-			assert(g_ignore_out_of_bound_chunks);
-			logg(W, "reached premature end of mdat\n");
-			break;
-		}
-
-		auto& cur_chunk = tracks_[track_idx].chunks_[cur_chunk_idx[track_idx]];
-		if (chunk_idx < 10 && track_idx == bad_tmcd_idx) {
-			goto loop_end;
-		}
-
-
-		if (order.size() < 100 && track_idx != bad_tmcd_idx)
-			order.emplace_back(make_pair(track_idx, cur_chunk.n_samples_));
+		if (cur_chunk.should_ignore_) goto loop_end;
 
 		if (first_off_abs_ < 0) {
 			first_off_abs_ = cur_chunk.off_;
@@ -689,8 +658,7 @@ void Mp4::genChunkTransitions() {
 			orig_first_track_ = &tracks_[track_idx];
 		}
 
-		if (last_track_idx >= 0) {
-			auto& last_chunk = tracks_[last_track_idx].chunks_[cur_chunk_idx[last_track_idx]-1];
+		if (last_chunk) {
 			auto last_end = last_chunk.off_ + last_chunk.size_;
 			if (off - current_mdat_->contentStart() < pat_size_ / 2) {
 				logg(W, "rel_off(cur_chunk) < pat_size/2 .. ", tracks_[track_idx].codec_.name_, " ", cur_chunk, "\n");
@@ -698,19 +666,17 @@ void Mp4::genChunkTransitions() {
 			}
 			assert(off >= last_end);
 			if (off != last_end) {
-				chunk_transitions_[{last_track_idx, idx_free_}].emplace_back(last_end);
+				chunk_transitions_[{last_chunk.track_idx_, idx_free_}].emplace_back(last_end);
 				tracks_[idx_free_].chunks_.emplace_back(last_end, off - last_end, off - last_end);
 				chunk_transitions_[{idx_free_, track_idx}].emplace_back(off);
 			}
 			else {
-				chunk_transitions_[{last_track_idx, track_idx}].emplace_back(off);
+				chunk_transitions_[{last_chunk.track_idx_, track_idx}].emplace_back(off);
 			}
 		}
 
         loop_end:
-		last_track_idx = track_idx;
-		cur_chunk_idx[track_idx]++;
-		chunk_idx++;
+		last_chunk = cur_chunk;
 	}
 
 	if (!tracks_.back().chunks_.size()) {
@@ -718,6 +684,19 @@ void Mp4::genChunkTransitions() {
 		idx_free_ = kDefaultFreeIdx;
 		logg(V, "removed dummy track 'free'\n");
 	}
+}
+
+void Mp4::genTrackOrder() {
+	if (!current_mdat_) findMdat(*current_file_);
+
+	vector<pair<int, int>> order;
+	for (auto& cur_chunk : AllChunksIn(this, true)) {
+		auto track_idx = cur_chunk.track_idx_;
+		if (order.size() > 100) break;
+		order.emplace_back(make_pair(track_idx, cur_chunk.n_samples_));
+	}
+
+	track_order_simple_ = findOrderSimple(order);
 
 	if (g_log_mode >= LogMode::V) {
 		logg("order ( ", order.size(), "): ");
@@ -893,7 +872,28 @@ void Mp4::correctChunkIdx(int track_idx) {
 	while (track_order_[chunk_idx_].first != track_idx) chunk_idx_++;
 
 	if (tracks_[track_idx].likely_n_samples_.size() > 1)
-		logg(W, "correctChunkIdx(", track_idx, ") could be wrong");
+		logg(W, "correctChunkIdx(", track_idx, ") could be wrong\n");
+}
+
+void Mp4::correctChunkIdxSimple(int track_idx) {
+	assert(track_idx != idx_free_);
+	auto order_sz = track_order_simple_.size();
+	if (!order_sz) return;
+
+	int off_ok = -1;
+	for (uint off=0; off < order_sz; off++) {
+		if (track_order_simple_[chunk_idx_+off % order_sz] == track_idx) {
+			if (off_ok < 0) off_ok = off;
+			else {logg(W, "correctChunkIdxSimple(", track_idx, "): next chunk is ambiguous\n"); break;};
+		}
+	}
+
+	assert(off_ok >= 0);
+
+	if (off_ok) {
+		logg(V, "correctChunkIdxSimple(", track_idx, "): skipping ", off_ok, "chunks\n\n");
+		chunk_idx_ += off_ok;
+	}
 }
 
 int Mp4::skipNextZeroCave(off_t off, int max_sz, int n_zeros) {
@@ -913,7 +913,7 @@ void Mp4::pushBackLastChunk() {
 
 bool Mp4::isTrackOrderEnough() {
 	auto isEnough = [&]() {
-	if (!track_order_.size()) return false;
+		if (!track_order_.size()) return false;
 	    for (auto& t : tracks_) {
 			if (t.isSupported()) continue;
 			if (t.is_dummy_ && dummy_is_skippable_) continue;  // not included in track_order_
@@ -936,13 +936,18 @@ bool Mp4::isTrackOrderEnough() {
 	return is_enough;
 }
 
+void Mp4::genLikelyAll() {
+	for (auto& t: tracks_) t.genLikely();
+}
+
 void Mp4::genDynStats(bool force_patterns) {
 	if (chunk_transitions_.size()) return;  // already generated
 	if (!current_mdat_) findMdat(*current_file_);
 	genChunks();
 
 	genChunkTransitions();
-	for (auto& t: tracks_) t.genLikely();
+	genTrackOrder();
+	genLikelyAll();
 
 	setDummyIsSkippable(); // note: genDynPatterns could (indirectly) change this outcome, via Mp4::has_zero_transitions_
 	if (isTrackOrderEnough() && !force_patterns) return;
@@ -1103,7 +1108,7 @@ uint Mp4::getTrackIdx(const string& codec_name) {
 	return r;
 }
 
-int Mp4::getTrackIdx2(const string& codec_name) {
+int Mp4::getTrackIdx2(const string& codec_name) const {
 	for (uint i=0; i < tracks_.size(); i++)
 		if (tracks_[i].codec_.name_ == codec_name) return i;
 	return -1;
@@ -1117,6 +1122,20 @@ string Mp4::getCodecName(uint track_idx) {
 Track& Mp4::getTrack(const string& codec_name) {
 	auto idx = getTrackIdx(codec_name);
 	return tracks_[idx];
+}
+
+// currently only used to distinguish duplicate tracks (e.g. 2x mp4a)
+bool Mp4::isExpectedTrackIdx(int i) {
+	if (track_order_simple_.empty()) return true;
+	int expected_idx = track_order_simple_[chunk_idx_ % track_order_simple_.size()];
+	if (expected_idx == i) return true;
+
+	if (getCodecName(i) != getCodecName(expected_idx)) {
+		logg(W, "expected codec ", getCodecName(expected_idx), " but found ",  getCodecName(i), "\n");
+		correctChunkIdxSimple(i);
+		return true;
+	}
+	return false;
 }
 
 bool Mp4::pointsToZeros(off_t off) {
@@ -1246,6 +1265,8 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
 			continue;
 		}
+
+		if (track.has_duplicates_ && !isExpectedTrackIdx(i)) continue;
 
 		return FrameInfo(i, c, offset, length);
 	}
@@ -1694,7 +1715,10 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		}
 
 		pushBackLastChunk();
-		if (chunk.track_idx_ != idx_free_) chunk_idx_++;
+		if (chunk.track_idx_ != idx_free_) {
+			if (!first_chunk_found_) onFirstChunkFound(chunk.track_idx_);
+			chunk_idx_++;
+		}
 
 		t.current_chunk_ = chunk;
 		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
@@ -1725,6 +1749,15 @@ string Mp4::offToStr(off_t offset) {
 	return ss(offset, " / " , toAbsOff(offset));
 }
 
+void Mp4::onFirstChunkFound(int track_idx) {
+	if (track_idx == idx_free_) return;
+	first_chunk_found_ = true;
+	assert(chunk_idx_ == 0);
+	correctChunkIdxSimple(track_idx);
+	if (chunk_idx_)
+		logg(W, "different start chunk: ", track_idx, " instead of ", track_order_simple_[0], "\n");
+}
+
 bool Mp4::tryMatch(off_t& offset) {
 	FrameInfo match = getMatch(offset);
 	if (match) {
@@ -1738,11 +1771,17 @@ bool Mp4::tryMatch(off_t& offset) {
 			correctChunkIdx(match.track_idx_);
 			disableNoiseBuffer();
 		}
+
+		if (!first_chunk_found_) onFirstChunkFound(match.track_idx_);
 		if (last_track_idx_ != match.track_idx_) {
 			if (match.track_idx_ != idx_free_) chunk_idx_++;
 			pushBackLastChunk();
 			t.current_chunk_.off_ = offset;
 			t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
+		}
+
+		if (t.has_duplicates_ && t.chunkReachedSampleLimit()) {
+			pushBackLastChunk(); chunk_idx_++;
 		}
 
 		addFrame(match);
@@ -1751,7 +1790,9 @@ bool Mp4::tryMatch(off_t& offset) {
 		logg(V, t.current_chunk_.n_samples_, "th sample in ", t.chunks_.size()+1, "th ", t.codec_.name_, "-chunk\n");
 		last_track_idx_ = match.track_idx_;
 		offset += match.length_;
+
 		pkt_idx_++;
+
 
 		return true;
 	}
@@ -1779,6 +1820,23 @@ bool Mp4::alreadyRepaired(const std::string& ok, const std::string& corrupt) {
 	return false;
 }
 
+bool Mp4::setDuplicateInfo() {
+	map<string, int> cnt;
+	bool foundAny = false;
+	for (auto& t : tracks_) {
+		if (!t.isSupported()) continue;
+		cnt[t.codec_.name_]++;
+	}
+	for (auto& t : tracks_) {
+		if (cnt[t.codec_.name_] > 1) {
+			foundAny = true;
+			t.has_duplicates_ = true;
+			t.genLikely();
+		}
+	}
+	return foundAny;
+}
+
 void Mp4::repair(const string& filename) {
 	if (chkNeedOldApi()) {
 		cout << "Help: You need to build against ffmpeg 3.3.\n"
@@ -1791,6 +1849,12 @@ void Mp4::repair(const string& filename) {
 		checkForBadTracks();
 		if (g_log_mode >= LogMode::V) printDynStats();
 		logg(I, "using dynamic stats, use '-is' to see them\n");
+	}
+	else if (setDuplicateInfo()) {;
+		genTrackOrder();
+		if (track_order_simple_.empty()) {
+			logg(W, "duplicate codecs found, but no (simple) track order found\n");
+		}
 	}
 
 	if (!g_ignore_unknown && max_part_size_ < g_max_partsize_default) {
@@ -1835,9 +1899,6 @@ void Mp4::repair(const string& filename) {
 	}
 
 	while (chkOffset(offset)) {
-		FrameInfo match;
-		Mp4::Chunk chunk;
-
 		if (shouldPreferChunkPrediction()) {
 			logg(V, "trying chunkPredict first.. \n");
 			if (tryChunkPrediction(offset) || tryMatch(offset)) continue;

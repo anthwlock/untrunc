@@ -133,6 +133,8 @@ public:
 
 	std::vector<int> orig_comp_offs_;  // from ctts
 	int dump_idx_ = 0;
+	bool chunkReachedSampleLimit();
+	int has_duplicates_ = false;
 private:
 	// from healthy file
 	std::vector<int> orig_sizes_;

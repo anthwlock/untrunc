@@ -705,6 +705,11 @@ bool Track::chunkMightBeAtAnd() {
 	return false;
 }
 
+bool Track::chunkReachedSampleLimit() {
+	if (likely_n_samples_.size() != 1 || likely_n_samples_p < 0.99) return false;
+	return current_chunk_.n_samples_ == likely_n_samples_[0];
+}
+
 void Track::printDynPatterns(bool show_percentage) {
 	auto own_idx = ownTrackIdx();
 	for (uint j=0; j < dyn_patterns_perm_.size(); j++) {
@@ -725,6 +730,7 @@ bool Track::dummyIsUsedAsPadding() {
 }
 
 void Track::genLikely() {
+	if (likely_n_samples_.size()) return;  // already done
 	assert(sizes_.size() > 0 || constant_size_);
 
 	if (sizes_.size() > 1) {

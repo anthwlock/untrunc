@@ -408,6 +408,37 @@ bool findOrder(vector<pair<int, int>>& data, bool ignore_first_failed) {
 	return !first_failed;
 }
 
+// like findOrder, but only looks at first entry
+vector<int> findOrderSimple(const vector<pair<int, int>>& data) {
+	vector<int> result;
+
+	for (uint i=0; i < data.size(); i++) {
+		int val_i = data[i].first;
+		if (i && val_i == data[0].first) break;
+		result.emplace_back(val_i);
+	}
+	if (result.empty()) return result;
+
+	uint first_failed = 0;
+	for (uint i=1; i < data.size(); i++) {
+		if (data[i].first != result[i%result.size()]) {
+			first_failed = i;
+			break;
+		}
+	}
+
+	if (g_log_mode >= V) {
+		cout << "first_failed: " << first_failed << " of " << data.size() << '\n';
+		cout << "simpleOrder: ";
+		for (auto& x : result) cout << x << " ";
+		cout << '\n';
+	}
+
+	if (first_failed) result.clear();
+	return result;
+}
+
+
 int parseByteStr(string& s) {
 	if (s.back() == 'b') s.pop_back();
 

@@ -183,6 +183,7 @@ void warnIfAlreadyExists(const std::string&);
 bool isAllZeros(const uchar* buf, int n);
 
 bool findOrder(std::vector<std::pair<int, int>>& data, bool ignore_first_failed=false);
+std::vector<int> findOrderSimple(const std::vector<std::pair<int, int>>& data);
 
 int parseByteStr(std::string& s);
 void parseMaxPartsize(std::string& s);
