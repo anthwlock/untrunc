@@ -1262,8 +1262,9 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 
         after_length_chk:
 		if (c.was_bad_) {
-			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
-			continue;
+			logg(W, "Codec::was_bad_ = 1\n");
+//			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
+//			continue;
 		}
 
 		if (track.has_duplicates_ && !isExpectedTrackIdx(i)) continue;
