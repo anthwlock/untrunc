@@ -284,6 +284,10 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	MATCH_FN("ap4x") {
 		return string((char*)start+4, 4) == "icpf";
 	}},
+	MATCH_FN("camm") {
+		int s3 = swap32(((int *)start)[2]);
+		return s == (int)0xc8000600 && s3 == (int)0xe118d841;
+	}},
 
 	/*
 	MATCH_FN("twos") {
@@ -470,6 +474,9 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	}},
 	GET_SZ_FN("ap4x") {
 		return swap32(*(int *)start);
+	}},
+	GET_SZ_FN("camm") {
+		return 60;
 	}},
 
 	/* if codec is not found in map,
