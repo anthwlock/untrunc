@@ -215,7 +215,7 @@ void Track::fixTimes() {
 
 	if (times_.empty()) times_ = orig_times_;
 	else if (times_.size() < len_offs)
-		logg(W, "only found decode times partially!");
+		logg(W, "only found decode times partially for ", codec_.name_, "!\n");
 
 	if (times_.empty()) return;
 
