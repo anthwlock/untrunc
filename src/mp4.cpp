@@ -950,7 +950,11 @@ void Mp4::genDynStats(bool force_patterns) {
 	genLikelyAll();
 
 	setDummyIsSkippable(); // note: genDynPatterns could (indirectly) change this outcome, via Mp4::has_zero_transitions_
-	if (isTrackOrderEnough() && !force_patterns) return;
+	if (isTrackOrderEnough() && !force_patterns) {
+		for (auto& t : tracks_)
+			t.dyn_patterns_.resize(tracks_.size());  // prevent segfault
+		return;
+	}
 
 	genDynPatterns();
 }
