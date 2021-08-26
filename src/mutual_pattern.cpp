@@ -139,6 +139,11 @@ patterns_t genRawPatterns(buffs_t buffs) {
 	auto dis = uniform_int_distribution<size_t>(0, buffs.size()-1);
 	shuffle(buffs.begin(), buffs.end(), gen);
 
+	if (buffs.size() == 1) {
+		auto a = buffs[0];
+		patterns.emplace_back(MutualPattern(a, a));
+	}
+
 	for (uint i=0; i+1 < buffs.size(); i++) {
 		auto a = buffs[i], b = buffs[i+1];
 		auto p = MutualPattern(a, b);
