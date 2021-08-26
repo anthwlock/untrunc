@@ -52,7 +52,7 @@ public:
 	void saveVideo(const std::string& filename);
 	static void listm(const std::string& filename);
 	static void unite(const std::string& mdat_fn, const std::string& moov_fn);
-	static void shorten(const std::string& filename, int mega_bytes);
+	static void shorten(const std::string& filename, int mega_bytes, bool force);
 
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);

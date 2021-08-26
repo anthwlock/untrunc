@@ -300,9 +300,10 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 	moov.write(fout);
 }
 
-void Mp4::shorten(const string& filename, int mega_bytes) {
+void Mp4::shorten(const string& filename, int mega_bytes, bool force) {
 	int64_t n_bytes = mega_bytes * 1e6;
-	string output = ss(filename + "_short-", mega_bytes, getMovExtension(filename));
+	string suf = force ? "_fshort-" : "_short-";
+	string output = ss(filename + suf, mega_bytes, getMovExtension(filename));
 	warnIfAlreadyExists(output);
 
 	FileRead f(filename);
@@ -320,7 +321,12 @@ void Mp4::shorten(const string& filename, int mega_bytes) {
 	else {
 		auto mdat_end_real = mdat.start_ + mdat.length_;
 		off_t n_after_mdat = f.length() - mdat_end_real;
-		assert(n_after_mdat < n_bytes);
+
+		if (n_bytes < n_after_mdat) {
+			if (!force) logg(ET, "moov might not be fully contained (", n_after_mdat, " < ", n_bytes, "), force with '-fsh'\n");
+			fout.copyN(f, 0, n_bytes);
+			return;
+		}
 
 		fout.copyRange(f, 0, mdat.start_);
 		mdat.updateFileEnd(n_bytes - n_after_mdat);
