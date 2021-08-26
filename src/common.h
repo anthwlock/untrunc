@@ -20,6 +20,7 @@ using offs_t = std::vector<off_t>;
 #define to_uint(a) static_cast<unsigned int>(a)
 #define to_size_t(a) static_cast<size_t>(a)
 #define to_int64(a) static_cast<int64_t>(a)
+#define to_uint64(a) static_cast<uint64_t>(a)
 
 enum LogMode { ET, E, W, I, W2, V, VV };
 extern LogMode g_log_mode;
