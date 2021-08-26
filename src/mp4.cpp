@@ -1596,7 +1596,7 @@ start:
 		int64_t step = 4;
 		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
 		if (unknown_length_) unknown_length_ += step;
-		else if (tracks_[last_track_idx_].is_dummy_) {
+		else if (idx_free_ > 0 && tracks_[last_track_idx_].is_dummy_) {
 			auto& c = tracks_[idx_free_].current_chunk_;
 			c.size_ += step;
 			c.n_samples_ += step;  // sample size is 1
