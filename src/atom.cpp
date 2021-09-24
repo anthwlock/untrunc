@@ -443,7 +443,6 @@ void BufferedAtom::write(FileWrite &output, bool force_64) {
 		output.writeInt(1);
 		output.writeChar(name_.data(), 4);
 		output.writeInt64(new_length);
-		cout << "written length: " << new_length << '\n';
 	}
 	else {
 		output.writeInt(new_length);
