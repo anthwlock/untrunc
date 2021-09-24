@@ -98,10 +98,11 @@ int Gui::onClosing(uiWindow* w, void* data) {
 
 int Gui::writeOutput(void* data) {
 	auto txt = uiNewAttributedString(buffer_.str().c_str());
-	uiMultilineEntryAppend(current_text_entry_, uiAttributedStringString(txt));
-	uiFreeAttributedString(txt);
+	if (uiAttributedStringLen(txt)) {
+		uiMultilineEntryAppend(current_text_entry_, uiAttributedStringString(txt));
+		buffer_.str("");
+	}
 //	uiMultilineEntryAppend(current_text_entry_, buffer_.str().c_str());
-	buffer_.str("");
 	return 1;
 }
 
