@@ -218,6 +218,9 @@ private:
 	uint max_part_size_ = 0;
 	bool first_chunk_found_ = false;
 
+	int fallback_track_idx_ = -1;
+	int calcFallbackTrackIdx();
+
 	static const int kDefaultFreeIdx = -2;
 };
 

@@ -1359,6 +1359,21 @@ int Mp4::getLikelyNextTrackIdx(int* n_samples) {
 	return p.first;
 }
 
+int Mp4::calcFallbackTrackIdx() {
+	if (!using_dyn_patterns_) return -1;
+	for (uint i=0; i < tracks_.size(); i++) {
+		auto& t = tracks_[i];
+		if (!t.isChunkTrack()) continue;
+
+		for (auto& t2 : tracks_) {
+			if (t2.dyn_patterns_[i].size()) continue;
+		}
+
+		return i;
+	}
+	return -1;
+}
+
 Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 	logg(V, "called getChunkPrediction(", offToStr(offset), ") ... \n");
 	Mp4::Chunk c;
@@ -1393,8 +1408,14 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 			if (sz >= 0) return Chunk(offset, 1, track_idx, sz);
 		}
 		if (!anyPatternMatchesHalf(offset, track_idx)) {
-			cout << "no half-pattern suggests this ..\n";
-			return c;
+			if (fallback_track_idx_ >= 0) {
+				logg(V, "using fallback track\n");
+				track_idx = fallback_track_idx_;
+			}
+			else {
+				cout << "no half-pattern suggests this ..\n";
+				return c;
+			}
 		}
 	}
 	else {
@@ -1875,6 +1896,9 @@ void Mp4::repair(const string& filename) {
 	logg(V, "ss: max_part_size_: ", max_part_size_, "\n");
 
 	if (alreadyRepaired(filename_ok_, filename)) exit(0);
+
+	fallback_track_idx_ = calcFallbackTrackIdx();
+	logg(V, "fallback: ", fallback_track_idx_, "\n");
 
 	auto& file_read = openFile(filename);
 
