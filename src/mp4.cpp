@@ -596,7 +596,7 @@ void Mp4::analyze(bool gen_off_map) {
 		Track& track = tracks_[idx];
 		if (!gen_off_map) cout << "\nTrack " << idx << " codec: " << track.codec_.name_ << endl;
 
-		if (track.num_samples_ && !track.sizes_.size()) {
+		if (track.isChunkTrack()) {
 			track.genChunkSizes();
 			for (uint i=0; i < track.chunks_.size(); i++) {
 				auto& c = track.chunks_[i];
@@ -606,7 +606,6 @@ void Mp4::analyze(bool gen_off_map) {
 			}
 		}
 		else {
-			if (track.num_samples_) assert(track.sizes_.size());
 			uint k = track.keyframes_.size() ? track.keyframes_[0] : -1, ik = 0;
 
 			auto c_it = track.chunks_.begin();

@@ -636,6 +636,10 @@ void Track::saveCompositionOffsets() {  // aka DisplayOffsets
 	}
 }
 
+bool Track::isChunkTrack() {
+	return num_samples_ && !sizes_.size();
+}
+
 bool Track::hasPredictableChunks() {
 	return likely_n_samples_.size() && likely_sample_sizes_.size();
 }

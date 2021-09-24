@@ -76,6 +76,8 @@ public:
 	void saveChunkOffsets();
 	void saveCompositionOffsets();
 
+	bool isChunkTrack();
+
 	std::string getCodecNameSlow();
 
 	// sample size stats
