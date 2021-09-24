@@ -62,7 +62,6 @@ public:
 	std::string filename_;
 
 	static bool alreadyExists(const std::string& fn);
-	static bool isRegularFile(const std::string& fn);
 
 protected:
 	size_t fillBuffer(off_t location);
@@ -71,6 +70,9 @@ protected:
 	FILE* file_ = nullptr;
 	off_t buf_begin_ = 0;
 	off_t buf_off_ = 0;
+
+private:
+	static bool isRegularFile(int fd);
 };
 
 class FileWrite {

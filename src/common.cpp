@@ -458,3 +458,30 @@ void parseMaxPartsize(string& s) {
 	if (s == "f") return; // just force dynamic max_partsize, no default
 	g_max_partsize = parseByteStr(s);
 }
+
+#ifdef _WIN32
+#include <windows.h>
+#include <codecvt>
+
+string to_utf8(const wchar_t* utf16) {
+	wstring_convert<codecvt_utf8_utf16<wchar_t>, wchar_t> convert;
+	return convert.to_bytes(utf16);
+}
+wstring to_utf16(const char* utf8) {
+	wstring_convert<codecvt_utf8_utf16<wchar_t>> converter;
+	return converter.from_bytes(utf8);
+}
+
+void argv_as_utf8(int argc, char* argv[]) {
+	wchar_t** wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
+	for (int i = 0; i < argc; i++) {
+		argv[i] = strdup(to_utf8(wargv[i]).c_str());
+	}
+	LocalFree(wargv);
+}
+
+FILE* _my_open(const char* path, const wchar_t* mode) {
+	wstring pathW = to_utf16(path);
+	return _wfopen(pathW.c_str(), mode);
+}
+#endif

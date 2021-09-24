@@ -46,14 +46,15 @@ FileRead::~FileRead() {
 
 void FileRead::open(const string& filename) {
 	filename_ = filename;
-	file_ = fopen(filename.c_str(), "rb");
+	file_ = my_open(filename.c_str(), "rb");
+
 	if (!file_) throw("Could not open file: " + filename);
 
 	fseeko(file_, 0L, SEEK_END);
 	size_ = ftello(file_);
 	fseeko(file_, 0L, SEEK_SET);
 
-	if (!isRegularFile(filename)) throw("not a regular file: " + filename);
+	if (!isRegularFile(fileno(file_))) throw("not a regular file: " + filename);
 
 	buffer_ = (uchar*) malloc(buf_size_);
 	fread(buffer_, 1, buf_size_, file_);
@@ -190,20 +191,24 @@ const uchar* FileRead::getFragment(off_t off, int size) {
 	return getPtr(size);
 }
 
-bool FileRead::isRegularFile(const string& path) {
-	struct stat path_stat;
-	stat(path.c_str(), &path_stat);
-	return S_ISREG(path_stat.st_mode);
+bool FileRead::isRegularFile(int fd) {
+	struct stat s;
+	fstat(fd, &s);
+	return S_ISREG(s.st_mode);
 }
 
 bool FileRead::alreadyExists(const string& fn) {
-	struct stat fn_stat;
-	return (stat(fn.c_str(), &fn_stat) == 0);
+	FILE *f;
+	if ((f = my_open(fn.c_str(), "r"))) {
+		fclose(f);
+		return 1;
+	}
+	return 0;
 }
 
 
 FileWrite::FileWrite(const string& filename) {
-	file_ = fopen(filename.c_str(), "wb");
+	file_ = my_open(filename.c_str(), "wb");
 	if(!file_)
 		throw "Could not create file for writing: " + filename;
 }

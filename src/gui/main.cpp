@@ -11,6 +11,8 @@ int main(int argc, char* argv[]) {
 	g_interactive = false;
 	g_is_gui = true;
 
+	argv_as_utf8(argc, argv);
+
 	Gui::init();
 	if (argc > 1) uiEntrySetText(Gui::Repair::entry_ok_, argv[1]);
 	if (argc > 1) uiEntrySetText(Gui::Analyze::entry_ok_, argv[1]);

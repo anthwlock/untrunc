@@ -91,7 +91,6 @@ void parseRange(const string& s) {
 
 int main(int argc, char *argv[]) {
 	const int kExpectArg = -22;
-
 	bool show_info = false;
 	bool show_tracks = false;
 	bool show_atoms = false;
@@ -110,6 +109,8 @@ int main(int argc, char *argv[]) {
 	int arg_range = -1;
 	int arg_dst = -1;
 	int arg_mp = -1;
+
+	argv_as_utf8(argc, argv);
 
 	int i = 1;
 	for (; i < argc; i++) {

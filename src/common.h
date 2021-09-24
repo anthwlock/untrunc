@@ -205,4 +205,14 @@ protected:
 	Atom* header_atom_;
 };
 
+
+#ifdef _WIN32
+void argv_as_utf8(int argc, char* argv[]);
+FILE* _my_open(const char* path, const wchar_t* mode);
+#define my_open(path, mode) _my_open(path, L ## mode)
+#else
+#define argv_as_utf8(...);
+#define my_open fopen
+#endif
+
 #endif // HELPER_H
