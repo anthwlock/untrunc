@@ -320,6 +320,7 @@ uiControl* Gui::analyzeTab() {
 	uiButtonOnClicked(b_atoms, [](uiButton* b, void* data){
 		defineFileForAnalyze();  // for findAtomNames, file_ok can be truncated as well
 		setDisabled(true);
+		Analyze::onProgress(0);
 		thread_ = new thread([](const string& file){
 			try {
 				Atom::findAtomNames(file);
@@ -396,6 +397,7 @@ void Gui::startRepair(uiButton* b, void* data) {
 	}
 
 	setDisabled(true);
+	Repair::onProgress(0);
 	thread_ = new thread([](const string& file_ok, const string& file_bad){
 		string output_suffix = g_ignore_unknown ? ss("-s", Mp4::step_) : "";
 
