@@ -46,8 +46,8 @@ public:
 	static bool twos_is_sowt;  // used in looksLikeTwosOrSowt
 
 private:
-	bool (*match_fn_)(Codec*, const uchar* start, int s) = nullptr;
-	bool (*match_strict_fn_)(Codec*, const uchar* start, int s) = nullptr;
+	bool (*match_fn_)(Codec*, const uchar* start, uint s) = nullptr;
+	bool (*match_strict_fn_)(Codec*, const uchar* start, uint s) = nullptr;
 	int (*get_size_fn_)(Codec*, const uchar* start, uint maxlength) = nullptr;
 
 	void initAVCodec();

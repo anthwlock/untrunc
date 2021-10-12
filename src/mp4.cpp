@@ -1278,6 +1278,10 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 
 		if (track.has_duplicates_ && !isExpectedTrackIdx(i)) continue;
 
+		if (c.name_ == "jpeg" && track.end_off_gcd_) {
+			length += track.stepToNextOtherChunk(offset + length);
+		}
+
 		return FrameInfo(i, c, offset, length);
 	}
 

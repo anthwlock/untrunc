@@ -676,11 +676,18 @@ int64_t Track::stepToNextOwnChunkAbs(off_t off) {
 	return step;
 }
 
-// currently only used for the (dummy) "free" track
+// currently only used for the (dummy) "free" or "jpeg" tracks
 int64_t Track::stepToNextOtherChunk(off_t off) {
 	if (end_off_gcd_ <= 1) return 0;
 	auto abs_off = g_mp4->toAbsOff(off);
 	auto step = end_off_gcd_ - (abs_off % end_off_gcd_);
+
+	if (!is_dummy_) {  // jpeg
+		if (step == end_off_gcd_) step = 0;
+		logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
+		     ", step: ", step, ", next: ", off + step, "\n");
+		return step;
+	}
 
 	if (!g_mp4->using_dyn_patterns_) return step;
 

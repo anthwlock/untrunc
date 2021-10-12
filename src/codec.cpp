@@ -21,8 +21,8 @@ extern "C" {
 
 using namespace std;
 
-extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match;
-extern map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match;
+extern map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_match;
+extern map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_strict_match;
 extern map<string, int(*) (Codec*, const uchar*, uint)> dispatch_get_size;
 
 bool Codec::twos_is_sowt = false;
@@ -98,9 +98,9 @@ bool Codec::isSupported() {
 
 
 #define MATCH_FN(codec)  {codec, [](Codec* self __attribute__((unused)), \
-	const uchar* start __attribute__((unused)), int s __attribute__((unused))) -> bool
+	const uchar* start __attribute__((unused)), uint s __attribute__((unused))) -> bool
 
-map<string, bool(*) (Codec*, const uchar*, int)> dispatch_strict_match {
+map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_strict_match {
 	MATCH_FN("avc1") {
 		int s2 = swap32(((int *)start)[1]);
 		if (self->strictness_lvl_ > 0) {
@@ -157,7 +157,7 @@ bool Codec::looksLikeTwosOrSowt(const uchar* start) {
 	return false;
 }
 
-map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
+map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_match {
 	MATCH_FN("avc1") {
 		//this works only for a very specific kind of video
 		//#define SPECIAL_VIDEO
@@ -286,6 +286,9 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 	}},
 	MATCH_FN("camm") {
 		return (start[0] == 0 && start[1] == 0) || (start[3] == 0 && start[2] < 7);
+	}},
+	MATCH_FN("jpeg") {
+		return s >> 16 == 0xFFD8;
 	}},
 
 	/*
@@ -480,6 +483,28 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		int lengths[] = { 12, 8, 12, 12, 12, 24, 14*4, 12 };
 		int type = start[2];
 		return lengths[type] + 4;
+	}},
+	GET_SZ_FN("jpeg") {
+		int n = 0, last_load = 0;
+		auto p = start;
+		while (1) {
+			if (to_uint(n) - last_load > g_max_buf_sz_needed / 2) {
+				p = self->loadAfter(n);
+				last_load = n;
+			}
+
+			uchar t = p[1];  // https://www.disktuna.com/list-of-jpeg-markers/
+			if (p[0] == 0xff && !(t <= 0x01) && !(0xd0 <= t && t <= 0xd8)) {
+				if (t == 0xd9) return n + 2;
+				int len = swap16(*((int16_t*)(p+2)));
+				n += len - 2;
+				p += len - 2;
+			}
+			else {
+				n++;
+				p++;
+			}
+		}
 	}},
 
 	/* if codec is not found in map,
