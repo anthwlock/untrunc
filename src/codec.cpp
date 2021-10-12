@@ -285,8 +285,7 @@ map<string, bool(*) (Codec*, const uchar*, int)> dispatch_match {
 		return string((char*)start+4, 4) == "icpf";
 	}},
 	MATCH_FN("camm") {
-		int s3 = swap32(((int *)start)[2]);
-		return s == (int)0xc8000600 && s3 == (int)0xe118d841;
+		return (start[0] == 0 && start[1] == 0) || (start[3] == 0 && start[2] < 7);
 	}},
 
 	/*
@@ -476,7 +475,11 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		return swap32(*(int *)start);
 	}},
 	GET_SZ_FN("camm") {
-		return 60;
+		// https://developers.google.com/streetview/publish/camm-spec
+		// https://github.com/ponchio/untrunc/blob/2f4de8aa/codec_camm.cpp#L12
+		int lengths[] = { 12, 8, 12, 12, 12, 24, 14*4, 12 };
+		int type = start[2];
+		return lengths[type] + 4;
 	}},
 
 	/* if codec is not found in map,
