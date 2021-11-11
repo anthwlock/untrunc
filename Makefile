@@ -20,15 +20,17 @@ else ifeq ($(TARGET), $(_EXE)-41)
   EXE := $(TARGET)
 endif
 
+FFDIR := ffmpeg-$(FF_VER)
+
 ifeq ($(FF_VER), shared)
   LDFLAGS += -lavformat -lavcodec -lavutil
 else
-  CXXFLAGS += -I./ffmpeg-$(FF_VER)
-  LDFLAGS += -Lffmpeg-$(FF_VER)/libavformat -lavformat
-  LDFLAGS += -Lffmpeg-$(FF_VER)/libavcodec -lavcodec
-  LDFLAGS += -Lffmpeg-$(FF_VER)/libavutil -lavutil
-  #LDFLAGS += -Lffmpeg-$(FF_VER)/libswscale/ -lswresample
-  #LDFLAGS += -Lffmpeg-$(FF_VER)/libavresample -lavresample
+  CXXFLAGS += -I./$(FFDIR)
+  LDFLAGS += -L$(FFDIR)/libavformat -lavformat
+  LDFLAGS += -L$(FFDIR)/libavcodec -lavcodec
+  LDFLAGS += -L$(FFDIR)/libavutil -lavutil
+  #LDFLAGS += -L$(FFDIR)/libswscale/ -lswresample
+  #LDFLAGS += -L$(FFDIR)/libavresample -lavresample
   #LDFLAGS += -lz -lbz2 -lX11 -lva -lva-drm -lva-x11 -llzma
   LDFLAGS += -lpthread -ldl
 endif
@@ -51,7 +53,6 @@ DIR := $(_DIR)_$(FF_VER)
 SRC := $(wildcard src/*.cpp src/avc1/*.cpp src/hvc1/*.cpp)
 OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
-FFDIR := ffmpeg-$(FF_VER)
 
 SRC_GUI := $(wildcard src/gui/*.cpp)
 OBJ_GUI := $(SRC_GUI:%.cpp=$(DIR)/%.o)
