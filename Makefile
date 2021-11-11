@@ -54,7 +54,7 @@ else
 	CXXFLAGS += -g
 endif
 
-VER = $(shell test -d .git && which git >/dev/null 2>&1 && git describe --always --dirty --abbrev=7)
+VER = $(shell test -d .git && command -v git >/dev/null && git describe --always --dirty --abbrev=7)
 CPPFLAGS += -MMD -MP
 CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
@@ -81,7 +81,7 @@ ifeq ($(TARGET), $(_EXE)-gui)
 	endif
 endif
 
-NPROC = $(shell which nproc >/dev/null 2>&1 && nproc || echo 1)
+NPROC = $(shell command -v nproc >/dev/null && nproc || echo 1)
 NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
 ifeq ($(NJOBS), 0)
 	NJOBS = 1
