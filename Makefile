@@ -7,41 +7,41 @@ LIBUI_STATIC := 0
 # make switching between ffmpeg versions easy
 TARGET := $(firstword $(MAKECMDGOALS))
 ifeq ($(TARGET), $(_EXE)-33)
-  FF_VER := 3.3.9
-  EXE := $(TARGET)
+	FF_VER := 3.3.9
+	EXE := $(TARGET)
 else ifeq ($(TARGET), $(_EXE)-34)
-  FF_VER := 3.4.5
-  EXE := $(TARGET)
+	FF_VER := 3.4.5
+	EXE := $(TARGET)
 else ifeq ($(TARGET), $(_EXE)-341)
-  FF_VER := 3.4.1
-  EXE := $(TARGET)
+	FF_VER := 3.4.1
+	EXE := $(TARGET)
 else ifeq ($(TARGET), $(_EXE)-41)
-  FF_VER := 4.1
-  EXE := $(TARGET)
+	FF_VER := 4.1
+	EXE := $(TARGET)
 endif
 
 FFDIR := ffmpeg-$(FF_VER)
 
 ifeq ($(FF_VER), shared)
-  LDFLAGS += -lavformat -lavcodec -lavutil
+	LDFLAGS += -lavformat -lavcodec -lavutil
 else
-  CXXFLAGS += -I./$(FFDIR)
-  LDFLAGS += -L$(FFDIR)/libavformat -lavformat
-  LDFLAGS += -L$(FFDIR)/libavcodec -lavcodec
-  LDFLAGS += -L$(FFDIR)/libavutil -lavutil
-  #LDFLAGS += -L$(FFDIR)/libswscale/ -lswresample
-  #LDFLAGS += -L$(FFDIR)/libavresample -lavresample
-  #LDFLAGS += -lz -lbz2 -lX11 -lva -lva-drm -lva-x11 -llzma
-  LDFLAGS += -lpthread -ldl
+	CXXFLAGS += -I./$(FFDIR)
+	LDFLAGS += -L$(FFDIR)/libavformat -lavformat
+	LDFLAGS += -L$(FFDIR)/libavcodec -lavcodec
+	LDFLAGS += -L$(FFDIR)/libavutil -lavutil
+	#LDFLAGS += -L$(FFDIR)/libswscale/ -lswresample
+	#LDFLAGS += -L$(FFDIR)/libavresample -lavresample
+	#LDFLAGS += -lz -lbz2 -lX11 -lva -lva-drm -lva-x11 -llzma
+	LDFLAGS += -lpthread -ldl
 endif
 
 CXXFLAGS += -std=c++11 -D_FILE_OFFSET_BITS=64
 
 ifeq ($(IS_RELEASE), 1)
-  CXXFLAGS += -O3
-  LDFLAGS += -s
+	CXXFLAGS += -O3
+	LDFLAGS += -s
 else
-  CXXFLAGS += -g
+	CXXFLAGS += -g
 endif
 
 VER = $(shell test -d .git && which git >/dev/null 2>&1 && git describe --always --dirty --abbrev=7)
@@ -59,22 +59,22 @@ OBJ_GUI := $(SRC_GUI:%.cpp=$(DIR)/%.o)
 DEP_GUI := $(OBJ_GUI:.o=.d)
 
 ifeq ($(TARGET), $(_EXE)-gui)
-  LDFLAGS += -lui -lpthread
+	LDFLAGS += -lui -lpthread
 
-  machine = $(shell $(CXX) -dumpmachine)
-  ifneq (,$(findstring mingw,$(machine)))
-	LDFLAGS += -Wl,--subsystem,windows
-	ifeq ($(LIBUI_STATIC), 1)
-	  OBJ_GUI += $(DIR)/src/gui/win_resources.o
-	  LDFLAGS += -lpthread -luser32 -lkernel32 -lusp10 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc
+	machine = $(shell $(CXX) -dumpmachine)
+	ifneq (,$(findstring mingw,$(machine)))
+		LDFLAGS += -Wl,--subsystem,windows
+		ifeq ($(LIBUI_STATIC), 1)
+			OBJ_GUI += $(DIR)/src/gui/win_resources.o
+			LDFLAGS += -lpthread -luser32 -lkernel32 -lusp10 -lgdi32 -lcomctl32 -luxtheme -lmsimg32 -lcomdlg32 -ld2d1 -ldwrite -lole32 -loleaut32 -loleacc
+		endif
 	endif
-  endif
 endif
 
 NPROC = $(shell which nproc >/dev/null 2>&1 && nproc || echo 1)
 NJOBS = $(shell echo $$(( $(NPROC) / 3)) )
 ifeq ($(NJOBS), 0)
-  NJOBS = 1
+	NJOBS = 1
 endif
 
 #$(info $$OBJ is [${OBJ}])
