@@ -54,7 +54,7 @@ else
 	CXXFLAGS += -g
 endif
 
-VER = $(shell test -d .git && command -v git >/dev/null && git describe --always --dirty --abbrev=7)
+VER = $(shell test -d .git && command -v git >/dev/null && echo "v`git rev-list --count HEAD`-`git describe --always --dirty --abbrev=7`")
 CPPFLAGS += -MMD -MP
 CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
 
