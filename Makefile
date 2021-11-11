@@ -20,6 +20,12 @@ else ifeq ($(TARGET), $(_EXE)-41)
 	EXE := $(TARGET)
 endif
 
+ifeq ($(OS),Windows_NT)
+	_OS := Windows
+else
+	_OS := $(shell uname)
+endif
+
 FFDIR := ffmpeg-$(FF_VER)
 
 ifeq ($(FF_VER), shared)
@@ -33,6 +39,10 @@ else
 	#LDFLAGS += -L$(FFDIR)/libavresample -lavresample
 	#LDFLAGS += -lz -lbz2 -lX11 -lva -lva-drm -lva-x11 -llzma
 	LDFLAGS += -lpthread -ldl
+
+	ifeq ($(_OS), Darwin)
+		LDFLAGS += -liconv
+	endif
 endif
 
 CXXFLAGS += -std=c++11 -D_FILE_OFFSET_BITS=64
@@ -98,13 +108,15 @@ else
 	wget -q --show-progress -O /tmp/$(FFDIR).tar.xz https://www.ffmpeg.org/releases/$(FFDIR).tar.xz
 endif
 	tar xf /tmp/$(FFDIR).tar.xz
+	mv $(FFDIR)/VERSION $(FFDIR)/VERSION.bak
 
 $(FFDIR)/config.asm: | $(FFDIR)/configure
 	@echo "(info) please wait ..."
 	cd $(FFDIR); ./configure --disable-doc --disable-programs \
 	--disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
 	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc \
-	--disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma
+	--disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma \
+	--disable-vda --disable-audiotoolbox --disable-videotoolbox
 
 $(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
 	cat $(FFDIR)/Makefile
