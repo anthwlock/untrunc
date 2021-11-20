@@ -115,7 +115,17 @@ map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_strict_match {
 		if (s1 == 0x00000017 && s2 == 0x674d0020) return true;
 		return false;
 	}},
-    MATCH_FN("mp4a") {
+    MATCH_FN("hvc1") {
+		if (start[0] != 0x00 || start[5] != 0x01) return false;
+		if (start[4] != 0x02 && start[4] != 0x26 && start[4] != 0x00) return false;
+		return true;
+	}},
+	MATCH_FN("fdsc") {
+		if (string((char*)start, 2) != "GP") return false;
+		if (start[8] || start[9]) return false;
+		return true;
+	}},
+	MATCH_FN("mp4a") {
 		return false;
 //		return (s>>16) == 0x210A;  // this needs to be improved
 	}},
