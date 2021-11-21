@@ -48,7 +48,7 @@ void FileRead::open(const string& filename) {
 	filename_ = filename;
 	file_ = my_open(filename.c_str(), "rb");
 
-	if (!file_) throw("Could not open file: " + filename);
+	if (!file_) throw("Could not open file '" + filename + "': " + strerror(errno));
 
 	fseeko(file_, 0L, SEEK_END);
 	size_ = ftello(file_);
@@ -210,7 +210,7 @@ bool FileRead::alreadyExists(const string& fn) {
 FileWrite::FileWrite(const string& filename) {
 	file_ = my_open(filename.c_str(), "wb");
 	if(!file_)
-		throw "Could not create file for writing: " + filename;
+		throw "Could not create file '" + filename + "': " + strerror(errno);
 }
 
 FileWrite::~FileWrite() {
