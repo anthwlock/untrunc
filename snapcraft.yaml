@@ -13,7 +13,7 @@ grade: stable
 confinement: strict
 
 apps:
-  untrunc-anthwlock: 
+  untrunc-anthwlock:
     command: untrunc
     plugs: [home, removable-media]
 
