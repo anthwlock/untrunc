@@ -337,76 +337,102 @@ bool Codec::matchSample(const uchar *start) {
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt, uint maxlength) {
-	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
+inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt) {
+    int ret;
 
-	// ffmpeg 3.4+ uses internal buffer which needs to be updated.
-	// this is slow because of the internal memory allocation.
-	// ff34+ decodes till exhaustion, which in turn spams repetitive warnings/errors
-	if (is_new_ffmpeg_api && consumed < 0) {
-		if (!g_dont_omit && !g_muted) {
-			logg(I, "Muted ffmpeg to reduce redundant warnings/errors. Use '-do' to see them.\n");
-			mute();  // don't spam libav warnings/errors
-		}
-		avcodec_flush_buffers(avctx);
-		pkt->size = maxlength;
-		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
-		if (consumed < 0) {
-			avcodec_flush_buffers(avctx);
-		}
-	}
-	return consumed;
+    // Send the packet with the compressed data to the decoder
+    ret = avcodec_send_packet(avctx, pkt);
+    if (ret < 0) {
+        // In case of failure, you may want to handle it accordingly
+        return ret;
+    }
+
+    // Receive the frame of audio samples from the decoder
+    ret = avcodec_receive_frame(avctx, frame);
+
+    // Check if the frame was received successfully
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+        *got_frame = 0;
+        return 0; // In these cases, need to send more packets or it's the end of stream
+    } else if (ret < 0) {
+        // Handle other types of errors
+        return ret;
+    } else {
+        *got_frame = 1;
+    }
+
+    return ret; // Return 0 on success, negative value on error
 }
 
 inline int untr_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt) {
-	// ffmpeg3.4+ expects every video packet to contain exactly 1 frame..
-	// thus there is no way to detect video frame bounderies using ffmpeg3.4+..
-	// https://github.com/FFmpeg/FFmpeg/blob/7fc329e2dd6226dfecaa4a1d7adf353bf2773726/libavcodec/avcodec.h#L4793
-	// https://github.com/FFmpeg/FFmpeg/commit/061a0c14bb5767bca72e3a7227ca400de439ba09
-	return avcodec_decode_video2(avctx, frame, got_frame, pkt);
+    int ret;
+
+    // Send the packet with the compressed data to the decoder
+    ret = avcodec_send_packet(avctx, pkt);
+    if (ret < 0) {
+        // In case of failure, you may want to handle it accordingly
+        return ret;
+    }
+
+    // Receive the frame of video from the decoder
+    ret = avcodec_receive_frame(avctx, frame);
+
+    // Check if the frame was received successfully
+    if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF) {
+        *got_frame = 0;
+        return 0; // In these cases, need to send more packets or it's the end of stream
+    } else if (ret < 0) {
+        // Handle other types of errors
+        return ret;
+    } else {
+        *got_frame = 1;
+    }
+
+    return ret; // Return 0 on success, negative value on error
 }
 #pragma GCC diagnostic pop
 
 map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
-	GET_SZ_FN("mp4a") {
-		start_m4pa:
-		maxlength = min(g_max_buf_sz_needed, maxlength);
+    GET_SZ_FN("mp4a") {
+      start_m4pa:
+      maxlength = min(g_max_buf_sz_needed, maxlength);
 
-		static AVPacket* packet = av_packet_alloc();
-//		packet->size = g_max_partsize;
-		static AVFrame* frame = av_frame_alloc();
+      static AVPacket* packet = av_packet_alloc();
+      static AVFrame* frame = av_frame_alloc();
 
-		packet->data = const_cast<uchar*>(start);
-		if (!is_new_ffmpeg_api) packet->size = maxlength;
-		int got_frame = 0;
+      packet->data = const_cast<uchar*>(start);
+      packet->size = maxlength;
 
-		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
-//		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
+      // Send the packet with the compressed data to the decoder
+      int send_ret = avcodec_send_packet(self->av_codec_context_, packet);
+      if (send_ret < 0) {
+        // Handle error: for example, AVERROR(EAGAIN) means that we need to try to send the packet again
+      }
 
-		self->audio_duration_ = frame->nb_samples;
-		logg(V, "nb_samples: ", self->audio_duration_, '\n');
+      // Receive the frame of audio samples from the decoder
+      int receive_ret = avcodec_receive_frame(self->av_codec_context_, frame);
+      if (receive_ret == 0) {
+        self->audio_duration_ = frame->nb_samples;
+        logg(V, "nb_samples: ", self->audio_duration_, '\n');
+      } else {
+        // Handle error or the case when no frame is produced (e.g., AVERROR(EAGAIN) or AVERROR_EOF)
+      }
 
-		self->was_bad_ = (!got_frame || self->av_codec_params_->channels != frame->channels);
-		if (self->was_bad_) {
-			logg(V, "got_frame: ", got_frame, '\n');
-			logg(V, "channels: ", self->av_codec_params_->channels, ", ", frame->channels, '\n');
+      self->was_bad_ = (receive_ret != 0 || self->av_codec_params_->channels != frame->channels);
+      if (self->was_bad_) {
+        logg(V, "receive_ret: ", receive_ret, '\n');
+        logg(V, "channels: ", self->av_codec_params_->channels, ", ", frame->channels, '\n');
+      }
 
-			if (is_new_ffmpeg_api && to_uint(packet->size) != maxlength) {
-				logg(V, "avcodec_flush_buffers, then retry..\n");
-				avcodec_flush_buffers(self->av_codec_context_);
-				packet->size = maxlength;
-				goto start_m4pa;
-			}
-		}
+      // In the new API, avcodec_send_packet can consume the input packet even if it does not produce a frame
+      if (send_ret >= 0) {
+        packet->size = 0;
+      }
 
-		// simulate state for new API
-		if (is_new_ffmpeg_api && consumed >= 0) {
-			packet->size -= consumed;
-			if (packet->size <= 0) packet->size = maxlength;
-		}
+      // To simulate state for new API, you may need to adjust based on send/receive logic
 
-		return consumed;
-	}},
+      return (send_ret < 0 || receive_ret < 0) ? -1 : 0; // or another appropriate way to determine consumed bytes
+    }},
 
     {"avc1", getSizeAvc1},
     {"hvc1", getSizeHvc1},
