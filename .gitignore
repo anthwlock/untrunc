@@ -7,3 +7,5 @@ ffmpeg-*
 libav-*
 build
 *.pro.user
+.DS_Store
+*.MP4
