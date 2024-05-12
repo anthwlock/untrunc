@@ -32,9 +32,10 @@ endif
 FFDIR := ffmpeg-$(FF_VER)
 
 ifeq ($(FF_VER), shared)
+	CXXFLAGS += -isystem/usr/include/ffmpeg
 	LDFLAGS += -lavformat -lavcodec -lavutil
 else
-	CXXFLAGS += -I./$(FFDIR)
+	CXXFLAGS += -isystem./$(FFDIR)
 	LDFLAGS += -L$(FFDIR)/libavformat -lavformat
 	LDFLAGS += -L$(FFDIR)/libavcodec -lavcodec
 	LDFLAGS += -L$(FFDIR)/libavutil -lavutil
