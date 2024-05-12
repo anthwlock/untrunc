@@ -386,10 +386,10 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		self->audio_duration_ = frame->nb_samples;
 		logg(V, "nb_samples: ", self->audio_duration_, '\n');
 
-		self->was_bad_ = (!got_frame || self->av_codec_params_->channels != frame->channels);
+		self->was_bad_ = (!got_frame || nb_channels(self->av_codec_params_) != nb_channels(frame));
 		if (self->was_bad_) {
 			logg(V, "got_frame: ", got_frame, '\n');
-			logg(V, "channels: ", self->av_codec_params_->channels, ", ", frame->channels, '\n');
+			logg(V, "channels: ", nb_channels(self->av_codec_params_), ", ", nb_channels(frame), '\n');
 
 			if (is_new_ffmpeg_api && to_uint(packet->size) != maxlength) {
 				logg(V, "avcodec_flush_buffers, then retry..\n");

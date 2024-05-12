@@ -19,6 +19,7 @@
 														*/
 
 #include "track.h"
+#include "codec.h"
 
 #include <iostream>
 #include <vector>
@@ -111,7 +112,7 @@ void Track::parseOk() {
 	if (codec_.name_ == "sowt" || codec_.name_ == "twos") {
 		assert(constant_size_);
 
-		int nc = codec_.av_codec_params_->channels;
+		int nc = nb_channels(codec_.av_codec_params_);
 		int expected_size = 2 * nc;
 
 		if (constant_size_ != expected_size) {

@@ -4,6 +4,10 @@
 #include <string>
 #include <vector>
 
+extern "C" {
+#include <libavformat/version.h>
+}
+
 #include "common.h"
 
 class AVCodecContext;
@@ -11,6 +15,13 @@ class AVCodecParameters;
 
 class Atom;
 class AvcConfig;
+
+#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(59, 27, 0)
+#define nb_channels(x) x->ch_layout.nb_channels
+#else
+#define nb_channels(x) x->channels
+#endif
+
 
 class Codec {
 public:
