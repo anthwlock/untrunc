@@ -188,7 +188,6 @@ private:
 	void checkForBadTracks();
 
 	std::string getOutputSuffix();
-	bool chkNeedOldApi();
 
 	bool shouldPreferChunkPrediction();
 

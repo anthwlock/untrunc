@@ -16,13 +16,6 @@ extern "C" {
 #define UNTR_VERSION "?"
 #endif
 
-// http://git.ffmpeg.org/gitweb/ffmpeg.git/commit/061a0c14bb57
-#if (LIBAVCODEC_VERSION_INT < AV_VERSION_INT(57, 107, 100))
-const bool is_new_ffmpeg_api = false;
-#else
-const bool is_new_ffmpeg_api = true;
-#endif
-
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;

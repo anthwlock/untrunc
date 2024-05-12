@@ -35,7 +35,6 @@ extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tr
 extern int64_t g_range_start, g_range_end;
 extern std::string g_dst_path;
 
-extern const bool is_new_ffmpeg_api;
 extern std::string g_version_str;
 extern uint g_num_w2;  // hidden warnings
 extern Mp4* g_mp4;

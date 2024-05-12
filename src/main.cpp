@@ -175,13 +175,6 @@ int main(int argc, char *argv[]) {
 
 	bool skip_info = find_atoms;
 	if (!skip_info) {
-		if (g_ignore_unknown && is_new_ffmpeg_api) {
-			cout << "WARNING: Because of internal decoder changes, using ffmpeg '" FFMPEG_VERSION "' with '-s' can be slow!\n"
-			     << "         You are advised to compile untrunc against ffmpeg 3.3!\n"
-			     << "         See the README.md on how to do that. ";
-			if (false && g_interactive) {cout << "Press [ENTER] to continue ... " << flush; getchar();}
-			else cout << '\n';
-		}
 		logg(I, g_version_str, '\n');
 	}
 

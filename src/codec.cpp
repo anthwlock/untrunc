@@ -10,6 +10,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/frame.h>
+#include "ff_internal.h"
 }
 
 #include "common.h"
@@ -331,45 +332,21 @@ bool Codec::matchSample(const uchar *start) {
 	return false;
 }
 
-
 #define GET_SZ_FN(codec)  {codec, [](Codec* self __attribute__((unused)), \
 	const uchar* start __attribute__((unused)), uint maxlength __attribute__((unused))) -> int
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-inline int untr_decode_audio4(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt, uint maxlength) {
-	int consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
-
-	// ffmpeg 3.4+ uses internal buffer which needs to be updated.
-	// this is slow because of the internal memory allocation.
-	// ff34+ decodes till exhaustion, which in turn spams repetitive warnings/errors
-	if (is_new_ffmpeg_api && consumed < 0) {
-		if (!g_dont_omit && !g_muted) {
-			logg(I, "Muted ffmpeg to reduce redundant warnings/errors. Use '-do' to see them.\n");
-			mute();  // don't spam libav warnings/errors
-		}
-		avcodec_flush_buffers(avctx);
-		pkt->size = maxlength;
-		consumed = avcodec_decode_audio4(avctx, frame, got_frame, pkt);
-		if (consumed < 0) {
-			avcodec_flush_buffers(avctx);
-		}
-	}
-	return consumed;
+inline int untr_decode(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt) {
+	// https://github.com/FFmpeg/FFmpeg/commit/20f9727018
+#if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 25, 100)
+	const FFCodec *c = ffcodec(avctx->codec);
+	return c->cb.decode(avctx, frame, got_frame, pkt);
+#else
+	return avctx->codec->decode(avctx, frame, got_frame, pkt);
+#endif
 }
-
-inline int untr_decode_video2(AVCodecContext *avctx, AVFrame *frame, int *got_frame, AVPacket *pkt) {
-	// ffmpeg3.4+ expects every video packet to contain exactly 1 frame..
-	// thus there is no way to detect video frame bounderies using ffmpeg3.4+..
-	// https://github.com/FFmpeg/FFmpeg/blob/7fc329e2dd6226dfecaa4a1d7adf353bf2773726/libavcodec/avcodec.h#L4793
-	// https://github.com/FFmpeg/FFmpeg/commit/061a0c14bb5767bca72e3a7227ca400de439ba09
-	return avcodec_decode_video2(avctx, frame, got_frame, pkt);
-}
-#pragma GCC diagnostic pop
 
 map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("mp4a") {
-		start_m4pa:
 		maxlength = min(g_max_buf_sz_needed, maxlength);
 
 		static AVPacket* packet = av_packet_alloc();
@@ -377,11 +354,10 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		static AVFrame* frame = av_frame_alloc();
 
 		packet->data = const_cast<uchar*>(start);
-		if (!is_new_ffmpeg_api) packet->size = maxlength;
+		packet->size = maxlength;
 		int got_frame = 0;
 
-		int consumed = untr_decode_audio4(self->av_codec_context_, frame, &got_frame, packet, maxlength);
-//		int consumed = avcodec_decode_audio4(context_, frame_, &got_frame, packet);
+		int consumed = untr_decode(self->av_codec_context_, frame, &got_frame, packet);
 
 		self->audio_duration_ = frame->nb_samples;
 		logg(V, "nb_samples: ", self->audio_duration_, '\n');
@@ -390,19 +366,6 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		if (self->was_bad_) {
 			logg(V, "got_frame: ", got_frame, '\n');
 			logg(V, "channels: ", nb_channels(self->av_codec_params_), ", ", nb_channels(frame), '\n');
-
-			if (is_new_ffmpeg_api && to_uint(packet->size) != maxlength) {
-				logg(V, "avcodec_flush_buffers, then retry..\n");
-				avcodec_flush_buffers(self->av_codec_context_);
-				packet->size = maxlength;
-				goto start_m4pa;
-			}
-		}
-
-		// simulate state for new API
-		if (is_new_ffmpeg_api && consumed >= 0) {
-			packet->size -= consumed;
-			if (packet->size <= 0) packet->size = maxlength;
 		}
 
 		return consumed;
@@ -471,7 +434,7 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 		packet->size = maxlength;
 		int got_frame = 0;
 
-		int consumed = untr_decode_video2(self->av_codec_context_, frame, &got_frame, packet);
+		int consumed = untr_decode(self->av_codec_context_, frame, &got_frame, packet);
 
 		self->was_keyframe_ = frame->key_frame;
 		self->was_bad_ = !got_frame;
