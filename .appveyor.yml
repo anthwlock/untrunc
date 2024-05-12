@@ -7,14 +7,14 @@ environment:
   matrix:
     - JOB: "32"
       _UNTR_DEST: untrunc_x32
-      _MINGW: C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32
+      _MINGW: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32
       _MINGW_TOOLCHAIN: i686-w64-mingw32
       _ARCH: win32
       _ARCH_UI: 386
 
     - JOB: "64"
       _UNTR_DEST: untrunc_x64
-      _MINGW: C:\mingw-w64\x86_64-7.3.0-posix-seh-rt_v5-rev0\mingw64
+      _MINGW: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64
       _MINGW_TOOLCHAIN: x86_64-w64-mingw32
       _ARCH: win64
       _ARCH_UI: amd64
