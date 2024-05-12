@@ -1486,6 +1486,18 @@ bool Mp4::needDynStats() {
 	return false;
 }
 
+bool Mp4::chkBadFFmpegVersion() {
+	if (has_sawb_bug) {
+		if (hasCodec("sawb")) {
+			logg(E, "FFmpeg 5.0 - 5.1.4 has a bug in the amrwb decoder, and this file has an 'sawb' track!\n");
+			cout << "Help: Please build against e.g. ffmpeg 4.4 or 6.0.\n"
+				 << "      See the README.md on how to do that.\n";
+			return true;
+		}
+	}
+	return false;
+}
+
 FrameInfo::FrameInfo(int track_idx, Codec& c, off_t offset, uint length)
     : track_idx_(track_idx), keyframe_(c.was_keyframe_), audio_duration_(c.audio_duration_),
       offset_(offset), length_(length), should_dump_(c.should_dump_) {}
@@ -1862,6 +1874,9 @@ bool Mp4::setDuplicateInfo() {
 }
 
 void Mp4::repair(const string& filename) {
+	if (chkBadFFmpegVersion()) {
+		return;
+	}
 	if (needDynStats()) {
 		g_use_chunk_stats = true;
 		genDynStats();

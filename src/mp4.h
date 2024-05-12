@@ -188,6 +188,7 @@ private:
 	void checkForBadTracks();
 
 	std::string getOutputSuffix();
+	bool chkBadFFmpegVersion();
 
 	bool shouldPreferChunkPrediction();
 

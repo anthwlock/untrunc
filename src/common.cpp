@@ -16,6 +16,14 @@ extern "C" {
 #define UNTR_VERSION "?"
 #endif
 
+// from: https://github.com/FFmpeg/FFmpeg/commit/f282c34c009e3653ec16
+// to:   https://github.com/FFmpeg/FFmpeg/commit/319e8a49b5bcfa80fcb6
+#if (AV_VERSION_INT(59, 10, 100) <= LIBAVCODEC_VERSION_INT) && (LIBAVCODEC_VERSION_INT <= AV_VERSION_INT(59, 42, 103))
+const bool has_sawb_bug = true;
+#else
+const bool has_sawb_bug = false;
+#endif
+
 using namespace std;
 
 LogMode g_log_mode = LogMode::I;
