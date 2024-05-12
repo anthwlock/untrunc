@@ -1,4 +1,5 @@
 version: '{build}'
+image: Visual Studio 2019
 
 environment:
   APPVEYOR: 1
@@ -7,14 +8,14 @@ environment:
   matrix:
     - JOB: "32"
       _UNTR_DEST: untrunc_x32
-      _MINGW: C:\mingw-w64\i686-6.3.0-posix-dwarf-rt_v5-rev1\mingw32
+      _MINGW: C:\mingw-w64\i686-8.1.0-posix-dwarf-rt_v6-rev0\mingw32
       _MINGW_TOOLCHAIN: i686-w64-mingw32
       _ARCH: win32
       _ARCH_UI: 386
 
     - JOB: "64"
       _UNTR_DEST: untrunc_x64
-      _MINGW: C:\mingw-w64\x86_64-7.3.0-posix-seh-rt_v5-rev0\mingw64
+      _MINGW: C:\mingw-w64\x86_64-8.1.0-posix-seh-rt_v6-rev0\mingw64
       _MINGW_TOOLCHAIN: x86_64-w64-mingw32
       _ARCH: win64
       _ARCH_UI: amd64
@@ -23,6 +24,7 @@ build: Script
 
 install:
   - cinst dependencywalker
+  - cinst zip
   #- cinst yasm
   #- cinst pkgconfiglite
 
@@ -86,6 +88,6 @@ deploy:
       **Head:** $(APPVEYOR_REPO_COMMIT)
       **Date:** $(APPVEYOR_REPO_COMMIT_TIMESTAMP)
     auth_token:
-      secure: CC35GTlF/os9e190Xvk5q/119AkTlnVULwU9YIiwIrUBfwRZ8jzE1aDB0ojiU2O6
+      secure: owJ4IKQTPyoLe68gzZKvWMvojgQTvqk+Z3Z5VdvAjU9taNCn33OR3cql42RTcv7m
     on:
       branch: master
