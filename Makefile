@@ -91,6 +91,15 @@ ifeq ($(NJOBS), 0)
 	NJOBS = 1
 endif
 
+ifneq ($(FF_VER), shared)
+	FF_MAJOR_VER := $(word 1, $(subst ., ,$(FF_VER)))
+	ifeq ($(shell test $(FF_MAJOR_VER) -lt 4; echo $$?),0)
+		EXTRA_FF_OPTS := --disable-vda
+	endif
+else
+	EXTRA_FF_OPTS :=
+endif
+
 #$(info $$OBJ is [${OBJ}])
 #$(info $$OBJ_GUI is [${OBJ_GUI}])
 $(shell mkdir -p $(dir $(OBJ_GUI)) 2>/dev/null)
@@ -120,7 +129,7 @@ $(FFDIR)/config.asm: | $(FFDIR)/configure
 	--disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
 	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter --disable-postproc \
 	--disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma \
-	--disable-vda --disable-audiotoolbox --disable-videotoolbox
+	--disable-audiotoolbox --disable-videotoolbox $(EXTRA_FF_OPTS)
 
 $(FFDIR)/libavcodec/libavcodec.a: | $(FFDIR)/config.asm
 	cat $(FFDIR)/Makefile
