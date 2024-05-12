@@ -61,7 +61,7 @@ std::streambuf *orig_cout, *orig_cerr;
 void enableNoiseBuffer();
 void disableNoiseBuffer();
 
-std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "'";
+std::string g_version_str = "version '" UNTR_VERSION "' using ffmpeg '" FFMPEG_VERSION "' " LIBAVCODEC_IDENT "";
 
 uint16_t swap16(uint16_t us) {
 	return (us >> 8) | (us << 8);
