@@ -188,7 +188,7 @@ int main(int argc, char *argv[]) {
 	try {
 		if (find_atoms) {Atom::findAtomNames(ok); return 0;}
 		if (unite) {chkC(); Mp4::unite(ok, corrupt); return 0;}
-		if (shorten) {Mp4::shorten(ok, corrupt.size() ? stoi(corrupt) : 200, force_shorten); return 0;}
+		if (shorten) {Mp4::shorten(ok, corrupt.size() ? stoi(corrupt) : 500, force_shorten); return 0;}
 		if (listm) {Mp4::listm(ok); return 0;}
 
 		Mp4 mp4;

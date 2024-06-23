@@ -307,7 +307,7 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 }
 
 void Mp4::shorten(const string& filename, int mega_bytes, bool force) {
-	int64_t n_bytes = mega_bytes * 1e6;
+	int64_t n_bytes = mega_bytes * 1<<20;
 	string suf = force ? "_fshort-" : "_short-";
 	string output = ss(filename + suf, mega_bytes, getMovExtension(filename));
 	warnIfAlreadyExists(output);
@@ -315,7 +315,7 @@ void Mp4::shorten(const string& filename, int mega_bytes, bool force) {
 	FileRead f(filename);
 	BufferedAtom mdat(f), moov(f);
 	if (f.length() <= n_bytes)
-		logg(ET, "file too small\n");
+		logg(ET, "File size already is < ", pretty_bytes(n_bytes), "\n");
 
 	bool good_structure = isPointingAtAtom(f);
 	if (good_structure) assert(findAtom(f, "mdat", mdat));
