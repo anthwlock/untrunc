@@ -346,14 +346,14 @@ void disableNoiseBuffer() {
 	std::cerr.rdbuf(orig_cerr);
 	g_noise_buffer_active = false;
 
-	if (!total_omited) return;
-
 	cutNoiseBuffer(true);
 	auto s = noise_buffer.str();
 	auto off = s.find_first_of('\n');
 	if (off != std::string::npos)
 		s = s.substr(off);
-	_logg("[[ ", total_omited, " bytes omitted, next ", s.size(), " bytes were buffered ]]\n");
+	if (total_omited) {
+		_logg("[[ ", total_omited, " bytes omitted, next ", s.size(), " bytes were buffered ]]\n");
+	}
 	std::cout << s;
 //	cout << "---end_buf\n";
 	noise_buffer.str("");
