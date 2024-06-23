@@ -4,6 +4,7 @@
 #include <iomanip>  // setprecision
 #include <sstream>
 #include <cmath>
+#include <unistd.h>
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -47,6 +48,7 @@ bool g_dont_omit = false;
 bool g_noise_buffer_active = false;
 bool g_ignore_out_of_bound_chunks = false;
 bool g_skip_existing = false;
+bool g_fast_assert = false;
 bool g_no_ctts = false;
 bool g_is_gui = false;
 uint g_num_w2 = 0;
@@ -486,3 +488,42 @@ FILE* _my_open(const char* path, const wchar_t* mode) {
 	return _wfopen(pathW.c_str(), mode);
 }
 #endif
+
+void callPstack() {
+#ifdef _WIN32
+    // Do nothing on Windows
+#else
+    // Check if pstack is available
+    if (system("which pstack > /dev/null 2>&1") == 0) {
+        pid_t pid = getpid(); // Get the current process ID
+        string cmd = "pstack " + to_string(pid);
+
+        cerr << "\n+ " << cmd << endl;
+        system(cmd.c_str());
+		cerr << "\n";
+    } else {
+        cerr << "pstack is not available on this system." << endl;
+    }
+#endif
+}
+
+// Function to trim leading and trailing whitespace from a string
+string trim(const string &str) {
+    size_t first = str.find_first_not_of(' ');
+    if (first == string::npos) return "";
+    size_t last = str.find_last_not_of(' ');
+    return str.substr(first, last - first + 1);
+}
+
+// split the string by comma and trim whitespace from each part
+vector<string> splitAndTrim(const string &str) {
+    vector<string> result;
+    stringstream ss(str);
+    string item;
+
+    while (getline(ss, item, ',')) {
+        result.push_back(trim(item));
+    }
+
+    return result;
+}

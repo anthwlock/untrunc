@@ -9,8 +9,6 @@
 #include <iomanip>  // setw
 #include <string.h>
 
-#include <assert.h>
-
 #include "AP_AtomDefinitions.h"
 
 

@@ -2,7 +2,6 @@
 
 #include <iostream>
 #include <vector>
-#include <cassert>
 
 extern "C" {
 #include <stdint.h>

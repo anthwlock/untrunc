@@ -6,7 +6,6 @@
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 
-#include <cassert>
 
 #include "../common.h"
 #include "nal.h"

@@ -1,7 +1,6 @@
 #include "nal.h"
 
 #include <iostream>
-#include <cassert>
 #include <cstdint>
 
 #include "../common.h"

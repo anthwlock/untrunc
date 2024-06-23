@@ -24,7 +24,6 @@
 #include <iostream>
 #include <vector>
 #include <string.h>
-#include <assert.h>
 #include <random>
 #include <iomanip>  // setprecision
 

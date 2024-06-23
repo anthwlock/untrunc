@@ -157,6 +157,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "dst") arg_dst = kExpectArg;
 			else if (a == "skip") g_skip_existing = true;
 			else if (a == "mp") arg_mp = kExpectArg;
+			else if (a == "fa") g_fast_assert = true;
 			else if (arg.size() > 2) {cerr << "Error: seperate multiple options with space! See '-h'\n";  return -1;}
 			else usage();
 		}

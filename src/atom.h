@@ -5,7 +5,6 @@ extern "C" {
 }
 #include <vector>
 #include <string>
-#include <cassert>
 
 #include "common.h"
 #include "file.h"

@@ -49,7 +49,7 @@ else
 	endif
 endif
 
-CXXFLAGS += -std=c++11 -D_FILE_OFFSET_BITS=64
+CXXFLAGS += -std=c++17 -D_FILE_OFFSET_BITS=64
 
 ifeq ($(IS_RELEASE), 1)
 	CXXFLAGS += -O3

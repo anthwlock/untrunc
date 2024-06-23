@@ -28,9 +28,11 @@ extern uint
     g_max_partsize,       // max theoretical part size
     g_max_buf_sz_needed,  // for determining part size
     g_max_partsize_default;
-extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video, g_show_tracks,
-    g_dont_write, g_use_chunk_stats, g_dont_exclude, g_dump_repaired, g_search_mdat,
-    g_strict_nal_frame_check, g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
+extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
+    g_show_tracks, g_dont_write, g_use_chunk_stats, g_dont_exclude,
+    g_dump_repaired, g_search_mdat, g_strict_nal_frame_check,
+    g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
+    g_fast_assert,
     g_ignore_out_of_bound_chunks, g_skip_existing, g_no_ctts, g_is_gui;
 extern int64_t g_range_start, g_range_end;
 extern std::string g_dst_path;
@@ -214,5 +216,51 @@ FILE* _my_open(const char* path, const wchar_t* mode);
 #define argv_as_utf8(...);
 #define my_open fopen
 #endif
+
+void callPstack();
+std::vector<std::string> splitAndTrim(const std::string &str);
+
+template <typename... Args>
+void printArgs(std::ostream& os, const std::string& sep, const std::string& argNames, Args... args) {
+	std::vector<std::string> names = splitAndTrim(argNames);
+	if (names.size()) {
+		os << sep;
+		int i = 0;
+		bool first = true; // Flag to check if it is the first element
+		([&](const auto& arg) {
+			if (!first) {
+				os << ", ";
+			}
+			first = false;
+			os << names[i++] << "=" << arg;
+		}(args), ...);
+	}
+	os << "\n";
+}
+
+
+#ifndef NDEBUG
+	#define assertt(Expr, ...) if (!(Expr)) __assertt(#Expr, __PRETTY_FUNCTION__, __FILE__, __LINE__, #__VA_ARGS__, ##__VA_ARGS__)
+#else
+	#define assertt(...);
+#endif
+
+template <typename... Args>
+void __assertt(const char* expr_str, const char* fn, const char* file, int line, const std::string& argNames, Args... args)
+{
+	disableNoiseBuffer();
+
+	std::cerr << file << ":" << line << ": " << fn << ": Assertion `" << expr_str << "' failed.";
+
+	printArgs(std::cerr, "  // ", argNames, args...);
+
+	if (g_fast_assert) exit(1);
+
+	callPstack();
+	abort();
+}
+
+#undef assert
+#define assert assertt
 
 #endif // HELPER_H
