@@ -478,6 +478,14 @@ void Mp4::saveVideo(const string& filename) {
 		logg(W, "Bytes NOT matched: ", pretty_bytes(bytes_not_matched), " (", percentage, "%)\n");
 	}
 
+	if (atoms_skipped_.size()) {
+		uint64_t sum = 0;
+		for (auto x : atoms_skipped_) sum += x;
+
+		auto lvl = sum > 1 * (1<<20) ? W : V;
+		logg(lvl, "Skipped atoms in mdat: ", atoms_skipped_.size(), " -> ", pretty_bytes(sum), " total\n");
+	}
+
 	if (g_dont_write) return;
 
 	editHeaderAtom();
@@ -1668,7 +1676,9 @@ int Mp4::skipAtoms(off_t offset, const uchar *start) {
 		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
 
-		if (offset + atom_len <= current_mdat_->contentSize()) {
+		initializer_list<string> atomsToNotSkip = {"tmcd"};  // May be part of normal payload, not an atom
+
+		if (offset + atom_len <= current_mdat_->contentSize() && !contains(atomsToNotSkip, s)) {
 			loggF(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
 			return atom_len;
 		}
@@ -1722,6 +1732,7 @@ bool Mp4::advanceOffset(off_t& offset, bool just_simulate) {
 
 		if ((skipped = skipAtoms(offset, start))) {
 			if (!just_simulate) {
+				atoms_skipped_.emplace_back(skipped);
 				if (unknown_length_) noteUnknownSequence(offset);
 			}
 			continue;

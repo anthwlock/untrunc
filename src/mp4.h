@@ -129,6 +129,8 @@ private:
 	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;
 	int64_t unknown_length_ = 0;
+	std::vector<uint> atoms_skipped_;
+
 	uint64_t pkt_idx_ = 0;
 	int last_track_idx_ = -1;  // 0th track is most relialbale
 	std::vector<int64_t> unknown_lengths_;
