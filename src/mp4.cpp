@@ -168,7 +168,7 @@ void Mp4::parseTracksOk() {
 			assert(track.chunks_.back().off_ < mdats.back()->start_ + mdats.back()->length_);
 		}
 
-		max_part_size_ = max(max_part_size_, track.max_allowed_ss_);
+		max_part_size_ = max(max_part_size_, track.ss_stats_.maxAllowedPktSz());
 	}
 
 	if (g_max_partsize > 0) {
@@ -184,7 +184,8 @@ void Mp4::printMediaInfo() {
 		cout << "\n\n";
 		printAtoms();
 		cout << "\n\n";
-		printDynStats();
+		g_use_chunk_stats = true;
+		printStats();
 	}
 	else {
 		printAtoms();
@@ -211,14 +212,20 @@ void Mp4::printAtoms() {
 		c->print(0);
 }
 
-void Mp4::printDynStats() {
-	if (first_off_abs_ < 0) genDynStats(true);
-	cout << "\ndynamic stats:";
+void Mp4::printTrackStats() {
+	for (auto& t : tracks_) {
+		t.printStats();
+	}
+}
+
+void Mp4::printStats() {
+	if (g_use_chunk_stats && first_off_abs_ < 0) genDynStats(true);
+	cout << "\nStats:\n";
 	cout << "first_off_: " << first_off_abs_ << '\n';
 	cout << "first_off_rel_: " << first_off_rel_ << '\n';
 	cout << "max_part_size_: " << max_part_size_ << '\n';
-	for (auto& t : tracks_)
-		t.printDynStats();
+	cout << "\n";
+	printTrackStats();
 }
 
 void Mp4::listm(const string& filename) {
@@ -1698,7 +1705,7 @@ void Mp4::printOffset(off_t offset) {
 
 	uint begin = swap32(*(uint*)s);
 	uint next = swap32(*(uint*)(s+4));
-	logg(V, "Offset: ", offToStr(offset), " : ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, '\n');
+	logg(V, "Offset: ", offToStr(offset), " : ", setfill('0'), setw(8), hex, begin, " ", setw(8), next, dec, setfill(' '), '\n');
 }
 
 void Mp4::chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedChunkPtr, off_t off) {
@@ -1903,15 +1910,16 @@ void Mp4::repair(const string& filename) {
 		g_use_chunk_stats = true;
 		genDynStats();
 		checkForBadTracks();
-		if (g_log_mode >= LogMode::V) printDynStats();
 		logg(I, "using dynamic stats, use '-is' to see them\n");
 	}
-	else if (setDuplicateInfo()) {;
+	else if (setDuplicateInfo()) {
 		genTrackOrder();
 		if (track_order_simple_.empty()) {
 			logg(W, "duplicate codecs found, but no (simple) track order found\n");
 		}
 	}
+
+	if (g_log_mode >= LogMode::V) printStats();
 
 	if (!g_ignore_unknown && max_part_size_ < g_max_partsize_default) {
 		double x = (double)max_part_size_ / g_max_partsize_default;

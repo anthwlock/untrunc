@@ -90,7 +90,6 @@ void Track::parseOk() {
 	getCompositionOffsets();
 
 	calcAvgSampleSize();
-	setMaxAllowedSampleSize();
 
 	if (constant_duration_ == -1 && !constant_size_ && times_.size() != sizes_.size()) {
 		cout << "Mismatch between time offsets and size offsets: \n";
@@ -293,20 +292,9 @@ void Track::getSampleSizes() {
 
 void Track::calcAvgSampleSize() {
 	if (constant_size_) {
-		avg_ss_normal_ = max_ss_normal_ = constant_size_;
+		ss_stats_.onConstant(constant_size_);
 		return;
 	}
-
-	int min_ss_normal, min_ss_keyframe,
-	    max_ss_normal = 0, max_ss_keyframe = 0,
-	    avg_ss_normal = 0, avg_ss_keyframe = 0;
-	min_ss_normal = min_ss_keyframe = numeric_limits<int>::max();
-
-	auto updateStat = [](int& min_ss, int& avg_ss, int& max_ss, int sz, int n) {
-		min_ss = min(min_ss, sz);
-		avg_ss = avg_ss + (int)(sz - avg_ss) / n;
-		max_ss = max(max_ss, sz);
-	};
 
 	uint k = keyframes_.size() ? keyframes_[0] : -1, ik = 0;
 	for (uint i=0; i < sizes_.size(); i++) {
@@ -316,88 +304,33 @@ void Track::calcAvgSampleSize() {
 		if (is_keyframe && ++ik < keyframes_.size())
 			k = keyframes_[ik];
 
-		int n = i+1;
-		if (is_keyframe) updateStat(min_ss_keyframe, avg_ss_keyframe, max_ss_keyframe, sz, n);
-		else updateStat(min_ss_normal, avg_ss_normal, max_ss_normal, sz, n);
+
+		ss_stats_.updateStat(sz, is_keyframe);
 	}
 
-	avg_ss_normal_   = avg_ss_normal;    min_ss_normal_   = min_ss_normal;    max_ss_normal_   = max_ss_normal;
-	avg_ss_keyframe_ = avg_ss_keyframe;  min_ss_keyframe_ = min_ss_keyframe;  max_ss_keyframe_ = max_ss_keyframe;
-
-	int n_keyframe = keyframes_.size();
-	int n_total = sizes_.size();
-	int n_normal = n_total - n_keyframe;
-
-	min_ss_total_ = min(min_ss_normal_, min_ss_keyframe_);
-	avg_ss_total_ = (n_normal * avg_ss_normal_ + n_keyframe * avg_ss_keyframe_) / n_total;
-	max_ss_total_ = max(max_ss_normal_, max_ss_keyframe_);
+	ss_stats_.onFinished();
 }
 
-void Track::setMaxAllowedSampleSize() {
-	int n_total = sizes_.size();
-	if (!n_total) {
-		max_allowed_ss_ = constant_size_;
-		return;
-	}
-
-	be_strict_maxpart_ = avg_ss_total_ > (1<<19) - (1<<17) &&
-	                     max_ss_normal_ < min_ss_keyframe_ &&
-	                     n_total > 35 &&
-	                     true;
-	logg(V, "ss: ", codec_.name_, " is_stable: ", be_strict_maxpart_, "\n");
-
-	if (!be_strict_maxpart_) {
-		int f = 7;
-		if (codec_.name_ == "mp4v") f = 4;
-		logg(V, "ss: using f=", f, " span\n");
-		max_allowed_ss_ = avg_ss_total_ + f*(max_ss_total_ - min_ss_total_);
-	}
-	else {
-		int avg_ss = max(avg_ss_normal_, avg_ss_keyframe_), max_ss = max(max_ss_normal_, max_ss_keyframe_);
-		if ((double)avg_ss / max_ss > 0.8) {
-			logg(V, "ss: using 2x avg\n");
-			max_allowed_ss_ = 2*avg_ss;
-		}
-		else {
-			int f = 2;
-			logg(V, "ss: using f=", f, " radius\n");
-			max_allowed_ss_ = avg_ss + f*(max_ss - avg_ss);
-		}
-	}
-}
-
-void Track::printDynStats() {
+void Track::printStats() {
 	cout << codec_.name_ << '\n';
+	cout << left << setw(20) << "ss_normal: " << ss_stats_.normal << "\n";
+	cout << left << setw(20) << "ss_keyframe: " << ss_stats_.keyframe << "\n";
 
-	auto printRow3 = [](const string& label, int min, int avg, int max) {
-		cout << left << setw(20) << label + ": " << right
-		     << setw(12) << min << " "
-		     << setw(12) << avg  << " "
-		     << setw(12) << max << '\n';
-	    };
-	printRow3("ss_normal", min_ss_normal_, avg_ss_normal_, max_ss_normal_);
-	if (keyframes_.size())
-		printRow3("ss_keyframe", min_ss_keyframe_, avg_ss_keyframe_, max_ss_keyframe_);
-	printRow3("ss_total", min_ss_total_, avg_ss_total_, max_ss_total_);
-	cout << left << setw(20 + 2*(12+1)) << "max_allowed_ss_: " << right
-	     << setw(12) << max_allowed_ss_ << " "
-	     << "  // strict=" << be_strict_maxpart_<< '\n';
-	cout << "chunk_distance_gcd_: " << chunk_distance_gcd_ << '\n';
-	cout << "start_off_gcd_: " << start_off_gcd_ << '\n';
-	cout << "end_off_gcd_: " << end_off_gcd_ << '\n';
+	if (g_use_chunk_stats) {
+		cout << "chunk_distance_gcd_: " << chunk_distance_gcd_ << '\n';
+		cout << "start_off_gcd_: " << start_off_gcd_ << '\n';
+		cout << "end_off_gcd_: " << end_off_gcd_ << '\n';
 
-	cout << "likely n_samples/chunk (p=" << likely_n_samples_p << "): ";
-	for (uint i=0; i < min(to_size_t(100), likely_n_samples_.size()); i++)
-		cout << likely_n_samples_[i] << ' ';
+		cout << "likely n_samples/chunk (p=" << likely_n_samples_p << "): ";
+		for (uint i=0; i < min(to_size_t(100), likely_n_samples_.size()); i++)
+			cout << likely_n_samples_[i] << ' ';
 
-	cout << "\nlikely sample_sizes (p=" << likely_samples_sizes_p << "): ";
-	for (uint i=0; i < min(to_size_t(100), likely_sample_sizes_.size()); i++)
-		cout << likely_sample_sizes_[i] << ' ';
+		cout << "\nlikely sample_sizes (p=" << likely_samples_sizes_p << "): ";
+		for (uint i=0; i < min(to_size_t(100), likely_sample_sizes_.size()); i++)
+			cout << likely_sample_sizes_[i] << ' ';
 
-	int sum = 0;
-	for (auto& v : dyn_patterns_) sum += v.size();
-	cout << '\n' << "n_mutual_patterns: " << sum << '\n';
-	printDynPatterns(true);
+		printDynPatterns(true);
+	}
 
 	cout << "\n";
 }
@@ -722,6 +655,10 @@ bool Track::chunkReachedSampleLimit() {
 }
 
 void Track::printDynPatterns(bool show_percentage) {
+	int sum = 0;
+	for (auto& v : dyn_patterns_) sum += v.size();
+	cout << '\n' << "n_mutual_patterns: " << sum << '\n';
+
 	auto own_idx = ownTrackIdx();
 	for (uint j=0; j < dyn_patterns_perm_.size(); j++) {
 		auto idx = dyn_patterns_perm_[j];

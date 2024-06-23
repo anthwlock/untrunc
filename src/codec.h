@@ -22,7 +22,6 @@ class AvcConfig;
 #define nb_channels(x) x->channels
 #endif
 
-
 class Codec {
 public:
 	Codec() = default;

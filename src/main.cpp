@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
 
 		if (show_tracks) mp4.printTracks();
 		else if (show_atoms) mp4.printAtoms();
-		else if (show_stats) mp4.printDynStats();
+		else if (show_stats) { g_use_chunk_stats = true; mp4.printStats(); }
 		else if (show_info) mp4.printMediaInfo();
 		else if (dump_samples) mp4.dumpSamples();
 		else if (analyze) mp4.analyze();

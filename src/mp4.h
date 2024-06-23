@@ -44,8 +44,9 @@ public:
 	void parseOk(const std::string& filename, bool accept_unhealthy=false); // parse the first file
 
 	void printTracks();
+	void printTrackStats();
 	void printAtoms();
-	void printDynStats();
+	void printStats();
 	void printMediaInfo();
 
 	void makeStreamable(const std::string& ok, const std::string& output);
