@@ -61,9 +61,13 @@ endif
 VER = $(shell test -d .git && command -v git >/dev/null && echo "v`git rev-list --count HEAD`-`git describe --always --dirty --abbrev=7`")
 CPPFLAGS += -MMD -MP
 CPPFLAGS += -DUNTR_VERSION=\"$(VER)\"
+USE_GCH := 0
 
 EXE ?= $(_EXE)
 DIR := $(_DIR)_$(FF_VER)
+PCH := src/pch.h
+PCH_OBJ := $(PCH:%=$(DIR)/%.gch)
+PCH_INC := $(PCH_OBJ:%.gch=%)
 SRC := $(wildcard src/*.cpp src/avc1/*.cpp src/hvc1/*.cpp)
 OBJ := $(SRC:%.cpp=$(DIR)/%.o)
 DEP := $(OBJ:.o=.d)
@@ -159,8 +163,16 @@ $(DIR)/cpp_flags: force
 	@echo '$(CPPFLAGS)' | cmp -s - $@ || echo '$(CPPFLAGS)' > $@
 $(DIR)/src/common.o: $(DIR)/cpp_flags
 
+$(PCH_OBJ): $(PCH)
+	$(CXX) $(CXXFLAGS) -x c++-header -o $@ -c $<
+
+ifeq ($(USE_GCH),1)
+$(DIR)/%.o: %.cpp $(PCH_OBJ)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -Winvalid-pch -include $(PCH_INC) -o $@ -c $<
+else
 $(DIR)/%.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -o $@ -c $<
+endif
 
 -include $(DEP)
 -include $(DEP_GUI)
