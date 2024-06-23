@@ -33,6 +33,22 @@ class AVFormatContext;
 class FrameInfo;
 class ChunkIt;
 
+struct WouldMatchCfg {
+	off_t offset;
+	const std::string& skip = "";
+	bool force_strict = false;
+	int last_track_idx = -1;
+	bool very_first = false;
+};
+
+inline
+std::ostream& operator<<(std::ostream& out, const WouldMatchCfg& cfg) {
+	return out << cfg.offset << ", "
+		"skip=\"" << cfg.skip << "\", " <<
+		"force_strict=" << cfg.force_strict << ", " <<
+		"very_first=" << cfg.very_first;
+}
+
 class Mp4 : public HasHeaderAtom {
 friend Track;
 friend Codec;
@@ -59,7 +75,7 @@ public:
 	void analyze(bool gen_off_map=false);
 	void repair(const std::string& filename);
 
-	bool wouldMatch(off_t offset, const std::string& skip = "", bool force_strict=false, int last_track_idx=-1);
+	bool wouldMatch(const WouldMatchCfg& cfg);
 	bool wouldMatch2(const uchar* start);
 	bool wouldMatchDyn(off_t offset, int last_idx);
 	FrameInfo predictSize(const uchar *start, int track_idx, off_t offset);

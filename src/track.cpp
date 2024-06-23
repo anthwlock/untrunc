@@ -632,7 +632,7 @@ int64_t Track::stepToNextOtherChunk(off_t off) {
 
 	for (int i=0; i < 5; i++) {
 		logg(V, "step:", step, "\n");
-		if (g_mp4->wouldMatch(off + step)) {
+		if (g_mp4->wouldMatch({off + step})) {
 			logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
 			     ", step: ", step, ", next: ", off + step, "\n");
 			return step;

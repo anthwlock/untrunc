@@ -1200,38 +1200,50 @@ bool Mp4::shouldBeStrict(off_t off, int track_idx) {
 
 }
 
-bool Mp4::wouldMatch(off_t offset, const string& skip, bool force_strict, int last_track_idx) {
+bool Mp4::wouldMatch(const WouldMatchCfg& cfg) {
 	auto chkChunkOffOk = [&](uint i) -> bool {
-		if (g_use_chunk_stats && to_uint(last_track_idx) != i && !tracks_[i].isChunkOffsetOk(offset)) {
+		if (g_use_chunk_stats && to_uint(cfg.last_track_idx) != i && !tracks_[i].isChunkOffsetOk(cfg.offset)) {
 			logg(V, "would match, but offset is not accepted as start-of-chunk by '", tracks_[i].codec_.name_, "'\n");
 			return false;
 		}
-		else logg(V, "chunkOffOk: ", offset, " ok for ", tracks_[i].codec_.name_, "\n");
+		else logg(V, "chunkOffOk: ", cfg.offset, " ok for ", tracks_[i].codec_.name_, "\n");
 		return true;
 	};
 
-	auto start = loadFragment(offset);
+	auto start = loadFragment(cfg.offset);
 	for (uint i=0; i < tracks_.size(); i++) {
 		auto& c = tracks_[i].codec_;
-		bool be_strict = force_strict || shouldBeStrict(offset, i);
-		if (tracks_[i].codec_.name_ == skip) continue;
+		if (cfg.very_first && orig_first_track_->codec_.name_ != c.name_) continue;
+		bool be_strict = cfg.force_strict || shouldBeStrict(cfg.offset, i);
+		if (tracks_[i].codec_.name_ == cfg.skip) continue;
 		if (be_strict && !c.matchSampleStrict(start)) continue;
 		if (!be_strict && !c.matchSample(start)) continue;
 
-		logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes, ", c.name_, "\n");
+
+		logg(V, "wouldMatch(", cfg, ") -> yes, ", c.name_, "\n");
 		return chkChunkOffOk(i);
 	}
 
 	if (g_use_chunk_stats) {
-		auto last_idx = last_track_idx >= 0 ? last_track_idx : last_track_idx_;
-		if (last_idx < 0) return false;
-		if (wouldMatchDyn(offset, last_idx)) {
-			logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> yes\n");
+		auto last_idx = cfg.last_track_idx >= 0 ? cfg.last_track_idx : last_track_idx_;
+		if (cfg.very_first) {  // very first offset
+			assert(last_track_idx_ == -1);
+			bool r = anyPatternMatchesHalf(cfg.offset, getTrackIdx(orig_first_track_->codec_.name_));
+			logg(V, "wouldMatch(", cfg, ") -> ", r , "  // via anyPatternMatchesHalf(", orig_first_track_->codec_.name_, ")\n");
+			return r;
+		}
+
+		if (last_idx < 0) {
+			logg(V, "wouldMatch(", cfg, ") -> no  // last_idx (", last_idx, ") < 0\n");
+			return false;
+		}
+		if (wouldMatchDyn(cfg.offset, last_idx)) {
+			logg(V, "wouldMatch(", cfg, ") -> yes\n");
 			return true;
 		}
 	}
 
-	logg(V, "wouldMatch(", offset, ", \"", skip, "\", ", force_strict, ") -> no\n");
+	logg(V, "wouldMatch(", cfg, ") -> no\n");
 	return false;
 }
 
@@ -1294,7 +1306,7 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 
 	// hardcoded match
 	if (pkt_idx_ == 4 && hasCodec("tmcd") && getTrack("tmcd").is_tmcd_hardcoded_) {
-		if (!wouldMatch(offset, "", true, last_track_idx_)) {
+		if (!wouldMatch({offset, "", true, last_track_idx_})) {
 			logg(V, "using hardcoded 'tmcd' packet (len=4)\n");
 			return FrameInfo(getTrackIdx("tmcd"), false, 0, offset, 4);
 		}
@@ -1383,7 +1395,7 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit, uint known_n_sampl
 		if (known_n_samples) n_samples = known_n_samples;
 		for (auto s_sz : t.likely_sample_sizes_) {
 			auto dst_off = offset + n_samples*s_sz;
-			if (dst_off < current_mdat_->contentSize() && wouldMatch(dst_off, "", false, track_idx_to_fit)) {
+			if (dst_off < current_mdat_->contentSize() && wouldMatch({dst_off, "", false, (int)track_idx_to_fit})) {
 				assert(n_samples > 0);
 				c = Chunk(offset, n_samples, track_idx_to_fit, s_sz);
 				return c;
@@ -2021,12 +2033,30 @@ void Mp4::repair(const string& filename) {
 	off_t offset = 0;
 
 	if (g_use_chunk_stats) {
+		off_t start_off = 0;
+
 		auto first_off_abs = first_off_abs_ - mdat->contentStart();
-		if (first_off_abs > 0 && wouldMatch(first_off_abs)) offset = first_off_abs;
-		else if (wouldMatch(first_off_rel_)) offset = first_off_rel_;
+		if (first_off_abs > 0 && wouldMatch({first_off_abs})) {
+			dbgg("set start offset via", first_off_abs_, first_off_abs);
+			offset = first_off_abs;
+		}
+		else if (first_off_rel_ ) {
+			if (wouldMatch({.offset=first_off_rel_, .very_first=true})) {
+				dbgg("set start offset via", first_off_rel_);
+				offset = first_off_rel_;
+			} else {
+				start_off = offset;
+				advanceOffset(start_off, true);  // some atom (e.g. wide) might get skipped
+				if (start_off && wouldMatch({.offset=start_off + first_off_rel_, .very_first=true})) {
+					dbgg("set start offset via rel2", start_off, first_off_rel_);
+					offset = start_off + first_off_rel_;
+				}
+			}
+		}
+
 		if (offset) {
 			logg(V, "beginning at offset ", offToStr(offset), " instead of 0\n");
-			addUnknownSequence(0, offset);
+			addUnknownSequence(start_off, offset);
 		}
 	}
 
