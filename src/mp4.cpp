@@ -803,8 +803,8 @@ FileRead& Mp4::openFile(const string& filename) {
 
 void Mp4::dumpIdxAndOff(off_t off, int idx) {
 	auto real_off = current_mdat_->contentStart() + off;
-	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(off, " / ")
-	     << setw(8) << real_off << " : ";
+	cout << setw(15) << ss("(", idx++, ") ") << setw(12) << ss(hexIf(off), " / ")
+	     << setw(8) << hexIf(real_off) << " : ";
 }
 
 void Mp4::chkExpectedOff(off_t* expected_off, off_t real_off, uint sz, int idx) {
@@ -1542,7 +1542,7 @@ bool operator!=(const FrameInfo& a, const FrameInfo& b) { return !(a == b); }
 
 ostream& operator<<(ostream& out, const FrameInfo& fi) {
 	auto cn = g_mp4->getCodecName(fi.track_idx_);
-	return out << ss("'", cn, "', ", fi.length_, ", ", fi.keyframe_, ", ", fi.audio_duration_);
+	return out << ss("'", cn, "', ", hexIf(fi.length_), ", ", fi.keyframe_, ", ", fi.audio_duration_);
 }
 
 Mp4::Chunk::Chunk(off_t off, int ns, int track_idx, int sample_size)
@@ -1804,7 +1804,7 @@ off_t Mp4::toAbsOff(off_t offset) {
 }
 
 string Mp4::offToStr(off_t offset) {
-	return ss(offset, " / " , toAbsOff(offset));
+	return ss(hexIf(offset), " / " , hexIf(toAbsOff(offset)));
 }
 
 void Mp4::onFirstChunkFound(int track_idx) {
