@@ -966,9 +966,12 @@ void Mp4::genDynStats(bool force_patterns) {
 void Mp4::checkForBadTracks() {
 	if (track_order_.size()) return;  // we already checked via `isTrackOrderEnough()`
 	for (auto& t: tracks_) {
-		if (!t.codec_.isSupported() && !t.hasPredictableChunks() &&
+		if (!t.isSupported() && !t.hasPredictableChunks() &&
 		    !(t.is_dummy_ && dummy_is_skippable_)) {
-			logg(ET, "bad track: '", t.codec_.name_, "'\n");
+			logg(W, "Bad track: '", t.codec_.name_, "'\n",
+					"         Adding more sophisticated logic for this track could significantly improve the recovered file's quality!\n");
+			if (!(t.codec_.name_ == "tmcd" && t.sizes_.size() <= 1))
+				hitEnterToContinue();
 		}
 	}
 }
