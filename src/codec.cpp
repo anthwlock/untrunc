@@ -129,7 +129,7 @@ map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_strict_match {
 		return false;
 //		return (s>>16) == 0x210A;  // this needs to be improved
 	}},
-	MATCH_FN("tmcd") { return false; }},
+	// MATCH_FN("tmcd") { return false; }},
 	MATCH_FN("mebx") { return false; }},
 };
 
@@ -266,10 +266,10 @@ map<string, bool(*) (Codec*, const uchar*, uint)> dispatch_match {
 	MATCH_FN("sawb") {
 		return start[0] == 0x44;
 	}},
-	MATCH_FN("tmcd") {  // GoPro timecode .. hardcoded in Mp4::GetMatches
-		return false;
-//		return !tmcd_seen_ && start[0] == 0 && g_mp4->wouldMatch(start+4, "tmcd");
-	}},
+// 	MATCH_FN("tmcd") {  // GoPro timecode .. hardcoded in Mp4::GetMatches
+// 		return false;
+// //		return !tmcd_seen_ && start[0] == 0 && g_mp4->wouldMatch(start+4, "tmcd");
+// 	}},
 	MATCH_FN("gpmd") {  // GoPro timecode, 4 bytes (?)
 		vector<string> fourcc = {"DEVC", "DVID", "DVNM", "STRM", "STNM", "RMRK",  "SCAL",
 		                         "SIUN", "UNIT", "TYPE", "TSMP", "TIMO", "EMPT"};
@@ -402,10 +402,10 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 	GET_SZ_FN("apcn") {
 		return swap32(*(int *)start);
 	}},
-	GET_SZ_FN("tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
-//		tmcd_seen_ = true;
-		return 4;
-	}},
+// 	GET_SZ_FN("tmcd") {  // GoPro timecode, always 4 bytes, only pkt-idx 4 (?)
+// //		tmcd_seen_ = true;
+// 		return 4;
+// 	}},
 	GET_SZ_FN("fdsc") {  // GoPro recovery
 		// TODO: How is this track used for recovery?
 

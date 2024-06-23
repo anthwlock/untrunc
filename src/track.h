@@ -43,6 +43,7 @@ public:
 	//in some videos the duration (stts) can be variable and we can rebuild them using these values.
 	std::vector<int> times_; // sample durations
 	int constant_duration_ = -1;
+	bool is_tmcd_hardcoded_ = false;
 
 	std::vector<int> sizes_;
 	int constant_size_ = 0;
@@ -122,7 +123,9 @@ public:
 	void printDynStats();
 	void printDynPatterns(bool show_percentage=false);
 	void genLikely();
-	bool isSupported() { return codec_.isSupported(); }
+	bool isSupported() {
+		return codec_.isSupported() || is_tmcd_hardcoded_;
+	}
 	bool hasZeroTransitions();
 
 	int useDynPatterns(off_t offset);

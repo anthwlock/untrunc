@@ -83,6 +83,13 @@ void Mp4::parseHealthy() {
 	if (hasCodec("fdsc") && hasCodec("avc1"))
 		getTrack("avc1").codec_.strictness_lvl_ = 1;
 
+	if (hasCodec("tmcd")) {
+		auto& t = getTrack("tmcd");
+		if (t.sizes_.size() == 1 && t.sizes_[0] == 4) {
+			t.is_tmcd_hardcoded_ = true;
+		}
+	}
+
 	for (uint i=0; i < tracks_.size(); i++)
 		if (contains({"twos", "sowt"}, tracks_[i].codec_.name_)) twos_track_idx_ = i;
 	if (twos_track_idx_ >= 0 && hasCodec("avc1")) {
@@ -1223,7 +1230,7 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 	auto start = loadFragment(offset);
 
 	// hardcoded match
-	if (pkt_idx_ == 4 && hasCodec("tmcd")) {
+	if (pkt_idx_ == 4 && hasCodec("tmcd") && getTrack("tmcd").is_tmcd_hardcoded_) {
 		if (!wouldMatch(offset, "", true, last_track_idx_)) {
 			logg(V, "using hardcoded 'tmcd' packet (len=4)\n");
 			return FrameInfo(getTrackIdx("tmcd"), false, 0, offset, 4);
