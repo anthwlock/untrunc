@@ -1225,6 +1225,54 @@ bool Mp4::wouldMatch2(const uchar *start) {
 	return false;
 }
 
+FrameInfo Mp4::predictSize(const uchar *start, int track_idx, off_t offset) {
+	auto& track = tracks_[track_idx];
+	Codec& c = track.codec_;
+	// logg(V, "Track codec: ", c.name_, '\n');
+
+	uint length;
+	int length_signed;
+	if (track.constant_size_ > 0) {
+		length = track.constant_size_;
+		goto after_length_chk;
+	}
+	length_signed = c.getSize(start, current_maxlength_, offset);
+	length = to_uint(length_signed);
+
+	logg(V, "part-length: ", length_signed, '\n');
+	if(length_signed < 1) {
+		logg(V, "Invalid length: part-length is ", length_signed, '\n');
+		return FrameInfo();
+	}
+	if(length > current_maxlength_) {
+		logg(V, "limit: ", min(max_part_size_, current_maxlength_), "\n");
+		logg(E, "Invalid length: ", length, " - too big (track: ", track_idx, ")\n");
+		return FrameInfo();
+	}
+	if (length  <  6 && c.name_ == "avc1") {  // very short NALs are ok, short frames aren't
+		logg(W2, "Invalid length: ", length, " - too small (track: ", track_idx, ")\n");
+		return FrameInfo();
+	}
+
+	after_length_chk:
+	if (c.was_bad_) {
+		logg(W, "Codec::was_bad_ = 1\n");
+//			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
+//			continue;
+	}
+
+	if (track.has_duplicates_ && !isExpectedTrackIdx(track_idx)) {
+		return FrameInfo();
+	}
+
+	auto r = FrameInfo(track_idx, c, offset, length);
+
+	if (c.name_ == "jpeg" && track.end_off_gcd_) {
+		r.length_ += track.stepToNextOtherChunk(offset + length);
+	}
+
+	return r;
+}
 
 FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 	auto start = loadFragment(offset);
@@ -1254,44 +1302,9 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 		if (be_strict && !c.matchSampleStrict(start)) continue;
 		if (!be_strict && !c.matchSample(start)) continue;
 
-		uint length;
-		int length_signed;
-		if (track.constant_size_ > 0) {
-			length = track.constant_size_;
-			goto after_length_chk;
-		}
-		length_signed = c.getSize(start, current_maxlength_, offset);
-		length = to_uint(length_signed);
-
-		logg(V, "part-length: ", length_signed, '\n');
-		if(length_signed < 1) {
-			logg(V, "Invalid length: part-length is ", length_signed, '\n');
-			continue;
-		}
-		if(length > current_maxlength_) {
-			logg(V, "limit: ", min(max_part_size_, current_maxlength_), "\n");
-			logg(E, "Invalid length: ", length, " - too big (track: ", i, ")\n");
-			continue;
-		}
-		if (length  <  6 && c.name_ == "avc1") {  // very short NALs are ok, short frames aren't
-			logg(W2, "Invalid length: ", length, " - too small (track: ", i, ")\n");
-			continue;
-		}
-
-        after_length_chk:
-		if (c.was_bad_) {
-			logg(W, "Codec::was_bad_ = 1\n");
-//			logg(V, "Codec::was_bad_ = 1 -> skipping\n");
-//			continue;
-		}
-
-		if (track.has_duplicates_ && !isExpectedTrackIdx(i)) continue;
-
-		if (c.name_ == "jpeg" && track.end_off_gcd_) {
-			length += track.stepToNextOtherChunk(offset + length);
-		}
-
-		return FrameInfo(i, c, offset, length);
+        auto m = predictSize(start, i, offset);
+		if (!m) continue;
+		return m;
 	}
 
 	if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..

@@ -61,6 +61,7 @@ public:
 	bool wouldMatch(off_t offset, const std::string& skip = "", bool force_strict=false, int last_track_idx=-1);
 	bool wouldMatch2(const uchar* start);
 	bool wouldMatchDyn(off_t offset, int last_idx);
+	FrameInfo predictSize(const uchar *start, int track_idx, off_t offset);
 	FrameInfo getMatch(off_t offset, bool force_strict=false);
 	void analyzeOffset(const std::string& filename, off_t offset);
 
