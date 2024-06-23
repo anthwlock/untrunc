@@ -1594,110 +1594,164 @@ bool Mp4::isAllZerosAt(off_t off, int n) {
 	return false;
 }
 
-bool Mp4::chkOffset(off_t& offset) {
-start:
-	if (offset >= current_mdat_->contentSize()) {  // at end?
-		pushBackLastChunk();
-		if (unknown_length_) noteUnknownSequence(offset);
-		return false;
+bool Mp4::currentChunkIsDone() {
+	return
+		g_use_chunk_stats &&
+		last_track_idx_ >= 0 &&
+		tracks_[last_track_idx_].chunkMightBeAtAnd();
+}
+
+int Mp4::getChunkPadding(off_t& offset) {
+	if (!currentChunkIsDone()) return 0;
+
+	if (track_order_.size()) {
+		int idx = getLikelyNextTrackIdx();
+		int step = tracks_[idx].stepToNextOwnChunkAbs(offset);
+		logg(V, "used stepToNextOwnChunkAbs of likelyNextTrack -> ", step, "\n");
+		if (step > 4) {
+			return step;
+		}
 	}
 
+	return 0;
+}
 
-	auto start = loadFragment(offset);
-	uint begin = *(uint*)start;
+// returns length skipped
+int Mp4::skipZeros(off_t& offset, const uchar* start) {
+	if (*(int*)start != 0) return 0;
 
-	static uint loop_cnt = 0;
-	if (g_log_mode == I && loop_cnt++ % 2000 == 0) outProgress(offset, current_mdat_->file_end_);
-
-	auto shouldKeepZeros = [&]() {
-		if (g_use_chunk_stats) {
-			for (auto& cn : {"sowt", "twos"}) {
-				if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset)) {
-					logg(V, "won't skip zeros at: ", offToStr(offset), "\n");
-					return true;
-				}
-			}
-
-			if (has_zero_transitions_) {
-				auto c = getChunkPrediction(offset, true);
-				if (c) {
-					logg(V, "won't skip zeros at: ", offToStr(offset), " (perfect chunk-match)\n");
-					return true;
-				}
+	if (g_use_chunk_stats) {
+		for (auto& cn : {"sowt", "twos"}) {
+			if (hasCodec(cn) && getTrack(cn).isChunkOffsetOk(offset)) {
+				logg(V, "won't skip zeros at: ", offToStr(offset), "\n");
+				return 0;
 			}
 		}
-		return false;
-	};
 
-	if (*(int*)start == 0 && !shouldKeepZeros()) {
-		logg(V, "skipping zeros at: ", offToStr(offset), "\n");
-		if (track_order_.size()) {
-			int idx = getLikelyNextTrackIdx();
-			int step = tracks_[idx].stepToNextOwnChunkAbs(offset);
-			logg(V, "used stepToNextOwnChunkAbs of likelyNextTrack -> ", step, "\n");
-			if (step > 4) {
-				offset += step;
-				return true;
+		if (has_zero_transitions_) {
+			auto c = getChunkPrediction(offset, true);
+			if (c) {
+				logg(V, "won't skip zeros at: ", offToStr(offset), " (perfect chunk-match)\n");
+				return 0;
 			}
 		}
-		if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
-			int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
-			logg(V, "used free's end_off_gcd -> ", len, "\n");
-			offset += len;
-			if (len) return true;
-			else logg(W, "end_off_gcd method failed..\n");
-		}
-		int64_t step = 4;
-		if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
-		if (unknown_length_) unknown_length_ += step;
-		else if (idx_free_ > 0 && tracks_[last_track_idx_].is_dummy_) {
-			auto& c = tracks_[idx_free_].current_chunk_;
-			c.size_ += step;
-			c.n_samples_ += step;  // sample size is 1
-		}
-		offset += step;
-		goto start;
 	}
 
+	if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
+		int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
+		logg(V, "used free's end_off_gcd -> ", len, "\n");
+		if (len) {
+			return len;
+		}
+		else logg(W, "end_off_gcd method failed..\n");
+	}
+
+	int64_t step = 4;
+	if (unknown_length_ || g_use_chunk_stats) step = calcStep(offset);
+	return step;
+}
+
+int Mp4::skipAtomHeaders(off_t offset, const uchar *start) {
 	// skip 'mdat' headers
 	if (string(start+4, start+8) == "mdat") {
-		if (unknown_length_) noteUnknownSequence(offset);
-		if (idx_free_ >= 0 && last_track_idx_ != idx_free_) {
-			pushBackLastChunk();
-			last_track_idx_ = idx_free_;
-		}
-
-		addToExclude(offset, 8);
 		loggF(V, "Skipping 'mdat' header: ", offToStr(offset), '\n');
-		offset += 8;
-		goto start;
+		return 8;
 	}
+	return 0;
+}
+
+int Mp4::skipAtoms(off_t offset, const uchar *start) {
+	uint begin = *(uint*)start;
 
 	// skip atoms (e.g. moov, free)
 	if (isValidAtomName(start+4)) {
-		if (unknown_length_) noteUnknownSequence(offset);
-		pushBackLastChunk();
-		last_track_idx_ = idx_free_;
 		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
+
 		if (offset + atom_len <= current_mdat_->contentSize()) {
 			loggF(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
-			addToExclude(offset, atom_len, true);
-			offset += atom_len;
-			goto start;
+			return atom_len;
 		}
 		else {
 			loggF(W, "NOT skipping ", s, " atom: ", atom_len, " (at ", offToStr(offset), ")\n");
 		}
 	}
 
+	return 0;
+}
+
+// has minimal side effects - returns true if not EOF
+bool Mp4::advanceOffset(off_t& offset, bool just_simulate) {
+	auto padding = getChunkPadding(offset);
+	if (padding > 0) {
+		if (offset >= current_mdat_->contentSize()) {
+			return false;
+		}
+
+		offset += padding;
+	}
+
+	int skipped = 0;
+	while (true) {
+		offset += skipped;
+
+		if (offset >= current_mdat_->contentSize()) {  // at end?
+			return false;
+		}
+
+		auto start = loadFragment(offset);
+		uint begin = *(uint*)start;
+
+		static uint loop_cnt = 0;
+		if (g_log_mode == I && loop_cnt++ % 2000 == 0) outProgress(offset, current_mdat_->file_end_);
+
+		if ((skipped = skipZeros(offset, start))) {
+			if (padding > 0) {  // we assume that if file uses padding, zeros might be part of payload
+				logg(V, "Ignoring zero skip (", skipped, "), since already done padding\n");
+			} else {
+				continue;
+			}
+		}
+
+		if ((skipped = skipAtomHeaders(offset, start))) {
+			if (!just_simulate) {
+				if (unknown_length_) noteUnknownSequence(offset);
+			}
+			continue;
+		}
+
+		if ((skipped = skipAtoms(offset, start))) {
+			if (!just_simulate) {
+				if (unknown_length_) noteUnknownSequence(offset);
+			}
+			continue;
+		}
+
+		break;
+	}
 
 	if (g_log_mode >= LogMode::V) {
-		logg(V, "\n(reading element from mdat)\n");
+		if (just_simulate) {
+			logg(V, "\n(reading element from mdat - simulate)\n");
+		} else {
+			logg(V, "\n(reading element from mdat)\n");
+		}
 		printOffset(offset);
 	}
 
 	return true;
+}
+
+
+bool Mp4::chkOffset(off_t& offset) {
+	off_t orig_off = offset;
+	bool r = advanceOffset(offset);
+	auto skipped = offset - orig_off;
+	if (skipped && !unknown_length_) {
+		dbgg("chkOffset ", skipped);
+		addToExclude(orig_off, skipped);
+	}
+	return r;
 }
 
 void Mp4::printOffset(off_t offset) {

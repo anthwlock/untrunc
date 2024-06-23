@@ -603,7 +603,7 @@ int64_t Track::stepToNextOwnChunk(off_t off) {
 int64_t Track::stepToNextOwnChunkAbs(off_t off) {
 	if (start_off_gcd_ <= 1) return 0;
 	auto abs_off = g_mp4->toAbsOff(off);
-	auto step = start_off_gcd_ - (abs_off % start_off_gcd_);
+	auto step = (start_off_gcd_ - (abs_off % start_off_gcd_)) % start_off_gcd_;
 
 	logg(V, __func__, "(", off, "): from: ", codec_.name_,  " step: ", step, "\n");
 	return step;

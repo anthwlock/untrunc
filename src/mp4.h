@@ -119,7 +119,13 @@ private:
 	void chkUntrunc(FrameInfo& fi, Codec& c, int i);
 	void addFrame(const FrameInfo& frame_info);
 	void addChunk(const Mp4::Chunk& chunk);
+
+	int skipZeros(off_t& offset, const uchar* start);
+	int skipAtomHeaders(off_t offset, const uchar *start);
+	int skipAtoms(off_t offset, const uchar *start);
+	bool advanceOffset(off_t& offset, bool just_simulate=false);
 	bool chkOffset(off_t& offset);  // updates offset
+
 	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;
 	int64_t unknown_length_ = 0;
@@ -193,6 +199,8 @@ private:
 	bool chkBadFFmpegVersion();
 
 	bool shouldPreferChunkPrediction();
+	bool currentChunkIsDone();
+	int getChunkPadding(off_t& offset);
 
 	Track* orig_first_track_;
 
