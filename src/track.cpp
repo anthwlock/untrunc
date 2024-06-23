@@ -195,7 +195,7 @@ void Track::clear() {
 	else sizes_.clear();
 
 	if (orig_times_.empty()) swap(times_, orig_times_);
-	else orig_times_.end();
+	else times_.clear();
 
 	keyframes_.clear();
 	chunks_.clear();
