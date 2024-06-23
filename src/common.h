@@ -54,6 +54,8 @@ const int64_t kRangeUnset = std::numeric_limits<int64_t>::min();
 	_Pragma("GCC diagnostic pop"); \
 
 void cutNoiseBuffer(bool force=false);
+void enableNoiseBuffer();
+void disableNoiseBuffer();
 
 template<class... Args>
 std::string ss(Args&&... args){
@@ -91,6 +93,23 @@ void _logg(LogMode m, Args&&... x){
 		}
 	}
 	_logg(std::forward<Args>(x)...);
+}
+
+#define loggF(lvl, ...) \
+	do { \
+	if (g_log_mode >= lvl) { _loggF(lvl, __VA_ARGS__); } \
+	else if (lvl == W2) {g_num_w2++;} \
+	} while(0)
+
+template<class... Args>
+void _loggF(Args&&... x) {
+	if (g_noise_buffer_active) {
+		disableNoiseBuffer();
+		_logg(std::forward<Args>(x)...);
+		enableNoiseBuffer();
+	} else {
+		_logg(std::forward<Args>(x)...);
+	}
 }
 
 bool contains(const std::initializer_list<std::string>& c, const std::string& v);
@@ -154,8 +173,6 @@ const std::map<std::string, std::string> g_atom_names = {
 
 void mute();
 void unmute();
-void enableNoiseBuffer();
-void disableNoiseBuffer();
 
 uint16_t swap16(uint16_t us);
 uint32_t swap32(uint32_t ui);

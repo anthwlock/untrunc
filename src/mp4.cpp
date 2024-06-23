@@ -1638,7 +1638,7 @@ start:
 		}
 
 		addToExclude(offset, 8);
-		logg(V, "Skipping 'mdat' header: ", offToStr(offset), '\n');
+		loggF(V, "Skipping 'mdat' header: ", offToStr(offset), '\n');
 		offset += 8;
 		goto start;
 	}
@@ -1651,13 +1651,13 @@ start:
 		uint atom_len = swap32(begin);
 		string s = string(start+4, start+8);
 		if (offset + atom_len <= current_mdat_->contentSize()) {
-			logg(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
+			loggF(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
 			addToExclude(offset, atom_len, true);
 			offset += atom_len;
 			goto start;
 		}
 		else {
-			logg(W, "NOT skipping ", s, " atom: ", atom_len, " (at ", offToStr(offset), ")\n");
+			loggF(W, "NOT skipping ", s, " atom: ", atom_len, " (at ", offToStr(offset), ")\n");
 		}
 	}
 
