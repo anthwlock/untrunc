@@ -239,6 +239,15 @@ void printArgs(std::ostream& os, const std::string& sep, const std::string& argN
 }
 
 
+#define dbgg(msg, ...) if (g_log_mode >= V) __dbgg(msg, #__VA_ARGS__, ##__VA_ARGS__)
+
+template <typename... Args>
+void __dbgg(const std::string& message, const std::string& argNames, Args... args) {
+	std::cout << message;
+	printArgs(std::cout, " ", argNames, args...);
+}
+
+
 #ifndef NDEBUG
 	#define assertt(Expr, ...) if (!(Expr)) __assertt(#Expr, __PRETTY_FUNCTION__, __FILE__, __LINE__, #__VA_ARGS__, ##__VA_ARGS__)
 #else
