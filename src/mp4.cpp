@@ -703,10 +703,10 @@ void Mp4::genTrackOrder() {
 	track_order_simple_ = findOrderSimple(order);
 
 	if (g_log_mode >= LogMode::V) {
-		logg("order ( ", order.size(), "): ");
+		_logg("order ( ", order.size(), "): ");
 		for (auto& p : order)
-			logg("(", p.first, ", ", p.second, ") ");
-		logg("\n");
+			_logg("(", p.first, ", ", p.second, ") ");
+		_logg("\n");
 	}
 	if (findOrder(order))
 		track_order_ = order;

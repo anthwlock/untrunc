@@ -353,7 +353,7 @@ void disableNoiseBuffer() {
 	auto off = s.find_first_of('\n');
 	if (off != std::string::npos)
 		s = s.substr(off);
-	logg("[[ ", total_omited, " bytes omitted, next ", s.size(), " bytes were buffered ]]\n");
+	_logg("[[ ", total_omited, " bytes omitted, next ", s.size(), " bytes were buffered ]]\n");
 	std::cout << s;
 //	cout << "---end_buf\n";
 	noise_buffer.str("");

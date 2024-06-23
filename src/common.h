@@ -62,8 +62,14 @@ std::string ss(Args&&... args){
 	return ss.str();
 }
 
+#define logg(lvl, ...) \
+	do { \
+	if (g_log_mode >= lvl) { _logg(lvl, __VA_ARGS__); } \
+	else if (lvl == W2) {g_num_w2++;} \
+	} while(0)
+
 template<class... Args>
-void logg(Args&&... args){
+void _logg(Args&&... args){
 //	(std::cout << ... << args); // Binary left fold (c++17)
 	UNFOLD_PARAM_PACK(args, std::cout);
 
@@ -71,11 +77,7 @@ void logg(Args&&... args){
 }
 
 template<class... Args>
-void logg(LogMode m, Args&&... x){
-	if (g_log_mode < m) {
-		if (m == W2) g_num_w2++;
-		return;
-	}
+void _logg(LogMode m, Args&&... x){
 	if (m == I)
 		std::cout << "Info: ";
 	else if (m == W || m == W2)
@@ -83,12 +85,12 @@ void logg(LogMode m, Args&&... x){
 	else if (m <= E) {
 		std::cout << "Error: ";
 		if (m == ET) {
-			logg(std::forward<Args>(x)...);
+			_logg(std::forward<Args>(x)...);
 			if (g_is_gui) throw std::runtime_error(ss(std::forward<Args>(x)...));
 			else exit(1);
 		}
 	}
-	logg(std::forward<Args>(x)...);
+	_logg(std::forward<Args>(x)...);
 }
 
 bool contains(const std::initializer_list<std::string>& c, const std::string& v);
