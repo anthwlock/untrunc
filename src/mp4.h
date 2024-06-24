@@ -50,6 +50,19 @@ std::ostream& operator<<(std::ostream& out, const WouldMatchCfg& cfg) {
 		"very_first=" << cfg.very_first;
 }
 
+struct FreeSeq {
+	off_t offset;  // relative
+	int64_t sz;
+	int prev_track_idx;
+	int64_t last_chunk_sz;
+
+    bool operator<(const FreeSeq& other) const {
+        return offset < other.offset;
+    }
+};
+
+std::ostream& operator<<(std::ostream& out, const FreeSeq& x);
+
 class Mp4 : public HasHeaderAtom {
 friend Track;
 friend Codec;
@@ -98,6 +111,10 @@ public:
 //	static const int pat_size_ = 64;
 	static const int pat_size_ = 32;
 	int idx_free_ = kDefaultFreeIdx;  // idx of dummy track
+
+	std::vector<FreeSeq> free_seqs_;  // for testing if 'free' is skippable
+	std::vector<FreeSeq> chooseFreeSeqs();
+	bool canSkipFree();
 
 	bool has_moov_ = false;
 

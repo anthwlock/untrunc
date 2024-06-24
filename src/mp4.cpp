@@ -672,6 +672,7 @@ void Mp4::resetChunkTransitions() {
 	tracks_.pop_back();
 	idx_free_ = kDefaultFreeIdx;
 	chunk_transitions_.clear();
+	free_seqs_.clear();
 
 	for (auto& t : tracks_) {
 		t.pad_after_chunk_ = -1;
@@ -716,6 +717,7 @@ void Mp4::genChunkTransitions() {
 					off_to_chunk_[relOff] = Mp4::Chunk(relOff, sz, idx_free_, 1);
 				}
 				tracks_[idx_free_].chunks_.emplace_back(last_end, sz, off - last_end);
+				free_seqs_.emplace_back(FreeSeq{relOff, sz, last_chunk.track_idx_, last_chunk.size_});
 
 				tracks_[last_chunk.track_idx_].adjustPadAfterChunk(sz);
 			}
@@ -952,42 +954,93 @@ void Mp4::dumpChunk(const Mp4::Chunk& chunk, int& idx, off_t* expected_off) {
 	idx += chunk.n_samples_;
 }
 
+std::ostream& operator<<(std::ostream& out, const FreeSeq& x) {
+	return out
+	<< "{"
+	<< g_mp4->getCodecName(x.prev_track_idx) << "_free "
+	<< "at " << hexIf(x.offset) << " "
+	<< "sz=" << x.sz << " "
+	<< "last_chunk_sz=" << x.last_chunk_sz
+	<< "}";
+}
+
+vector<FreeSeq> Mp4::chooseFreeSeqs() {
+	map<int, int> last_transition;
+	for (int i=0; i < free_seqs_.size(); i++) {
+		auto& x = free_seqs_[i];
+		last_transition[x.prev_track_idx] = i;
+	}
+
+	vector<int> idxsToDel;
+	for (const auto& pair : last_transition) {
+		idxsToDel.push_back(pair.second);
+	}
+	sort(idxsToDel.begin(), idxsToDel.end(), std::greater<int>());
+	dbgg("", vecToStr(idxsToDel));
+
+	for (int idx : idxsToDel) {
+		dbgg("Remoing free_seq ..", idx, free_seqs_[idx]);
+		free_seqs_.erase(free_seqs_.begin() + idx);
+	}
+
+	return choose100(free_seqs_);
+}
+
+bool Mp4::canSkipFree() {
+	vector<FreeSeq> free_seqs = chooseFreeSeqs();
+	logg(V, "chooseFreeSeqs:  ", free_seqs.size(), '\n');
+
+	for (auto& free_seq : free_seqs) {
+		off_t off = free_seq.offset, off_end = free_seq.offset + free_seq.sz;
+		string last_track_name = "<start>";
+		vector<off_t> possibleOffs;
+		if (free_seq.prev_track_idx >= 0) {
+			auto& t = tracks_[free_seq.prev_track_idx];
+			last_track_name = t.codec_.name_;
+			auto to_pad = t.alignPktLength(free_seq.last_chunk_sz) - free_seq.last_chunk_sz;
+			logg(V, "to_pad:", to_pad, "\n");
+			possibleOffs.emplace_back(off + to_pad);
+			if (t.pad_after_chunk_) {  // we dont know (here) if chunk was at end, so check both
+				possibleOffs.emplace_back(off + to_pad + t.pad_after_chunk_);
+			}
+		}
+		else {
+			possibleOffs.emplace_back(off);
+		}
+
+		bool found_ok = false;
+		for (auto off_i : possibleOffs) {
+			if (off_i == off_end) {found_ok=1; continue;}  // padding might was enough
+			advanceOffset(off_i, true);
+			if (off_i == off_end) {found_ok=1; continue;};
+		}
+		if (found_ok) continue;
+
+		logg(V, "canSkipFree ", last_track_name, "_free at ", offToStr(free_seq.offset), " failed: ", off_end, " not in ", vecToStr(possibleOffs), "\n");
+		return false;
+	}
+
+	return true;
+}
+
 void Mp4::setDummyIsSkippable() {
 	if (idx_free_ < 0) return;
 	auto& t = tracks_[idx_free_];
 	logg(V, "running setDummyIsSkippable() ... \n");
 
-	auto offsetChkWorks = [&]() {
-		vector<pair<off_t, off_t>> tests;
-	//	for (auto& c : t.chunks_) tests.emplace_back(c.off_, c.off_+c.size_);
-		for (auto& c : t.chunks_) tests.emplace_back(c.off_ - current_mdat_->contentStart(), c.off_+c.size_ - current_mdat_->contentStart());
-		auto chosen_tests = choose100(tests);
-		logg(V, "chosen_tests.size(): ", chosen_tests.size(), '\n');
-		for (auto& kv : tests) {
-			off_t off = kv.first, off_end = kv.second;
-			chkOffset(off);
-			last_track_idx_ = -1;
-	//		if (off != off_end) return false;
-			if (off != off_end) {
-				logg(V, "chkOffset failed: '", offToStr(off), "' != '", offToStr(off_end), "'\n");
-				return false;
-			}
-		}
-		return true;
-	};
-
-	if (offsetChkWorks()) {
-		logg(V, "yes, via chkOffset\n");
+	dummy_is_skippable_ = false;
+	if (canSkipFree()) {
+		logg(V, "yes, via canSkipFree\n");
 		dummy_is_skippable_ = true;
 	}
-	else if (t.dummyIsUsedAsPadding()) {
+	if (t.dummyIsUsedAsPadding()) {
 		logg(V, "yes, by using padding-skip strategy\n");
 		dummy_is_skippable_ = true;
 		dummy_do_padding_skip_ = true;
 	}
-	else {
+
+	if (!dummy_is_skippable_) {
 		logg(V, "no, seems not to be skippable\n");
-		dummy_is_skippable_ = false;
 	}
 }
 
