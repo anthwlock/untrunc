@@ -32,6 +32,8 @@ extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
     g_show_tracks, g_dont_write, g_use_chunk_stats, g_dont_exclude,
     g_dump_repaired, g_search_mdat, g_strict_nal_frame_check,
     g_ignore_forbidden_nal_bit, g_noise_buffer_active, g_dont_omit,
+    g_ignore_keyframe_mismatch,
+    g_skip_nal_filler_data,
     g_off_as_hex,
     g_fast_assert,
     g_ignore_out_of_bound_chunks, g_skip_existing, g_no_ctts, g_is_gui;

@@ -89,6 +89,7 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 				logg(V, "found filler data: ");
 				printBuffer(pos, 30);
 			}
+			if (g_skip_nal_filler_data) return length;
 			break;
 		default:
 			if(previous_slice.is_ok) {

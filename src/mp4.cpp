@@ -128,6 +128,20 @@ void Mp4::parseOk(const string& filename, bool accept_unhealthy) {
 	if (ftyp) {
 		ftyp_ = ftyp->getString(0, 4);
 		logg(V, "ftyp_ = '", ftyp_, "'\n");
+
+		auto minor_ver = ftyp->readInt(4);
+		if (minor_ver == 1) {
+			for (int i = 8; i < ftyp->content_.size(); i += 4) {
+				auto brand = ftyp->getString(i, 4);
+				if (brand == "CAEP") {  // e.g. 'Canon R5'
+					logg(V, "detected 'CAEP', deactivating 'g_strict_nal_frame_check'\n");
+					g_strict_nal_frame_check = false;
+					g_ignore_keyframe_mismatch = true;
+					g_skip_nal_filler_data = true;
+				}
+			}
+		}
+
 	}
 	else {
 		logg(V, "no 'ftyp' atom found\n");
@@ -1770,7 +1784,7 @@ FrameInfo::operator bool() const {
 
 bool operator==(const FrameInfo& a, const FrameInfo& b) {
 	return a.length_ == b.length_ && a.track_idx_ == b.track_idx_ &&
-	    a.keyframe_ == b.keyframe_;
+	    (a.keyframe_ == b.keyframe_ || g_ignore_keyframe_mismatch);
 //	    a.keyframe_ == b.keyframe_ && a.audio_duration_ == b.audio_duration_;
 
 }
