@@ -1509,11 +1509,6 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 		return m;
 	}
 
-	if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
-		int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
-		return FrameInfo(idx_free_, false, 0, offset, len);
-	}
-
 	return FrameInfo();
 }
 
@@ -1815,6 +1810,12 @@ bool operator!=(const Mp4::Chunk& a, const Mp4::Chunk& b) { return !(a == b); }
 
 
 int64_t Mp4::calcStep(off_t offset) {
+	if (idx_free_ > 0 && dummy_do_padding_skip_) {  // next chunk is probably padded with random data..
+		int len = tracks_[idx_free_].stepToNextOtherChunk(offset);
+		dbgg("calcStep: freeTrack.stepToNextOtherChunk:", offset, len);
+		if (len) return len;
+	}
+
 	int64_t step = numeric_limits<int64_t>::max();
 	if (g_use_chunk_stats) {
 		step = numeric_limits<int64_t>::max();

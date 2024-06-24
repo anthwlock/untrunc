@@ -623,26 +623,7 @@ int64_t Track::stepToNextOtherChunk(off_t off) {
 		     ", step: ", step, ", next: ", off + step, "\n");
 		return step;
 	}
-
-	if (!g_mp4->using_dyn_patterns_) return step;
-
-	if (g_mp4->hasUnclearTransitions(ownTrackIdx())) {
-		logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
-		     ", step: ", step, ", next: ", off + step, "  // unclear transition!\n");
-		return step;
-	}
-
-	for (int i=0; i < 5; i++) {
-		logg(V, "step:", step, "\n");
-		if (g_mp4->wouldMatch({off + step})) {
-			logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,
-			     ", step: ", step, ", next: ", off + step, "\n");
-			return step;
-		}
-		step += end_off_gcd_;
-	}
-	logg(V, "stepToNextOtherChunkOff(", off, "): from: ", codec_.name_,  " next: <nothing found>\n");
-	return 0;
+	return step;
 }
 
 bool Track::chunkMightBeAtAnd() {
