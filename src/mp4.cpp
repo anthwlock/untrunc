@@ -884,12 +884,6 @@ void Mp4::genDynPatterns() {
 }
 
 
-void Mp4::noteUnknownSequence(off_t offset) {
-	addToExclude(offset-unknown_length_, unknown_length_);
-	unknown_lengths_.emplace_back(unknown_length_);
-	unknown_length_ = 0;
-}
-
 void Mp4::addUnknownSequence(off_t start, uint64_t length) {
 	assert(length);
 	addToExclude(start, length);
@@ -1956,7 +1950,7 @@ bool Mp4::advanceOffset(off_t& offset, bool just_simulate) {
 
 		if ((skipped = skipAtomHeaders(offset, start))) {
 			if (!just_simulate) {
-				if (unknown_length_) noteUnknownSequence(offset);
+				chkUnknownSequenceEnded(offset);
 			}
 			continue;
 		}
@@ -1964,7 +1958,7 @@ bool Mp4::advanceOffset(off_t& offset, bool just_simulate) {
 		if ((skipped = skipAtoms(offset, start))) {
 			if (!just_simulate) {
 				atoms_skipped_.emplace_back(skipped);
-				if (unknown_length_) noteUnknownSequence(offset);
+				chkUnknownSequenceEnded(offset);
 			}
 			continue;
 		}
@@ -2068,11 +2062,9 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			logg(V, "found '", t.codec_.name_, "' chunk inside unknown sequence: ", chunk, "\n");
 			unknown_length_ += chunk.size_;
 		}
-		else if (unknown_length_) {
-			noteUnknownSequence(offset);
+		else if (chkUnknownSequenceEnded(offset)) {
 			logg(V, "found healthy chunk again: ", chunk, "\n");
 			correctChunkIdx(chunk.track_idx_);
-			disableNoiseBuffer();
 		}
 
 		onNewChunkStarted(chunk.track_idx_);
@@ -2121,11 +2113,9 @@ void Mp4::addMatch(off_t& offset, FrameInfo& match) {
 
 	if (use_offset_map_) chkFrameDetectionAt(match, offset);
 
-	if (unknown_length_) {
-		noteUnknownSequence(offset);
+	if (chkUnknownSequenceEnded(offset)) {
 		logg(V, "found healthy packet again: ", match, "\n");
 		correctChunkIdx(match.track_idx_);
-		disableNoiseBuffer();
 	}
 
 	if (!first_chunk_found_) onFirstChunkFound(match.track_idx_);

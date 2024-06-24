@@ -213,9 +213,19 @@ private:
 	bool anyPatternMatchesHalf(off_t offset, uint track_idx_to_try);
 	Mp4::Chunk fitChunk(off_t offset, uint track_idx, uint known_n_samples=0);
 
-	void noteUnknownSequence(off_t offset);
 	void addUnknownSequence(off_t start, uint64_t length);
 	void addToExclude(off_t start, uint64_t length, bool force=false);
+
+	bool chkUnknownSequenceEnded(off_t offset) {
+		if (!unknown_length_) return false;
+		disableNoiseBuffer();
+
+		addToExclude(offset-unknown_length_, unknown_length_);
+		unknown_lengths_.emplace_back(unknown_length_);
+		unknown_length_ = 0;
+
+		return true;
+	}
 
 	int64_t calcStep(off_t offset);
 
