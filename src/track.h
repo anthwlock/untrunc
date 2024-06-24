@@ -251,7 +251,7 @@ public:
 		Chunk(off_t off, int64_t size, int ns);
 		off_t off_ = 0;  // absolute offset
 		int64_t already_excluded_ = 0;
-		int64_t size_ = 0;
+		int64_t size_ = 0;  // only updated for 'free'
 		int n_samples_ = 0;
 	};
 
@@ -267,9 +267,12 @@ public:
 	double likely_samples_sizes_p = 0;
 	bool hasPredictableChunks();
 	bool shouldUseChunkPrediction();
-	int64_t chunk_distance_gcd_;
+	int64_t chunk_distance_gcd_;  // to next chunk of same track
+
+	// these offsets are absolute (to file begin)
 	int64_t start_off_gcd_;
-	int64_t end_off_gcd_;  // e.g. after free sequence
+	int64_t end_off_gcd_;  // sometimes 'free' sequences are used for padding to absolute n*32kb offsets
+
 	bool isChunkOffsetOk(off_t off);
 	int64_t stepToNextOwnChunk(off_t off);
 	int64_t stepToNextOwnChunkAbs(off_t off);
