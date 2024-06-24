@@ -257,6 +257,8 @@ public:
 
 	// we try to predict next track_idx with these
 	std::vector<std::vector<MutualPattern>> dyn_patterns_;  // track_idx -> MutualPatterns
+	int predictable_start_cnt_ = 0;
+	int unpredictable_start_cnt_ = 0;
 
 	std::vector<Chunk> chunks_;
 	std::vector<int> likely_n_samples_;  // per chunk

@@ -166,8 +166,18 @@ private:
 	std::vector<uint> atoms_skipped_;
 
 	uint64_t pkt_idx_ = 0;
-	int last_track_idx_ = -1;  // 0th track is most relialbale
+
+	// 0th track is most reliable
+	// is equal to idx_free_ in case of unknown bytes, not padding
+	int last_track_idx_ = -1;
+	bool done_padding_ = false;
 	bool done_padding_after_ = false;
+
+	void setLastTrackIdx(int track_idx) {
+		last_track_idx_ = track_idx;
+		done_padding_ = false;
+	}
+
 	std::vector<int64_t> unknown_lengths_;
 
 	std::string filename_ok_;
@@ -218,7 +228,17 @@ private:
 	FileRead& openFile(const std::string& filename);
 	FileRead* current_file_ = nullptr;
 
+	bool predictChunkViaOrder(off_t offset, Mp4::Chunk& c);
+	bool chunkStartLooksInvalid(off_t offset, const Mp4::Chunk& c);
 	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
+
+	int getNextTrackViaDynPatterns(off_t offset) {
+		int last_idx = done_padding_ && idx_free_ >= 0 ? idx_free_ : last_track_idx_;
+		auto track_idx = tracks_[last_idx].useDynPatterns(offset);
+		logg(V, "'", getCodecName(last_idx), "'.useDynPatterns() -> track_idx=", track_idx, "\n");
+		return track_idx;
+	}
+
 	void addMatch(off_t& offset, FrameInfo& match);
 	bool tryMatch(off_t& off);
 	bool tryChunkPrediction(off_t& off);
