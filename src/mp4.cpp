@@ -1044,7 +1044,7 @@ void Mp4::correctChunkIdx(int track_idx) {
 
 	// TODO: call correctChunkIdx once we know n_samples
 	//       ATM result could be wrong if 'chunk::ĺikely_n_samples_.size() > 1'
-	while (track_order_[chunk_idx_].first != track_idx) chunk_idx_++;
+	while (track_order_[next_chunk_idx_].first != track_idx) next_chunk_idx_++;
 
 	if (tracks_[track_idx].likely_n_samples_.size() > 1)
 		logg(W, "correctChunkIdx(", track_idx, ") could be wrong\n");
@@ -1057,7 +1057,7 @@ void Mp4::correctChunkIdxSimple(int track_idx) {
 
 	int off_ok = -1;
 	for (uint off=0; off < order_sz; off++) {
-		if (track_order_simple_[chunk_idx_+off % order_sz] == track_idx) {
+		if (track_order_simple_[next_chunk_idx_+off % order_sz] == track_idx) {
 			if (off_ok < 0) off_ok = off;
 			else {logg(W, "correctChunkIdxSimple(", track_idx, "): next chunk is ambiguous\n"); break;};
 		}
@@ -1067,7 +1067,7 @@ void Mp4::correctChunkIdxSimple(int track_idx) {
 
 	if (off_ok) {
 		logg(V, "correctChunkIdxSimple(", track_idx, "): skipping ", off_ok, "chunks\n\n");
-		chunk_idx_ += off_ok;
+		next_chunk_idx_ += off_ok;
 	}
 }
 
@@ -1310,7 +1310,7 @@ Track& Mp4::getTrack(const string& codec_name) {
 // currently only used to distinguish duplicate tracks (e.g. 2x mp4a)
 bool Mp4::isExpectedTrackIdx(int i) {
 	if (track_order_simple_.empty()) return true;
-	int expected_idx = track_order_simple_[chunk_idx_ % track_order_simple_.size()];
+	int expected_idx = track_order_simple_[next_chunk_idx_ % track_order_simple_.size()];
 	if (expected_idx == i) return true;
 
 	if (getCodecName(i) != getCodecName(expected_idx)) {
@@ -1561,7 +1561,7 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit, uint known_n_sampl
 }
 
 int Mp4::getLikelyNextTrackIdx(int* n_samples) {
-	auto p = track_order_[chunk_idx_ % track_order_.size()];
+	auto p = track_order_[next_chunk_idx_ % track_order_.size()];
 	if (n_samples) *n_samples = p.second;
 	return p.first;
 }
@@ -2032,7 +2032,7 @@ void Mp4::chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedCh
 		cout << "):\n";
 	};
 
-	cout << "bad detection (at " << offToStr(off) << ", chunk " << chunk_idx_ << ", pkt " << pkt_idx_;
+	cout << "bad detection (at " << offToStr(off) << ", chunk " << next_chunk_idx_ << ", pkt " << pkt_idx_;
 	coutExtraInfo();
 
 	if (detectedFramePtr) cout << "  detected: " << *detectedFramePtr << '\n';
@@ -2102,9 +2102,9 @@ string Mp4::offToStr(off_t offset) {
 void Mp4::onFirstChunkFound(int track_idx) {
 	if (track_idx == idx_free_) return;
 	first_chunk_found_ = true;
-	assert(chunk_idx_ == 0);
+	assert(next_chunk_idx_ == 0);
 	correctChunkIdxSimple(track_idx);
-	if (chunk_idx_)
+	if (next_chunk_idx_)
 		logg(W, "different start chunk: ", track_idx, " instead of ", track_order_simple_[0], "\n");
 }
 

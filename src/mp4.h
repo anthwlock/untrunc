@@ -280,7 +280,7 @@ private:
 	std::vector<std::pair<int, int>> track_order_;
 	std::vector<int> track_order_simple_;
 	bool trust_simple_track_order_ = false;
-	uint64_t chunk_idx_ = 0;  // does not count the 'free' track
+	uint64_t next_chunk_idx_ = 0;  // does not count the 'free' track
 	int getLikelyNextTrackIdx(int* n_samples=nullptr);
 	bool isTrackOrderEnough();
 	void genTrackOrder();
@@ -298,7 +298,7 @@ private:
 		done_padding_after_ = false;
 		if (new_track_idx != idx_free_) {
 			if (!first_chunk_found_) onFirstChunkFound(new_track_idx);
-			chunk_idx_++;
+			next_chunk_idx_++;
 		}
 	}
 
