@@ -672,6 +672,11 @@ void Mp4::resetChunkTransitions() {
 	tracks_.pop_back();
 	idx_free_ = kDefaultFreeIdx;
 	chunk_transitions_.clear();
+
+	for (auto& t : tracks_) {
+		t.pad_after_chunk_ = -1;
+		t.last_pad_after_chunk_ = -1;
+	}
 }
 
 void Mp4::genChunkTransitions() {
@@ -701,16 +706,23 @@ void Mp4::genChunkTransitions() {
 			}
 			assert(off >= last_end);
 			if (off != last_end) {
+				auto relOff = last_end - current_mdat_->contentStart();
+				auto sz = off - last_end;
+
 				chunk_transitions_[{last_chunk.track_idx_, idx_free_}].emplace_back(last_end);
-				tracks_[idx_free_].chunks_.emplace_back(last_end, off - last_end, off - last_end);
 				chunk_transitions_[{idx_free_, track_idx}].emplace_back(off);
+
+				tracks_[idx_free_].chunks_.emplace_back(last_end, sz, off - last_end);
+
+				tracks_[last_chunk.track_idx_].adjustPadAfterChunk(sz);
 			}
 			else {
 				chunk_transitions_[{last_chunk.track_idx_, track_idx}].emplace_back(off);
+				tracks_[last_chunk.track_idx_].adjustPadAfterChunk(0);
 			}
 		}
 
-        loop_end:
+		loop_end:
 		last_chunk = cur_chunk;
 	}
 
@@ -1487,7 +1499,7 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit, uint known_n_sampl
 	for (auto n_samples : t.likely_n_samples_) {
 		if (known_n_samples) n_samples = known_n_samples;
 		for (auto s_sz : t.likely_sample_sizes_) {
-			auto dst_off = offset + n_samples*s_sz;
+			auto dst_off = offset + n_samples*s_sz + t.pad_after_chunk_;
 			if (dst_off < current_mdat_->contentSize() && wouldMatch({dst_off, "", false, (int)track_idx_to_fit})) {
 				assert(n_samples > 0);
 				c = Chunk(offset, n_samples, track_idx_to_fit, s_sz);
@@ -1716,6 +1728,12 @@ bool Mp4::currentChunkIsDone() {
 
 int Mp4::getChunkPadding(off_t& offset) {
 	if (!currentChunkIsDone()) return 0;
+
+	if (last_track_idx_ != idx_free_ && tracks_[last_track_idx_].pad_after_chunk_ > 0 && !done_padding_after_) {
+		logg(V, "Applying pad_after_chunk_ ", getCodecName(last_track_idx_)," ", tracks_[last_track_idx_].pad_after_chunk_, "\n");
+		done_padding_after_ = true;
+		return tracks_[last_track_idx_].pad_after_chunk_;
+	}
 
 	if (track_order_.size()) {
 		int idx = getLikelyNextTrackIdx();
@@ -1949,11 +1967,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			disableNoiseBuffer();
 		}
 
-		pushBackLastChunk();
-		if (chunk.track_idx_ != idx_free_) {
-			if (!first_chunk_found_) onFirstChunkFound(chunk.track_idx_);
-			chunk_idx_++;
-		}
+		onNewChunkStarted(chunk.track_idx_);
 
 		t.current_chunk_ = chunk;
 		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
@@ -2007,14 +2021,13 @@ void Mp4::addMatch(off_t& offset, FrameInfo& match) {
 
 	if (!first_chunk_found_) onFirstChunkFound(match.track_idx_);
 	if (last_track_idx_ != match.track_idx_) {
-		if (match.track_idx_ != idx_free_) chunk_idx_++;
-		pushBackLastChunk();
+		onNewChunkStarted(match.track_idx_);
 		t.current_chunk_.off_ = offset;
 		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 	}
 
 	if (t.has_duplicates_ && t.chunkReachedSampleLimit()) {
-		pushBackLastChunk(); chunk_idx_++;
+		onNewChunkStarted(match.track_idx_);
 	}
 
 	addFrame(match);

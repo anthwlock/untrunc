@@ -231,6 +231,21 @@ public:
 		return alignPktLength(getSize(idx));
 	}
 
+	int pad_after_chunk_ = -1;
+	int last_pad_after_chunk_ = -1;  // helper so we can skip last chunk (padding might be different there)
+
+	void adjustPadAfterChunk(int new_pad) {
+		if (last_pad_after_chunk_ != -1) {
+			auto x = last_pad_after_chunk_;
+			if (pad_after_chunk_ == -1) {
+				pad_after_chunk_ = x;
+			} else if (pad_after_chunk_ != x) {
+				pad_after_chunk_ = 0;
+			}
+		}
+		last_pad_after_chunk_ = new_pad;
+	}
+
 	struct Chunk {
 		Chunk() = default;
 		Chunk(off_t off, int64_t size, int ns);

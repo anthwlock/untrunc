@@ -321,6 +321,7 @@ void Track::printStats() {
 		cout << "start_off_gcd_: " << start_off_gcd_ << '\n';
 		cout << "end_off_gcd_: " << end_off_gcd_ << '\n';
 		cout << "pkt_sz_gcd_: " << pkt_sz_gcd_ << '\n';
+		cout << "pad_after_chunk_: " << pad_after_chunk_ << '\n';
 
 		cout << "likely n_samples/chunk (p=" << likely_n_samples_p << "): ";
 		for (uint i=0; i < min(to_size_t(100), likely_n_samples_.size()); i++)

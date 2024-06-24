@@ -150,6 +150,7 @@ private:
 
 	uint64_t pkt_idx_ = 0;
 	int last_track_idx_ = -1;  // 0th track is most relialbale
+	bool done_padding_after_ = false;
 	std::vector<int64_t> unknown_lengths_;
 
 	std::string filename_ok_;
@@ -244,6 +245,15 @@ private:
 
 	int skipNextZeroCave(off_t off, int max_sz, int n_zeros);
 	void pushBackLastChunk();
+
+	void onNewChunkStarted(int new_track_idx) {
+		pushBackLastChunk();
+		done_padding_after_ = false;
+		if (new_track_idx != idx_free_) {
+			if (!first_chunk_found_) onFirstChunkFound(new_track_idx);
+			chunk_idx_++;
+		}
+	}
 
 	int twos_track_idx_ = -1;
 	bool using_dyn_patterns_ = false;
