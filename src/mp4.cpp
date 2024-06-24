@@ -895,7 +895,7 @@ void Mp4::genDynPatterns() {
 
 	for (auto& t: tracks_) {
 		t.genPatternPerm();
-		if (!has_zero_transitions_ && t.hasZeroTransitions()) has_zero_transitions_ = true;
+		has_zero_transitions_ = has_zero_transitions_ || t.hasZeroTransitions();
 	}
 	logg(V, "has_zero_transitions_: ", has_zero_transitions_, '\n');
 	using_dyn_patterns_ = true;
