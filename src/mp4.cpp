@@ -854,6 +854,10 @@ void Mp4::genTrackOrder() {
 	}
 	if (findOrder(order))
 		track_order_ = order;
+
+	for (auto& [i, n_samples] : order) {
+		cycle_size_ += tracks_[i].ss_stats_.averageSize() * n_samples;
+	}
 }
 
 buffs_t Mp4::offsToBuffs(const offs_t& offs, const string& load_prefix) {
@@ -1600,6 +1604,14 @@ int Mp4::calcFallbackTrackIdx() {
 // returns true in case we are sure
 bool Mp4::predictChunkViaOrder(off_t offset, Mp4::Chunk& c) {
 	if (!track_order_.size()) return 0;
+	if (amInFreeSequence()) return 0;
+	if (!currentChunkFinished()) {
+		if (!nearEnd(offset)) {
+			dbgg("ignoring track_order since !currentChunkFinished");
+			return 0;
+		}
+		dbgg("using track_order_ despite !currentChunkFinished since nearEnd", offset);
+	}
 
 	int n_samples;
 	int track_idx = getLikelyNextTrackIdx(&n_samples);

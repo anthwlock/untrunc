@@ -259,7 +259,15 @@ private:
 
 	bool predictChunkViaOrder(off_t offset, Mp4::Chunk& c);
 	bool chunkStartLooksInvalid(off_t offset, const Mp4::Chunk& c);
-	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
+	Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
+
+	bool nearEnd(off_t offset) {
+		return offset > (current_mdat_->contentSize() - cycle_size_);
+	}
+
+	bool amInFreeSequence() {
+		return last_track_idx_ == idx_free_;
+	}
 
 	bool currentChunkFinished(int add_extra=0) {
 		if (next_chunk_idx_ == 0) return true;
@@ -328,6 +336,7 @@ private:
 	std::vector<std::pair<int, int>> track_order_;
 	std::vector<int> track_order_simple_;
 	bool trust_simple_track_order_ = false;
+	int cycle_size_ = 0;  // (average) size of single track_order_ repetition
 	uint64_t next_chunk_idx_ = 0;  // does not count the 'free' track
 	int getLikelyNextTrackIdx(int* n_samples=nullptr);
 	bool isTrackOrderEnough();
