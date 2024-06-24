@@ -197,6 +197,7 @@ private:
 	FileRead* current_file_ = nullptr;
 
 	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
+	void addMatch(off_t& offset, FrameInfo& match);
 	bool tryMatch(off_t& off);
 	bool tryChunkPrediction(off_t& off);
 

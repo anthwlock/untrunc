@@ -1900,42 +1900,45 @@ void Mp4::onFirstChunkFound(int track_idx) {
 		logg(W, "different start chunk: ", track_idx, " instead of ", track_order_simple_[0], "\n");
 }
 
+void Mp4::addMatch(off_t& offset, FrameInfo& match) {
+	auto& t = tracks_[match.track_idx_];
+
+	if (use_offset_map_) chkFrameDetectionAt(match, offset);
+
+	if (unknown_length_) {
+		noteUnknownSequence(offset);
+		logg(V, "found healthy packet again: ", match, "\n");
+		correctChunkIdx(match.track_idx_);
+		disableNoiseBuffer();
+	}
+
+	if (!first_chunk_found_) onFirstChunkFound(match.track_idx_);
+	if (last_track_idx_ != match.track_idx_) {
+		if (match.track_idx_ != idx_free_) chunk_idx_++;
+		pushBackLastChunk();
+		t.current_chunk_.off_ = offset;
+		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
+	}
+
+	if (t.has_duplicates_ && t.chunkReachedSampleLimit()) {
+		pushBackLastChunk(); chunk_idx_++;
+	}
+
+	addFrame(match);
+
+	t.current_chunk_.n_samples_++;
+	logg(V, t.current_chunk_.n_samples_, "th sample in ", t.chunks_.size()+1, "th ", t.codec_.name_, "-chunk\n");
+	last_track_idx_ = match.track_idx_;
+	offset += match.length_;
+
+	pkt_idx_++;
+
+}
+
 bool Mp4::tryMatch(off_t& offset) {
 	FrameInfo match = getMatch(offset);
 	if (match) {
-		auto& t = tracks_[match.track_idx_];
-
-		if (use_offset_map_) chkFrameDetectionAt(match, offset);
-
-		if (unknown_length_) {
-			noteUnknownSequence(offset);
-			logg(V, "found healthy packet again: ", match, "\n");
-			correctChunkIdx(match.track_idx_);
-			disableNoiseBuffer();
-		}
-
-		if (!first_chunk_found_) onFirstChunkFound(match.track_idx_);
-		if (last_track_idx_ != match.track_idx_) {
-			if (match.track_idx_ != idx_free_) chunk_idx_++;
-			pushBackLastChunk();
-			t.current_chunk_.off_ = offset;
-			t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
-		}
-
-		if (t.has_duplicates_ && t.chunkReachedSampleLimit()) {
-			pushBackLastChunk(); chunk_idx_++;
-		}
-
-		addFrame(match);
-
-		t.current_chunk_.n_samples_++;
-		logg(V, t.current_chunk_.n_samples_, "th sample in ", t.chunks_.size()+1, "th ", t.codec_.name_, "-chunk\n");
-		last_track_idx_ = match.track_idx_;
-		offset += match.length_;
-
-		pkt_idx_++;
-
-
+		addMatch(offset, match);
 		return true;
 	}
 	return false;
