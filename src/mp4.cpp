@@ -712,6 +712,9 @@ void Mp4::genChunkTransitions() {
 				chunk_transitions_[{last_chunk.track_idx_, idx_free_}].emplace_back(last_end);
 				chunk_transitions_[{idx_free_, track_idx}].emplace_back(off);
 
+				if (use_offset_map_) {
+					off_to_chunk_[relOff] = Mp4::Chunk(relOff, sz, idx_free_, 1);
+				}
 				tracks_[idx_free_].chunks_.emplace_back(last_end, sz, off - last_end);
 
 				tracks_[last_chunk.track_idx_].adjustPadAfterChunk(sz);
@@ -1937,9 +1940,9 @@ void Mp4::chkDetectionAtImpl(FrameInfo* detectedFramePtr, Mp4::Chunk* detectedCh
 	else if (detectedChunkPtr) cout << "  detected: " << *detectedChunkPtr << '\n';
 	else cout << "  detected: (none)\n";
 
-	if (correctFrameFound) cout << "  correct: " << correctFrameIt->second << '\n';
-	else if (correctChunkFound) cout << "  correct: " << correctChunkIt->second << '\n';
-	else cout << "  correct: (none)\n";
+	if (correctFrameFound) cout << "  correct:  " << correctFrameIt->second << '\n';
+	else if (correctChunkFound) cout << "  correct:  " << correctChunkIt->second << '\n';
+	else cout << "   correct: (none)\n";
 
 	hitEnterToContinue();
 }
@@ -2097,6 +2100,10 @@ void Mp4::repair(const string& filename) {
 	if (chkBadFFmpegVersion()) {
 		return;
 	}
+
+	use_offset_map_ = use_offset_map_ || filename == filename_ok_;
+	if (use_offset_map_) analyze(true);
+
 	if (needDynStats()) {
 		g_use_chunk_stats = true;
 		genDynStats();
@@ -2136,9 +2143,6 @@ void Mp4::repair(const string& filename) {
 		broken_is_64_ = true;
 		logg(I, "using 64-bit offsets for the broken file\n");
 	}
-
-	use_offset_map_ = use_offset_map_ || filename == filename_ok_;
-	if (use_offset_map_) analyze(true);
 
 	duration_ = 0;
 	for(uint i=0; i < tracks_.size(); i++)
