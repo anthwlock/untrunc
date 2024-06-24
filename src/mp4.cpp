@@ -1362,7 +1362,7 @@ bool Mp4::pointsToZeros(off_t off) {
 bool Mp4::shouldBeStrict(off_t off, int track_idx) {
 	auto& t = tracks_[track_idx];
 	if (!unknown_length_ || !t.isSupported()) return false;
-	if (!g_use_chunk_stats || !tracks_.back().is_dummy_ || !t.chunkMightBeAtAnd() || !t.isChunkOffsetOk(off)) return true;
+	if (!g_use_chunk_stats || !tracks_.back().is_dummy_ || !t.chunkProbablyAtAnd() || !t.isChunkOffsetOk(off)) return true;
 
 	assert(last_track_idx_ == idx_free_);
 	auto buff = getBuffAround(off, Mp4::pat_size_);
@@ -1861,7 +1861,7 @@ bool Mp4::currentChunkIsDone() {
 	return
 		g_use_chunk_stats &&
 		last_track_idx_ >= 0 &&
-		tracks_[last_track_idx_].chunkMightBeAtAnd();
+		tracks_[last_track_idx_].chunkProbablyAtAnd();
 }
 
 int Mp4::getChunkPadding(off_t& offset) {
@@ -2125,7 +2125,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 
 bool Mp4::shouldPreferChunkPrediction() {
 	return g_use_chunk_stats &&
-	            ((last_track_idx_ >= 0 && tracks_[last_track_idx_].chunkMightBeAtAnd()) ||
+	            ((last_track_idx_ >= 0 && tracks_[last_track_idx_].chunkProbablyAtAnd()) ||
 	            (last_track_idx_ == -1 && orig_first_track_->shouldUseChunkPrediction())
 	            );
 }

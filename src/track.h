@@ -281,7 +281,7 @@ public:
 	bool dummyIsUsedAsPadding();
 
 	Track::Chunk current_chunk_;
-	bool chunkMightBeAtAnd();
+	bool chunkProbablyAtAnd();
 
 	void printStats();
 	void printDynPatterns(bool show_percentage=false);

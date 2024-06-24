@@ -626,8 +626,8 @@ int64_t Track::stepToNextOtherChunk(off_t off) {
 	return step;
 }
 
-bool Track::chunkMightBeAtAnd() {
-	if (!current_chunk_.n_samples_ || likely_n_samples_p < 0.7) return true;
+bool Track::chunkProbablyAtAnd() {
+	if (!current_chunk_.n_samples_ || likely_n_samples_p < 0.7) return false;
 	for (auto n : likely_n_samples_) if (current_chunk_.n_samples_ == n) return true;
 	return false;
 }
