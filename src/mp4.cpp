@@ -1040,11 +1040,14 @@ void Mp4::setDummyIsSkippable() {
 
 void Mp4::correctChunkIdx(int track_idx) {
 	assert(track_idx >= 0 && track_idx != idx_free_);
-	if (!track_order_.size()) return;
+	if (!track_order_.size()) {
+		correctChunkIdxSimple(track_idx);
+		return;
+	}
 
 	// TODO: call correctChunkIdx once we know n_samples
 	//       ATM result could be wrong if 'chunk::ĺikely_n_samples_.size() > 1'
-	while (track_order_[next_chunk_idx_].first != track_idx) next_chunk_idx_++;
+	while (track_order_[next_chunk_idx_ % track_order_.size()].first != track_idx) next_chunk_idx_++;
 
 	if (tracks_[track_idx].likely_n_samples_.size() > 1)
 		logg(W, "correctChunkIdx(", track_idx, ") could be wrong\n");
@@ -1315,7 +1318,7 @@ bool Mp4::isExpectedTrackIdx(int i) {
 
 	if (getCodecName(i) != getCodecName(expected_idx)) {
 		logg(W, "expected codec ", getCodecName(expected_idx), " but found ",  getCodecName(i), "\n");
-		correctChunkIdxSimple(i);
+		correctChunkIdx(i);
 		return true;
 	}
 	return false;
@@ -2103,7 +2106,7 @@ void Mp4::onFirstChunkFound(int track_idx) {
 	if (track_idx == idx_free_) return;
 	first_chunk_found_ = true;
 	assert(next_chunk_idx_ == 0);
-	correctChunkIdxSimple(track_idx);
+	correctChunkIdx(track_idx);
 	if (next_chunk_idx_)
 		logg(W, "different start chunk: ", track_idx, " instead of ", track_order_simple_[0], "\n");
 }
