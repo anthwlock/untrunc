@@ -80,6 +80,8 @@ void Mp4::parseHealthy() {
 		return certainty[a.codec_.name_] > certainty[b.codec_.name_];
 	});
 
+	afterTrackRealloc();
+
 	if (hasCodec("fdsc") && hasCodec("avc1"))
 		getTrack("avc1").codec_.strictness_lvl_ = 1;
 
@@ -750,6 +752,8 @@ void Mp4::genChunkTransitions() {
 		idx_free_ = kDefaultFreeIdx;
 		logg(V, "removed dummy track 'free'\n");
 	}
+
+	afterTrackRealloc();
 }
 
 struct TrackGcdInfo {

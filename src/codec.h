@@ -10,17 +10,20 @@ extern "C" {
 
 #include "common.h"
 
+#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(59, 27, 0)
+#define nb_channels(x) x->ch_layout.nb_channels
+#else
+#define nb_channels(x) x->channels
+#endif
+
 class AVCodecContext;
 class AVCodecParameters;
 
 class Atom;
 class AvcConfig;
 
-#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(59, 27, 0)
-#define nb_channels(x) x->ch_layout.nb_channels
-#else
-#define nb_channels(x) x->channels
-#endif
+struct SampleSizeStats;
+struct Track;
 
 class Codec {
 public:
@@ -48,6 +51,12 @@ public:
 	bool matchSampleStrict(const uchar* start);
 	uint strictness_lvl_ = 0;
 	off_t cur_off_ = 0;
+
+	SampleSizeStats *ss_stats_ = NULL;  // set by onTrackRealloc
+	int track_idx_ = -1;
+	Track* getTrack();
+
+	void onTrackRealloc(int track_idx_);
 
 	bool isSupported();
 	const uchar* loadAfter(off_t offset);

@@ -242,6 +242,12 @@ private:
 	bool chunkStartLooksInvalid(off_t offset, const Mp4::Chunk& c);
 	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
 
+	void afterTrackRealloc() {
+		for (int i=0; i < tracks_.size(); i++) {
+			tracks_[i].codec_.onTrackRealloc(i);
+		}
+	}
+
 	int getNextTrackViaDynPatterns(off_t offset) {
 		int last_idx = done_padding_ && idx_free_ >= 0 ? idx_free_ : last_track_idx_;
 		auto track_idx = tracks_[last_idx].useDynPatterns(offset);

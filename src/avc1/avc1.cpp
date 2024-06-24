@@ -98,6 +98,11 @@ int getSizeAvc1(Codec* self, const uchar* start, uint maxlength) {
 			}
 			break;
 		}
+
+		if (self->ss_stats_->wouldExceed("avc1", length, nal_info.length_, self->was_keyframe_)) {
+			return length;
+		}
+
 		pos += nal_info.length_;
 		length += nal_info.length_;
 		maxlength -= nal_info.length_;

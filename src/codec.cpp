@@ -65,6 +65,19 @@ void Codec::initOnce() {
 	}
 }
 
+Track* Codec::getTrack() {
+	assert(track_idx_ >= 0, track_idx_);
+	auto r = &g_mp4->tracks_[track_idx_];
+	assert(r->codec_.name_ == name_, track_idx_, r->codec_.name_, name_);
+	return r;
+}
+
+void Codec::onTrackRealloc(int track_idx) {
+	track_idx_ = track_idx;
+	auto t = getTrack();
+	ss_stats_ = &t->ss_stats_;  // hopefully Track t does not reallocate anymore
+}
+
 
 void Codec::parseOk(Atom *trak) {
 	Atom *stsd = trak->atomByName("stsd");
