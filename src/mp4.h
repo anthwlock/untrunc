@@ -139,6 +139,26 @@ public:
 	bool isExpectedTrackIdx(int i);
 	void onFirstChunkFound(int track_idx);
 	void correctChunkIdxSimple(int track_idx);
+
+	// Note: An backtrack algo across multiple (e.g. track_order.size()) matches would be better than this, since it would work even if currentChunkFinished + we wouldn't have to check upfront
+	int findSizeWithContinuation(off_t off, std::vector<int> sizes) {
+		if (!track_order_.size() || currentChunkFinished(1)) {
+			return sizes.back();
+		}
+		auto& t = tracks_[last_track_idx_];
+		for (int i = sizes.size() - 1; i >= 0; --i) {
+			auto sz = t.alignPktLength(sizes[i]);
+			const uchar *buf = current_mdat_->getFragmentIf(off + sz, 1024);
+			if (!buf) continue;
+			bool matches = t.codec_.matchSample(buf);
+			dbgg("findSizeWithContinuation", i, sizes[i], matches);
+			if (matches) {
+				return sizes[i];
+			}
+		}
+		return sizes.back();
+	}
+
 private:
 	Atom *root_atom_ = nullptr;
 	static BufferedAtom* mdatFromRange(FileRead& file_read, BufferedAtom& mdat);
@@ -231,7 +251,6 @@ private:
 
 	const std::vector<std::string> ignore_duration_ = {"tmcd", "fdsc"};
 
-	const uchar* current_fragment_;
 	uint current_maxlength_;
 	BufferedAtom* current_mdat_ = nullptr;
 
@@ -241,6 +260,18 @@ private:
 	bool predictChunkViaOrder(off_t offset, Mp4::Chunk& c);
 	bool chunkStartLooksInvalid(off_t offset, const Mp4::Chunk& c);
 	Mp4::Chunk getChunkPrediction(off_t offset, bool only_perfect_fit=false);
+
+	bool currentChunkFinished(int add_extra=0) {
+		if (next_chunk_idx_ == 0) return true;
+		auto [cur_track_idx, expected_ns] = track_order_[(next_chunk_idx_-1) % track_order_.size()];
+		assert(cur_track_idx == last_track_idx_);
+		auto& t = tracks_[cur_track_idx];
+		if (t.current_chunk_.n_samples_ + add_extra < expected_ns) {
+			dbgg("current_chunk not finished", next_chunk_idx_, t.codec_.name_, t.current_chunk_.n_samples_, expected_ns);
+			return false;
+		}
+		return true;
+	}
 
 	void afterTrackRealloc() {
 		for (int i=0; i < tracks_.size(); i++) {
@@ -258,6 +289,17 @@ private:
 	void addMatch(off_t& offset, FrameInfo& match);
 	bool tryMatch(off_t& off);
 	bool tryChunkPrediction(off_t& off);
+
+	bool tryAll(off_t& offset) {
+		if (shouldPreferChunkPrediction()) {
+			logg(V, "trying chunkPredict first.. \n");
+			if (tryChunkPrediction(offset) || tryMatch(offset)) return true;
+		}
+		else {
+			if (tryMatch(offset) || tryChunkPrediction(offset)) return true;
+		}
+		return false;
+	}
 
 	void printOffset(off_t offset);
 

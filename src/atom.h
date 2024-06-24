@@ -78,6 +78,12 @@ public:
 
 	int64_t contentSize() const { return file_end_ - contentStart(); }
 	const uchar *getFragment(off_t offset, int size);
+
+	const uchar *getFragmentIf(off_t offset, int size) {
+		if (offset + size > contentSize()) return NULL;
+		return file_read_.getFragment(contentStart() + offset, size);
+	}
+
 	uint readInt(off_t offset);
 	int newHeaderSize() { return needs64bitVersion() ? 16 : 8; }
 	bool needs64bitVersion();

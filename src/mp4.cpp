@@ -1297,7 +1297,7 @@ const uchar* Mp4::loadFragment(off_t offset, bool update_cur_maxlen) {
 	if (update_cur_maxlen)
 		current_maxlength_ = min((int64_t) max_part_size_, current_mdat_->contentSize() - offset);
 	auto buf_sz = min((int64_t) g_max_buf_sz_needed, current_mdat_->contentSize() - offset);
-	return current_fragment_ = current_mdat_->getFragment(offset, buf_sz);
+	return current_mdat_->getFragment(offset, buf_sz);
 }
 
 bool Mp4::hasCodec(const string& codec_name) {
@@ -2297,18 +2297,7 @@ void Mp4::repair(const string& filename) {
 	}
 
 	while (chkOffset(offset)) {
-		if (shouldPreferChunkPrediction()) {
-			logg(V, "trying chunkPredict first.. \n");
-			if (tryChunkPrediction(offset) || tryMatch(offset)) continue;
-		}
-		else {
-			if (tryMatch(offset) || tryChunkPrediction(offset)) continue;
-		}
-
-		if (!unknown_length_) {
-			pushBackLastChunk();
-			setLastTrackIdx(idx_free_);
-		}
+		if (tryAll(offset)) continue;
 
 		if (!unknown_length_) {
 			pushBackLastChunk();
