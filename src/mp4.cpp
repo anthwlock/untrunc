@@ -2075,10 +2075,11 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 		t.current_chunk_ = chunk;
 		t.current_chunk_.already_excluded_ = current_mdat_->total_excluded_yet_;
 
-		if (!t.is_dummy_) addChunk(chunk);
+		if (!t.is_dummy_) {
+			addChunk(chunk);
+			pkt_idx_ += chunk.n_samples_;
+		}
 
-		last_track_idx_ = chunk.track_idx_;
-		pkt_idx_ += chunk.n_samples_;
 		assert(chunk.size_ >= 0);
 		offset += chunk.size_;
 
@@ -2132,7 +2133,10 @@ void Mp4::addMatch(off_t& offset, FrameInfo& match) {
 		onNewChunkStarted(match.track_idx_);
 	}
 
-	addFrame(match);
+	if (!t.is_dummy_) {
+		addFrame(match);
+		pkt_idx_++;
+	}
 
 	t.current_chunk_.n_samples_++;
 	logg(V, t.current_chunk_.n_samples_, "th sample in ", t.chunks_.size()+1, "th ", t.codec_.name_, "-chunk\n");
@@ -2143,9 +2147,6 @@ void Mp4::addMatch(off_t& offset, FrameInfo& match) {
 		offset += match.pad_afterwards_;
 		done_padding_ = true;
 	}
-
-	pkt_idx_++;
-
 }
 
 bool Mp4::tryMatch(off_t& offset) {
@@ -2284,6 +2285,11 @@ void Mp4::repair(const string& filename) {
 		}
 		else {
 			if (tryMatch(offset) || tryChunkPrediction(offset)) continue;
+		}
+
+		if (!unknown_length_) {
+			pushBackLastChunk();
+			setLastTrackIdx(idx_free_);
 		}
 
 		if (!unknown_length_) {
