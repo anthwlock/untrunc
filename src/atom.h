@@ -91,6 +91,12 @@ public:
 	std::vector<std::pair<off_t, uint64_t>> sequences_to_exclude_;  // from resulting mdat
 	int64_t total_excluded_yet_ = 0;
 
+	off_t excludedEndOff() {
+		if (sequences_to_exclude_.empty()) return 0;
+		auto [last_start, last_length] = sequences_to_exclude_.back();
+		return last_start + last_length;
+	}
+
 	void write(FileWrite &file, bool force_64=false);
 
 	void updateFileEnd(int64_t file_end);

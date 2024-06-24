@@ -247,6 +247,17 @@ private:
 		return true;
 	}
 
+	// Use if previous subroutine may have called addToExclude already
+	void chkExcludeOverlap(off_t& start, int64_t& length) {
+		auto last_end = (long long)current_mdat_->excludedEndOff();
+		auto already_skipped = std::max(0LL, last_end - start);
+		if (already_skipped) {
+			start = last_end;
+			length -= already_skipped;
+		}
+		assert(length >= 0, length);
+	}
+
 	int64_t calcStep(off_t offset);
 
 	const std::vector<std::string> ignore_duration_ = {"tmcd", "fdsc"};

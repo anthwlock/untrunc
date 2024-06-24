@@ -914,8 +914,11 @@ void Mp4::addUnknownSequence(off_t start, uint64_t length) {
 
 void Mp4::addToExclude(off_t start, uint64_t length, bool force) {
 	if (g_dont_exclude && !force) return;
-	assert(!current_mdat_->sequences_to_exclude_.size() ||
-	       start > current_mdat_->sequences_to_exclude_.back().first);
+	if (current_mdat_->sequences_to_exclude_.size()) {
+		auto [last_start, last_length] = current_mdat_->sequences_to_exclude_.back();
+		off_t last_end = last_start + last_length;
+		assert(start >= last_end, start, last_end, last_start, last_length, start, length);
+	}
 
 	if (start + length > to_uint64(current_mdat_->contentSize())) {
 		logg(V, start, " + ", length, " > ", current_mdat_->contentSize(), "\n");
@@ -2019,6 +2022,7 @@ bool Mp4::chkOffset(off_t& offset) {
 	auto skipped = offset - orig_off;
 	if (skipped && !unknown_length_) {
 		dbgg("chkOffset ", skipped);
+		chkExcludeOverlap(orig_off, skipped);
 		addToExclude(orig_off, skipped);
 	}
 	return r;
