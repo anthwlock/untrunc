@@ -213,12 +213,23 @@ public:
 	void saveSampleSizes();
 	void saveChunkOffsets();
 	void saveCompositionOffsets();
+	void mergeChunks();
+	void splitChunks();
 
 	bool isChunkTrack();
 
 	std::string getCodecNameSlow();
 
 	SampleSizeStats ss_stats_;
+
+	int pkt_sz_gcd_ = 1;
+	int alignPktLength(int length) {
+		length += (pkt_sz_gcd_ - (length % pkt_sz_gcd_)) % pkt_sz_gcd_;
+		return length;
+	}
+	int getSizeWithGcd(size_t idx) {
+		return alignPktLength(getSize(idx));
+	}
 
 	struct Chunk {
 		Chunk() = default;

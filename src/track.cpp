@@ -320,6 +320,7 @@ void Track::printStats() {
 		cout << "chunk_distance_gcd_: " << chunk_distance_gcd_ << '\n';
 		cout << "start_off_gcd_: " << start_off_gcd_ << '\n';
 		cout << "end_off_gcd_: " << end_off_gcd_ << '\n';
+		cout << "pkt_sz_gcd_: " << pkt_sz_gcd_ << '\n';
 
 		cout << "likely n_samples/chunk (p=" << likely_n_samples_p << "): ";
 		for (uint i=0; i < min(to_size_t(100), likely_n_samples_.size()); i++)
@@ -767,6 +768,53 @@ int Track::useDynPatterns(off_t offset) {
 	return -1;
 }
 
+void Track::mergeChunks() {
+	vector<Track::Chunk> orig_chunks;
+	swap(orig_chunks, chunks_);
+
+	size_t sample_idx = 0;
+	auto chunkSize = [&](Chunk c){
+		int64_t sz = 0;
+		for (int i=0; i < c.n_samples_; i++) sz += getSizeWithGcd(sample_idx++);
+		return sz;
+	};
+
+	auto& c1 = orig_chunks[0];
+	c1.size_ = chunkSize(c1);
+	for (uint i=0; i+1 < orig_chunks.size(); i++) {
+		auto& c2 = orig_chunks[i+1];
+		c2.size_ = chunkSize(c2);
+		if (c1.off_ + c1.size_ == c2.off_) {
+			c1.size_ += c2.size_;
+			c1.n_samples_ += c2.n_samples_;
+		}
+		else {
+			chunks_.emplace_back(c1);
+			c1 = c2;
+		}
+	}
+	chunks_.push_back(c1);
+}
+
+void Track::splitChunks() {
+	logg(V, "splitChunks() .. \n");
+	vector<Track::Chunk> orig_chunks;
+	swap(orig_chunks, chunks_);
+
+	size_t pkt_idx = 0;
+	for (uint i=0; i < orig_chunks.size(); i++) {
+		auto& c = orig_chunks[i];
+		auto off = c.off_;
+		for (uint j=0; j < c.n_samples_; j++) {
+			auto sz = getSize(pkt_idx++);
+			chunks_.emplace_back(Track::Chunk(off, sz, 1));
+			if (g_dont_exclude)
+				sz = alignPktLength(sz);
+			off += sz;
+		}
+	}
+}
+
 void Track::genChunkSizes() {
 	if (!chunks_.size())
 		throw logic_error(ss("healthy file has a '", codec_.name_,
@@ -774,31 +822,7 @@ void Track::genChunkSizes() {
 	assert(chunks_[0].n_samples_ >= 1);
 
 	if (chunks_[0].n_samples_ == 1) {  // really? better check..
-		vector<Track::Chunk> orig_chunks;
-		swap(orig_chunks, chunks_);
-
-		size_t sample_idx = 0;
-		auto chunkSize = [&](Chunk c){
-			int64_t sz = 0;
-			for (int i=0; i < c.n_samples_; i++) sz += getSize(sample_idx++);
-			return sz;
-		};
-
-		auto& c1 = orig_chunks[0];
-		c1.size_ = chunkSize(c1);
-		for (uint i=0; i+1 < orig_chunks.size(); i++) {
-			auto& c2 = orig_chunks[i+1];
-			c2.size_ = chunkSize(c2);
-			if (c1.off_ + c1.size_ == c2.off_) {
-				c1.size_ += c2.size_;
-				c1.n_samples_ += c2.n_samples_;
-			}
-			else {
-				chunks_.emplace_back(c1);
-				c1 = c2;
-			}
-		}
-		chunks_.push_back(c1);
+		mergeChunks();
 	}
 	else if (chunks_[0].size_ < 0) {  // chunk sizes not yet generated
 		int sample_idx = 0;

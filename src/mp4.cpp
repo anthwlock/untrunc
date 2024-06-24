@@ -444,6 +444,9 @@ void Mp4::saveVideo(const string& filename) {
 
 	for(Track& track : tracks_) {
 		track.applyExcludedToOffs();
+		if (track.pkt_sz_gcd_ > 1 && g_dont_exclude) {
+			track.splitChunks();
+		}
 		track.writeToAtoms(broken_is_64_);
 
 		auto& cn = track.codec_.name_;
@@ -665,6 +668,12 @@ void Mp4::genChunks() {
 	for (auto& t : tracks_) t.genChunkSizes();
 }
 
+void Mp4::resetChunkTransitions() {
+	tracks_.pop_back();
+	idx_free_ = kDefaultFreeIdx;
+	chunk_transitions_.clear();
+}
+
 void Mp4::genChunkTransitions() {
 	ChunkIt::Chunk last_chunk;
 
@@ -709,6 +718,84 @@ void Mp4::genChunkTransitions() {
 		tracks_.pop_back();
 		idx_free_ = kDefaultFreeIdx;
 		logg(V, "removed dummy track 'free'\n");
+	}
+}
+
+struct TrackGcdInfo {
+	int prev_pkt_idx = -1;
+	int combined_size_gcd = -1;
+	int cnt = 0;
+
+	void adjustGcd(size_t combined_sz) {
+		cnt++;
+		if (combined_size_gcd == -1) {
+			combined_size_gcd = combined_sz;
+		}
+		else {
+			combined_size_gcd = gcd(combined_size_gcd, combined_sz);
+		}
+	}
+};
+
+// Find tracks that seem to pad their packet's sizes (e.g. always n*8)
+void Mp4::collectPktGcdInfo(map<int, TrackGcdInfo> &track_to_info) {
+	ChunkIt::Chunk last_real;
+	int last_padding = 0;
+
+	for (auto& cur_chunk : AllChunksIn(this, false, false)) {
+		auto track_idx = cur_chunk.track_idx_;
+		auto off = cur_chunk.off_;
+
+		if (track_idx == idx_free_) {
+			last_padding = cur_chunk.size_;
+			continue;
+		}
+
+		auto &t = tracks_[cur_chunk.track_idx_];
+		if (t.isChunkTrack()) {
+			last_real = cur_chunk;
+			continue;
+		}
+
+		auto &info = track_to_info[cur_chunk.track_idx_];
+
+		if (last_real.track_idx_ == cur_chunk.track_idx_ && last_padding) {
+			size_t combined_sz = t.getSize(info.prev_pkt_idx++) + last_padding;
+			info.adjustGcd(combined_sz);
+		}
+		else {
+			info.prev_pkt_idx++;
+		}
+
+		last_padding = 0;
+
+		for (int i=0; i < cur_chunk.n_samples_-1; i++) {
+			info.adjustGcd(t.getSize(info.prev_pkt_idx++));
+		}
+
+		last_real = cur_chunk;
+	}
+}
+
+void Mp4::analyzeFree() {
+	if (idx_free_ == kDefaultFreeIdx) return;
+
+	map<int, TrackGcdInfo> track_to_info;
+	collectPktGcdInfo(track_to_info);
+
+	bool doneMerge = false;
+	for (const auto& [idx, info] : track_to_info) {
+		if (info.cnt < 3) continue;
+		if (info.combined_size_gcd <= 1) continue;
+		logg(V, "found pkt_sz_gcd_: ", getCodecName(idx), " ", info.combined_size_gcd, "\n");
+		tracks_[idx].pkt_sz_gcd_ = info.combined_size_gcd;
+		tracks_[idx].mergeChunks();
+		doneMerge = true;
+	}
+
+	if (doneMerge) {
+		resetChunkTransitions();
+		genChunkTransitions();
 	}
 }
 
@@ -972,6 +1059,8 @@ void Mp4::genDynStats(bool force_patterns) {
 	genChunks();
 
 	genChunkTransitions();
+	analyzeFree();
+
 	genTrackOrder();
 	genLikelyAll();
 
@@ -1296,6 +1385,10 @@ FrameInfo Mp4::predictSize(const uchar *start, int track_idx, off_t offset) {
 
 	if (c.name_ == "jpeg" && track.end_off_gcd_) {
 		r.length_ += track.stepToNextOtherChunk(offset + length);
+	}
+	else if (track.pkt_sz_gcd_ > 1) {
+		r.pad_afterwards_ = (track.pkt_sz_gcd_ - (length % track.pkt_sz_gcd_)) % track.pkt_sz_gcd_;
+		logg(V, "r.pad_afterwards_: ", r.pad_afterwards_, "\n");
 	}
 
 	return r;
@@ -1930,6 +2023,11 @@ void Mp4::addMatch(off_t& offset, FrameInfo& match) {
 	logg(V, t.current_chunk_.n_samples_, "th sample in ", t.chunks_.size()+1, "th ", t.codec_.name_, "-chunk\n");
 	last_track_idx_ = match.track_idx_;
 	offset += match.length_;
+
+	if (match.pad_afterwards_) {
+		addToExclude(offset, match.pad_afterwards_);
+		offset += match.pad_afterwards_;
+	}
 
 	pkt_idx_++;
 

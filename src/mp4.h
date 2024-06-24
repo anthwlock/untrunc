@@ -32,6 +32,7 @@ class FileRead;
 class AVFormatContext;
 class FrameInfo;
 class ChunkIt;
+struct TrackGcdInfo;
 
 struct WouldMatchCfg {
 	off_t offset;
@@ -166,7 +167,10 @@ private:
 
 	void genDynStats(bool force_patterns=false);
 	void genChunks();
+	void resetChunkTransitions();
 	void genChunkTransitions();
+	void collectPktGcdInfo(std::map<int, TrackGcdInfo> &track_to_info);
+	void analyzeFree();
 	void genDynPatterns();
 	void genLikelyAll();
 	off_t first_off_rel_ = -1;  // relative to mdat
@@ -269,10 +273,11 @@ public:
 	const Mp4* mp4_;
 	ChunkIt::Chunk current_;
 
-	ChunkIt(const Mp4* mp4, bool do_filter) : mp4_(mp4), do_filter_(do_filter) {
+	ChunkIt(const Mp4* mp4, bool do_filter, bool exclude_dummy) : mp4_(mp4), do_filter_(do_filter) {
 		int n_real_tracks = mp4_->tracks_.size();
-		if (mp4_->tracks_.back().is_dummy_) n_real_tracks--;
-		cur_chunk_idx_.resize(n_real_tracks);
+		if (exclude_dummy)
+			if (mp4_->tracks_.back().is_dummy_) n_real_tracks--;
+		cur_next_chunk_idx_.resize(n_real_tracks);
 		mdat_end_ = mp4_->current_mdat_->start_ + mp4_->current_mdat_->length_;
 
 		bad_tmcd_idx_ = mp4_->getTrackIdx2("tmcd");  // tmcd disturbs the 'order' array
@@ -283,12 +288,12 @@ public:
 	static ChunkIt mkEndIt() { return ChunkIt(true); }
 
 	void operator++() {
-		chunk_idx_++;
+		next_chunk_idx_++;
 		int track_idx = -1;
 		auto off = std::numeric_limits<off_t>::max();
-		for (uint i=0; i < cur_chunk_idx_.size(); i++) {
-			if (cur_chunk_idx_[i] >= mp4_->tracks_[i].chunks_.size()) continue;
-			auto toff = mp4_->tracks_[i].chunks_[cur_chunk_idx_[i]].off_;
+		for (uint i=0; i < cur_next_chunk_idx_.size(); i++) {
+			if (cur_next_chunk_idx_[i] >= mp4_->tracks_[i].chunks_.size()) continue;
+			auto toff = mp4_->tracks_[i].chunks_[cur_next_chunk_idx_[i]].off_;
 			if (toff < off) {
 				track_idx = i;
 				off = toff;
@@ -301,10 +306,10 @@ public:
 			becomeEndIt();
 			return;
 		}
-		current_ = ChunkIt::Chunk(mp4_->tracks_[track_idx].chunks_[cur_chunk_idx_[track_idx]], track_idx);
-		cur_chunk_idx_[track_idx]++;
+		current_ = ChunkIt::Chunk(mp4_->tracks_[track_idx].chunks_[cur_next_chunk_idx_[track_idx]], track_idx);
+		cur_next_chunk_idx_[track_idx]++;
 
-		if (chunk_idx_ < 10 && track_idx == bad_tmcd_idx_) {
+		if (next_chunk_idx_ < 10 && track_idx == bad_tmcd_idx_) {
 			current_.should_ignore_ = true;
 			if (do_filter_) operator++();
 		}
@@ -319,8 +324,8 @@ public:
 private:
 	off_t mdat_end_;
 	int bad_tmcd_idx_ = -1;
-	size_t chunk_idx_ = -1;
-	std::vector<uint> cur_chunk_idx_;
+	size_t next_chunk_idx_ = -1;
+	std::vector<uint> cur_next_chunk_idx_;
 	bool do_filter_;
 
 	ChunkIt(bool is_end_it_) { assert(is_end_it_); becomeEndIt(); }
@@ -331,7 +336,7 @@ private:
 class AllChunksIn {
 public:
 	ChunkIt it_, end_it_;
-	AllChunksIn(Mp4* mp4, bool do_filter) : it_(mp4, do_filter), end_it_(ChunkIt::mkEndIt()) {}
+	AllChunksIn(Mp4* mp4, bool do_filter, bool exclude_dummy=true) : it_(mp4, do_filter, exclude_dummy), end_it_(ChunkIt::mkEndIt()) {}
 	ChunkIt begin() {return it_;}
 	ChunkIt end() {return end_it_;}
 };
@@ -350,6 +355,7 @@ public:
 	off_t offset_;
 	uint length_ = 0;
 	bool should_dump_;
+	uint pad_afterwards_ = 0;
 };
 bool operator==(const FrameInfo& lhs, const FrameInfo& rhs);
 bool operator!=(const FrameInfo& lhs, const FrameInfo& rhs);
