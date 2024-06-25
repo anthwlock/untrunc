@@ -878,7 +878,7 @@ patterns_t Mp4::offsToPatterns(const offs_t& all_offs, const string& load_prefix
 	auto patterns = genRawPatterns(buffs);
 
 	auto offs_to_check = choose100(all_offs);
-	auto buffs2 = offsToBuffs(offs_to_consider, load_prefix);
+	auto buffs2 = offsToBuffs(offs_to_check, load_prefix);
 	countPatternsSuccess(patterns, buffs2);
 
 //	for (auto& p : patterns) cout << p.successRate() << " " << p << '\n';
