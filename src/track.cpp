@@ -714,11 +714,6 @@ void Track::genLikely() {
 			chunk_distance_gcd_ = gcd(chunk_distance_gcd_, chunks_[i].off_ - chunks_[i-1].off_);
 		}
 
-		for (auto& c : chunks_) {
-			off_t end_off = c.off_ + c.size_;
-			end_off_gcd_ = gcd(end_off_gcd_, end_off);
-		}
-
 		start_off_gcd_ = chunks_[0].off_;  // these offsets are absolute (to file begin)
 		end_off_gcd_ = chunks_[0].off_ + chunks_[0].size_;
 		for (auto& c : chunks_) {
