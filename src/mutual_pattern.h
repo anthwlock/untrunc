@@ -24,7 +24,7 @@ public:
 	double successRate();
 
 private:
-	std::vector<bool> is_mutual_;
+	std::vector<uint8_t> is_mutual_;
 	ByteArr data_;
 
 	void intersectBuf(const ByteArr& buf);
@@ -43,7 +43,7 @@ bool operator!=(const MutualPattern& a, const MutualPattern& b);
 
 using patterns_t = std::vector<MutualPattern>;
 
-patterns_t genRawPatterns(buffs_t buffs);
+patterns_t genRawPatterns(buffs_t& buffs);
 void countPatternsSuccess(patterns_t& patterns, buffs_t buffs);
 void filterBySuccessRate(patterns_t& patterns, const std::string& label);
 

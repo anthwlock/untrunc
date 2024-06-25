@@ -52,9 +52,12 @@ uint MutualPattern::intersectLen(const ByteArr& other) {
 uint MutualPattern::intersectLen(const uchar* other) {
 	uint sum = 0;
 //	cout << first_mutual_ << ' ' << last_mutual_ << '\n';
+	auto is_mutual = is_mutual_.data();
+	auto data = data_.data();
+
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual_[i]) continue;
-		if (data_[i] == other[i]) sum++;
+		if (!is_mutual[i]) continue;
+		if (data[i] == other[i]) sum++;
 	}
 	return sum;
 }
@@ -133,7 +136,7 @@ bool operator!=(const MutualPattern& a, const MutualPattern& b) {
 
 // utility functions
 
-patterns_t genRawPatterns(buffs_t buffs) {
+patterns_t genRawPatterns(buffs_t& buffs) {
 	patterns_t patterns;
 	auto gen = getRandomGenerator();
 	auto dis = uniform_int_distribution<size_t>(0, buffs.size()-1);

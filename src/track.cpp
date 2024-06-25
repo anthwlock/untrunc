@@ -837,7 +837,7 @@ bool Track::doesMatchTransition(const uchar* buff, int track_idx) {
 		}
 	}
 
-	if (g_mp4->transitionIsUnclear(ownTrackIdx(), track_idx) && !g_mp4->wouldMatch2(buff + Mp4::pat_size_ / 2)) {
+	if (has_unclear_transition_[track_idx] && !g_mp4->wouldMatch2(buff + Mp4::pat_size_ / 2)) {
 		logg(V, "inverted chunk match: ", codec_.name_, "_", g_mp4->getCodecName(track_idx), "\n");
 		return true;
 	}
@@ -851,7 +851,8 @@ void Track::applyExcludedToOffs() {
 }
 
 uint Track::ownTrackIdx() {
-	return g_mp4->getTrackIdx(codec_.name_);
+	// return g_mp4->getTrackIdx(codec_.name_);
+	return codec_.track_idx_;
 }
 
 int64_t Track::getDurationInTimescale()  {

@@ -228,8 +228,19 @@ private:
 	buffs_t offsToBuffs(const offs_t& offs, const std::string& load_prefix);
 	patterns_t offsToPatterns(const offs_t& offs, const std::string& load_prefix);
 
-	bool transitionIsUnclear(int track_idx_a, int track_idx_b);
-	bool hasUnclearTransitions(int track_idx_a);
+	bool calcTransitionIsUnclear(int track_idx_a, int track_idx_b);
+	void setHasUnclearTransition() {
+		for (int i=0; i < tracks_.size(); i++) {
+			auto &t = tracks_[i];
+			t.has_unclear_transition_.clear();
+			for (int j=0; j < tracks_.size(); j++) {
+				auto v = calcTransitionIsUnclear(i, j);
+				t.has_unclear_transition_.push_back(v);
+			}
+		}
+	}
+
+
 	bool anyPatternMatchesHalf(off_t offset, uint track_idx_to_try);
 	Mp4::Chunk fitChunk(off_t offset, uint track_idx, uint known_n_samples=0);
 

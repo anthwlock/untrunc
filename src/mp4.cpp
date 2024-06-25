@@ -1155,6 +1155,7 @@ void Mp4::genDynStats(bool force_patterns) {
 	genLikelyAll();
 
 	genDynPatterns();
+	setHasUnclearTransition();
 
 	setDummyIsSkippable();
 }
@@ -1519,19 +1520,13 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 	return FrameInfo();
 }
 
-bool Mp4::transitionIsUnclear(int track_idx_a, int track_idx_b) {
-	auto& ta = tracks_[track_idx_a], tb = tracks_[track_idx_b];
+bool Mp4::calcTransitionIsUnclear(int track_idx_a, int track_idx_b) {
+	auto &ta = tracks_[track_idx_a], &tb = tracks_[track_idx_b];
 	if (tb.isSupported()) return false;
-	if (ta.dyn_patterns_[track_idx_b].empty() &&
-	    chunk_transitions_[{track_idx_a, track_idx_b}].size() > 5) {
+	if (ta.dyn_patterns_[track_idx_b].empty() &&  // no clear pattern
+	    chunk_transitions_[{track_idx_a, track_idx_b}].size() > 5) {  // transition happens
 		return true;
 	}
-	return false;
-}
-
-bool Mp4::hasUnclearTransitions(int track_idx_a) {
-	for (uint i=0; i < tracks_.size(); i++)
-		if (transitionIsUnclear(track_idx_a, i)) return true;
 	return false;
 }
 

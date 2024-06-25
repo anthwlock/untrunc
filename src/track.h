@@ -233,6 +233,7 @@ public:
 
 	int pad_after_chunk_ = -1;
 	int last_pad_after_chunk_ = -1;  // helper so we can skip last chunk (padding might be different there)
+	std::vector<uint8_t> has_unclear_transition_;  // track_idx -> has_unclear_transition
 
 	void adjustPadAfterChunk(int new_pad) {
 		if (last_pad_after_chunk_ != -1) {
