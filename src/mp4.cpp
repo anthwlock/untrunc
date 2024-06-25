@@ -1939,7 +1939,7 @@ int Mp4::skipAtoms(off_t offset, const uchar *start) {
 
 		initializer_list<string> atomsToNotSkip = {"tmcd"};  // May be part of normal payload, not an atom
 
-		if (offset + atom_len <= current_mdat_->contentSize() && !contains(atomsToNotSkip, s)) {
+		if (offset + atom_len <= current_mdat_->contentSize() && !contains(atomsToNotSkip, s) && atom_len < (1<<20)) {
 			loggF(!contains({"free", "iidx"}, s) ? W : V, "Skipping ", s, " atom: ", atom_len, '\n');
 			return atom_len;
 		}
