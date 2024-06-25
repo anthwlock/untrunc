@@ -534,7 +534,7 @@ void Mp4::saveVideo(const string& filename) {
 		offset += ftyp->length_; //not all mov have a ftyp.
 
 	for (Track& track : tracks_) {
-		assert(track.chunks_.size());
+		assert(track.chunks_.size(), track.codec_.name_, track.getNumSamples());
 		for (auto& c : track.chunks_) c.off_ += offset;
 		track.saveChunkOffsets(); //need to save the offsets back to the atoms
 	}
