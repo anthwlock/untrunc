@@ -23,10 +23,10 @@ environment:
 build: Script
 
 install:
-  - cinst dependencywalker
-  - cinst zip
-  #- cinst yasm
-  #- cinst pkgconfiglite
+  - choco install dependencywalker
+  - choco install zip
+  #- choco install yasm
+  #- choco install pkgconfiglite
 
 init:
   - git config --global core.autocrlf input
