@@ -1459,6 +1459,9 @@ FrameInfo Mp4::predictSize(const uchar *start, int track_idx, off_t offset) {
 		logg(W2, "Invalid length: ", length, " - too small (track: ", track_idx, ")\n");
 		return FrameInfo();
 	}
+	if (unknown_length_ && track.ss_stats_.likelyTooSmall(length)) {
+		return FrameInfo();
+	}
 
 	after_length_chk:
 	if (c.was_bad_) {

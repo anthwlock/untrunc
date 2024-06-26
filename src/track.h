@@ -31,7 +31,8 @@
 struct SSTats {
 	uint min = std::numeric_limits<uint>::max(),
 		max=0,
-		upper_bound=0, lower_bound=0;
+		upper_bound=0, lower_bound=0,
+		lower_bound_2=0;  // even lower
 	uint64_t n=0;
 	double avg=0, m2=0, dev=0, rel_dev=0, z_score_max=0, z_score_min=0;
 
@@ -72,10 +73,12 @@ struct SSTats {
 			z_score = std::max(std::max(2.326, z_score_min+1), z_score_min*1.5);
 			lower_bound = ceil(std::max(0., avg - dev * z_score));
 		}
+
+		lower_bound_2 = lower_bound >> 5;
 	}
 
 	void onConstant(uint sz) {
-		min = avg = max = upper_bound = lower_bound = sz;
+		min = avg = max = upper_bound = lower_bound = lower_bound_2 = sz;
 		n = 100;
 	}
 
@@ -152,6 +155,15 @@ struct SampleSizeStats {
 	bool isBigEnough(uint sz, bool is_keyframe) {
 		uint limit = getLowerLimit(is_keyframe);
 		return limit && sz >= limit;
+	}
+
+	bool likelyTooSmall(uint sz) {
+		auto& s = normal;
+		if (sz < s.lower_bound_2 && s.n > 20 && s.rel_dev < 1) {
+			dbgg("likelyTooSmall", sz, s.lower_bound_2);
+			return true;
+		}
+		return false;
 	}
 
 	bool wouldExceed(const char *label, uint length, uint additional, bool is_keyframe) {
