@@ -41,6 +41,7 @@ struct WouldMatchCfg {
 	int last_track_idx = -1;
 	bool very_first = false;
 };
+typedef WouldMatchCfg WMCfg;
 
 inline
 std::ostream& operator<<(std::ostream& out, const WouldMatchCfg& cfg) {

@@ -1492,7 +1492,7 @@ FrameInfo Mp4::getMatch(off_t offset, bool force_strict) {
 
 	// hardcoded match
 	if (pkt_idx_ == 4 && hasCodec("tmcd") && getTrack("tmcd").is_tmcd_hardcoded_) {
-		if (!wouldMatch({offset, "", true, last_track_idx_})) {
+		if (!wouldMatch(WMCfg{offset, "", true, last_track_idx_})) {
 			logg(V, "using hardcoded 'tmcd' packet (len=4)\n");
 			return FrameInfo(getTrackIdx("tmcd"), false, 0, offset, 4);
 		}
@@ -1570,7 +1570,7 @@ Mp4::Chunk Mp4::fitChunk(off_t offset, uint track_idx_to_fit, uint known_n_sampl
 		if (known_n_samples) n_samples = known_n_samples;
 		for (auto s_sz : t.likely_sample_sizes_) {
 			auto dst_off = offset + n_samples*s_sz + t.pad_after_chunk_;
-			if (dst_off < current_mdat_->contentSize() && wouldMatch({dst_off, "", false, (int)track_idx_to_fit})) {
+			if (dst_off < current_mdat_->contentSize() && wouldMatch(WMCfg{dst_off, "", false, (int)track_idx_to_fit})) {
 				assert(n_samples > 0);
 				c = Chunk(offset, n_samples, track_idx_to_fit, s_sz);
 				return c;
@@ -2287,18 +2287,18 @@ void Mp4::repair(const string& filename) {
 		off_t start_off = 0;
 
 		auto first_off_abs = first_off_abs_ - mdat->contentStart();
-		if (first_off_abs > 0 && wouldMatch({first_off_abs})) {
+		if (first_off_abs > 0 && wouldMatch(WMCfg{first_off_abs})) {
 			dbgg("set start offset via", first_off_abs_, first_off_abs);
 			offset = first_off_abs;
 		}
 		else if (first_off_rel_ ) {
-			if (wouldMatch({.offset=first_off_rel_, .very_first=true})) {
+			if (wouldMatch(WMCfg{.offset=first_off_rel_, .very_first=true})) {
 				dbgg("set start offset via", first_off_rel_);
 				offset = first_off_rel_;
 			} else {
 				start_off = offset;
 				advanceOffset(start_off, true);  // some atom (e.g. wide) might get skipped
-				if (start_off && wouldMatch({.offset=start_off + first_off_rel_, .very_first=true})) {
+				if (start_off && wouldMatch(WMCfg{.offset=start_off + first_off_rel_, .very_first=true})) {
 					dbgg("set start offset via rel2", start_off, first_off_rel_);
 					offset = start_off + first_off_rel_;
 				}
