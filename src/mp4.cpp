@@ -330,7 +330,7 @@ void Mp4::unite(const string& mdat_fn, const string& moov_fn) {
 }
 
 void Mp4::shorten(const string& filename, int mega_bytes, bool force) {
-	int64_t n_bytes = mega_bytes * 1<<20;
+	int64_t n_bytes = (int64_t)mega_bytes * 1<<20;
 	string suf = force ? "_fshort-" : "_short-";
 	string output = ss(filename + suf, mega_bytes, getMovExtension(filename));
 	warnIfAlreadyExists(output);
