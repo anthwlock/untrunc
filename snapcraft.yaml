@@ -5,7 +5,7 @@ description: |
   Restore a damaged (truncated) mp4, m4v, mov, 3gp video. Provided you have a similar not broken video. And some luck.
   Improved version of ponchio/untrunc
 license: GPL-2.0
-base: core18
+base: core22
 #architectures: [amd64, i386]
 #architectures: amd64
 
