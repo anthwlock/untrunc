@@ -13,9 +13,15 @@ RUN apt-get update && [ "$FF_VER" = 'shared' ] && \
 ADD . /untrunc-src
 WORKDIR /untrunc-src
 
+RUN apt-get update && apt-get install -y software-properties-common && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test && \
+    apt-get update && apt-get install -y g++-9 && \
+    update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-9 60
+
+
 # build untrunc
 #RUN /usr/bin/g++ -o untrunc *.cpp -lavformat -lavcodec -lavutil
-RUN /usr/bin/make FF_VER=$FF_VER && strip untrunc
+RUN CXX=g++-9 /usr/bin/make FF_VER=$FF_VER && strip untrunc
 
 
 # deliver clean image
