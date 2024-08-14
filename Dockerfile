@@ -1,5 +1,5 @@
 # pull base image
-FROM ubuntu:bionic AS build
+FROM ubuntu:22.04 AS build
 LABEL stage=intermediate
 ARG FF_VER=shared
 
@@ -19,11 +19,11 @@ RUN /usr/bin/make FF_VER=$FF_VER && strip untrunc
 
 
 # deliver clean image
-FROM ubuntu:bionic
+FROM ubuntu:22.04
 ARG FF_VER=shared
 
 RUN apt-get update && [ "$FF_VER" = 'shared' ] && \
-	apt-get -y install --no-install-recommends libavformat57 libavcodec57 libavutil55 && \
+	apt-get -y install --no-install-recommends libavformat58 libavcodec58 libavutil56 && \
 	rm -rf /var/lib/apt/lists/* || true
 COPY --from=build /untrunc-src/untrunc /bin/untrunc
 
