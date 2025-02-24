@@ -67,7 +67,6 @@ sudo cp untrunc /usr/local/bin
 
 ## Docker container
 
-
 You can use the included Dockerfile to build and execute the package as a container.\
 The optional argument 'FF_VER' will be passed to `make`.
 
