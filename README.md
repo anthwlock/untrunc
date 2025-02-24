@@ -67,6 +67,7 @@ sudo cp untrunc /usr/local/bin
 
 ## Docker container
 
+
 You can use the included Dockerfile to build and execute the package as a container.\
 The optional argument 'FF_VER' will be passed to `make`.
 
@@ -77,6 +78,13 @@ docker image prune --filter label=stage=intermediate -f
 
 docker run -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
 ```
+
+For one-off use you can run the following one-liner:
+```sh
+docker run --rm -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
+```
+The `--rm` flag ensures that the container is removed after execution.
+
 
 ## Snapcraft
 
