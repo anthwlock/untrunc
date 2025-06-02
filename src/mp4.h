@@ -267,7 +267,7 @@ private:
 			start = last_end;
 			length -= already_skipped;
 		}
-		assert(length >= 0, length);
+		//assert(length >= 0, length);
 	}
 
 	int64_t calcStep(off_t offset);

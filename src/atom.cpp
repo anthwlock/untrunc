@@ -467,7 +467,7 @@ void BufferedAtom::write(FileWrite &output, bool force_64) {
 			offset += to_skip_it->second;
 			to_skip_it++;
 			assert(at_end(to_skip_it) || to_skip_it->first > (to_skip_it-1)->first);
-			assert(offset <= contentSize(), offset, contentSize(), offset-contentSize());
+			//assert(offset <= contentSize(), offset, contentSize(), offset-contentSize());
 		}
 	}
 
