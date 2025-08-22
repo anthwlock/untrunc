@@ -516,6 +516,8 @@ void Track::saveSampleToChunk() {
 }
 
 void Track::saveChunkOffsets() {
+	if (!chunks_.size()) return;
+
 	assert(chunks_[0].off_ >= 0, codec_.name_, chunks_[0].off_);
 
 	Atom *co64 = trak_->atomByName("co64");
