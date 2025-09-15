@@ -3,6 +3,7 @@ FF_VER := shared
 _EXE   := untrunc
 IS_RELEASE := 0
 LIBUI_STATIC := 0
+STATIC_BUILD := 0
 
 # make switching between ffmpeg versions easy
 TARGET := $(firstword $(MAKECMDGOALS))
@@ -34,6 +35,11 @@ FFDIR := ffmpeg-$(FF_VER)
 ifeq ($(FF_VER), shared)
 	CXXFLAGS += -isystem/usr/include/ffmpeg
 	LDFLAGS += -lavformat -lavcodec -lavutil
+	
+	# Add static linking flags when STATIC_BUILD is enabled
+	ifeq ($(STATIC_BUILD), 1)
+		LDFLAGS += -static -static-libgcc -static-libstdc++
+	endif
 else
 	CXXFLAGS += -isystem./$(FFDIR)
 	LDFLAGS += -L$(FFDIR)/libavformat -lavformat
@@ -46,6 +52,11 @@ else
 
 	ifeq ($(_OS), Darwin)
 		LDFLAGS += -liconv
+	endif
+	
+	# Add static linking flags when STATIC_BUILD is enabled
+	ifeq ($(STATIC_BUILD), 1)
+		LDFLAGS += -static -static-libgcc -static-libstdc++
 	endif
 endif
 
@@ -126,6 +137,12 @@ else
 endif
 	tar xf /tmp/$(FFDIR).tar.xz
 	mv $(FFDIR)/VERSION $(FFDIR)/VERSION.bak
+	@echo "(info) applying FFmpeg patch for binutils >= 2.41 compatibility..."
+	@if [ -f ffmpeg-mathops.patch ]; then \
+		cd $(FFDIR) && patch -p1 < ../ffmpeg-mathops.patch && echo "Patch applied successfully"; \
+	else \
+		echo "Warning: ffmpeg-mathops.patch not found, skipping patch"; \
+	fi
 
 $(FFDIR)/config.asm: | $(FFDIR)/configure
 	@echo "(info) please wait ..."

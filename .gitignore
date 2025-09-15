@@ -7,3 +7,4 @@ ffmpeg-*
 libav-*
 build
 *.pro.user
+untrunc_libs/*

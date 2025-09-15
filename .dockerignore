@@ -2,7 +2,7 @@ Dockerfile
 .dockerignore
 untrunc
 untrunc-*
-ffmpeg-*
+ffmpeg-[0-9]*
 .build_*
 build
 old
