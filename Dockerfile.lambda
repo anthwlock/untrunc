@@ -1,0 +1,37 @@
+# Dockerfile for building static untrunc binary compatible with AWS Lambda
+# Use x86_64 image for Lambda compatibility
+FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.13 AS build
+
+# Install build dependencies
+RUN dnf update -y && \
+    dnf install -y gcc-c++ make git yasm wget ca-certificates xz tar patch && \
+    dnf clean all
+
+# Copy source code
+COPY . /untrunc-src
+WORKDIR /untrunc-src
+
+# Configure for release build
+ENV IS_RELEASE=1
+
+# Build untrunc with FFmpeg 6.0 (better compatibility)
+RUN echo "Building untrunc with FFmpeg 6.0..." && \
+    make FF_VER=6.0 && \
+    strip untrunc
+
+# Create minimal runtime image
+FROM --platform=linux/amd64 public.ecr.aws/lambda/python:3.13
+
+# Copy the binary
+COPY --from=build /untrunc-src/untrunc /opt/untrunc
+
+# Make it executable and set up for Lambda layer
+RUN chmod +x /opt/untrunc && \
+    mkdir -p /opt/bin && \
+    cp /opt/untrunc /opt/bin/untrunc
+
+# Test the binary dependencies
+RUN echo "Testing binary..." && \
+    ldd /opt/untrunc 2>&1 || echo "Dependencies check completed"
+
+ENTRYPOINT ["/opt/bin/untrunc"]
