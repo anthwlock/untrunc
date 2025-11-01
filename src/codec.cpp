@@ -448,7 +448,7 @@ map<string, int(*) (Codec*, const uchar*, uint maxlength)> dispatch_get_size {
 
 		int consumed = untr_decode(self->av_codec_context_, frame, &got_frame, packet);
 
-		self->was_keyframe_ = frame->key_frame;
+		self->was_keyframe_ = frame->pict_type == AV_PICTURE_TYPE_I;
 		self->was_bad_ = !got_frame;
 
 		return consumed;
