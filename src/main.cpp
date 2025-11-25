@@ -45,6 +45,7 @@ void usage() {
 	     << "-sm  - search mdat, even if no mp4-structure found\n"
 	     << "-dcc  - dont check if chunks are inside mdat\n"
 	     << "-dyn  - use dynamic stats\n"
+	     << "-rsv  - Sony RSV file recovery mode\n"
 	     << "-range <A:B>  - raw data range\n"
 	     << "-dst <dir|file>  - set destination\n"
 	     << "-skip  - skip existing\n"
@@ -153,6 +154,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "u") unite = true;
 			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
 			else if (a == "dyn") g_use_chunk_stats = true;
+			else if (a == "rsv") g_rsv_mode = true;
 			else if (a == "range") arg_range = kExpectArg;
 			else if (a == "dst") arg_dst = kExpectArg;
 			else if (a == "skip") g_skip_existing = true;

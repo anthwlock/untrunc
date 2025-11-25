@@ -57,6 +57,7 @@ bool g_off_as_hex = true;
 bool g_fast_assert = false;
 bool g_no_ctts = false;
 bool g_is_gui = false;
+bool g_rsv_mode = false;
 uint g_num_w2 = 0;
 Mp4* g_mp4 = nullptr;
 void (*g_onProgress)(int) = nullptr;
