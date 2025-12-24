@@ -29,6 +29,10 @@ extern "C" {
 #include <vector>
 #include <string>
 
+#ifdef __APPLE__
+#include <sys/types.h> /* ssize_t */
+#endif
+
 #include "common.h"
 
 class FileRead {
