@@ -75,7 +75,7 @@ The optional argument 'FF_VER' will be passed to `make`.
 docker build -t untrunc .
 docker image prune --filter label=stage=intermediate -f
 
-docker run -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
+docker run --rm -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
 ```
 
 ## Snapcraft
