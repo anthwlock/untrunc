@@ -2023,6 +2023,10 @@ bool Mp4::chkOffset(off_t& offset) {
 		chkExcludeOverlap(orig_off, skipped);
 		addToExclude(orig_off, skipped);
 	}
+	if (!r) {  // at end
+		pushBackLastChunk();
+		chkUnknownSequenceEnded(offset);
+	}
 	return r;
 }
 
