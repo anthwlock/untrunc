@@ -449,7 +449,7 @@ void Mp4::saveVideo(const string& filename) {
 		cout << "Info: Found " << pkt_idx_ << " packets ( ";
 		for(const Track& t : tracks_){
 			cout << t.codec_.name_ << ": " << t.getNumSamples() << ' ';
-			if (contains({"avc1", "hvc1"}, t.codec_.name_))
+			if (contains({"avc1", "hvc1", "hev1"}, t.codec_.name_) || t.keyframes_.size())
 				cout << ss(t.codec_.name_, "-keyframes: ", t.keyframes_.size(), " ");
 		}
 		cout << ")\n";
