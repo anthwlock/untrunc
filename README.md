@@ -21,6 +21,7 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 * compatible with new versions of ffmpeg
 * handles invalid atom lengths
 * supports GoPro and Sony XAVC videos
+* supports Sony RSV (Recording in progreSs Video) file recovery
 * many bugs got fixed, actively maintained
 
 ## Building
@@ -108,6 +109,18 @@ Then it should churn away and hopefully produce a playable file called `broken-v
 That's it you're done!
 
 (Thanks to Tom Sparrow for providing the guide)
+
+### Sony RSV Files
+
+Untrunc can recover Sony RSV files (incomplete/corrupted video files with the `.rsv` extension) created when recording is interrupted unexpectedly (e.g., power loss, card removal). These files contain raw video data but lack the proper container structure. RSV files are automatically detected, or you can force RSV mode with the `-rsv` flag:
+
+```shell
+./untrunc /path/to/reference.mp4 /path/to/corrupt.RSV
+# or explicitly:
+./untrunc -rsv /path/to/reference.mp4 /path/to/corrupt.RSV
+```
+
+RSV recovery supports both H.264/AVC and H.265/HEVC codecs, and automatically detects GOP structure parameters. See [RSV_FILE_FORMAT.md](RSV_FILE_FORMAT.md) for detailed format documentation.
 
 
 ### Help/Support
