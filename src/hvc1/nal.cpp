@@ -18,7 +18,7 @@ bool h265IsSlice(int nal_type) {
 	    nal_type == NAL_CRA_NUT ||
 	    nal_type == NAL_RASL_N ||
 	    nal_type == NAL_RASL_R ||
-//	    nal_type == NAL_IDR_N_LP ||
+	    nal_type == NAL_IDR_N_LP ||
 	    nal_type == NAL_IDR_W_RADL;
 }
 
