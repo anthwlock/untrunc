@@ -28,14 +28,6 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).\
 In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
-#### macOS with Homebrew
-
-```
-brew install ffmpeg yasm
-export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig"
-CPPFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib" make
-```
-
 #### With system libraries
 
 ```shell
@@ -72,6 +64,15 @@ git clone --depth 5 https://github.com/anthwlock/untrunc && cd untrunc
 make FF_VER=3.3.9
 sudo cp untrunc /usr/local/bin
 ```
+
+#### macOS with Homebrew
+
+```
+brew install ffmpeg yasm
+export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig"
+CPPFLAGS="-I/opt/homebrew/include" LDFLAGS="-L/opt/homebrew/lib" make
+```
+
 
 ## Docker container
 
