@@ -14,7 +14,7 @@ confinement: strict
 
 apps:
   untrunc-anthwlock:
-    command: untrunc
+    command: bin/untrunc
     plugs: [home, removable-media]
 
 parts:
