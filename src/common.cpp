@@ -5,6 +5,9 @@
 #include <sstream>
 #include <cmath>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -492,20 +495,26 @@ FILE* _my_open(const char* path, const wchar_t* mode) {
 }
 #endif
 
-void callPstack() {
+void showStacktrace() {
 #ifdef _WIN32
     // Do nothing on Windows
 #else
-    // Check if pstack is available
-    if (system("which pstack > /dev/null 2>&1") == 0) {
-        pid_t pid = getpid(); // Get the current process ID
-        string cmd = "pstack " + to_string(pid);
+    // Check if gdb is available
+    if (system("which gdb > /dev/null 2>&1") == 0) {
+        pid_t pid = getpid();
 
+#ifdef __linux__
+        // Allow any process to ptrace us (needed for gdb on modern Linux)
+        prctl(PR_SET_PTRACER, PR_SET_PTRACER_ANY, 0, 0, 0);
+#endif
+
+		string cmd = "gdb -batch -q -ex 'thread apply all bt' -p " + to_string(pid);
         cerr << "\n+ " << cmd << endl;
+		cmd += " 2>&1 | grep -v -E \"warning: could not find '.*' file for /lib/|warning: .*\\.\\./sysdeps/unix/sysv/linux/.*: No such file or directory\" | cat -s";
         system(cmd.c_str());
-		cerr << "\n";
+        cerr << "\n";
     } else {
-        cerr << "pstack is not available on this system." << endl;
+        cerr << "gdb is not available on this system." << endl;
     }
 #endif
 }

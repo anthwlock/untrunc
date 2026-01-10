@@ -245,7 +245,7 @@ FILE* _my_open(const char* path, const wchar_t* mode);
 #define my_open fopen
 #endif
 
-void callPstack();
+void showStacktrace();
 std::vector<std::string> splitAndTrim(const std::string &str);
 
 template <typename... Args>
@@ -293,7 +293,7 @@ void __assertt(const char* expr_str, const char* fn, const char* file, int line,
 
 	if (g_fast_assert) exit(1);
 
-	callPstack();
+	showStacktrace();
 	abort();
 }
 
