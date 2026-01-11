@@ -1085,7 +1085,7 @@ void Mp4::correctChunkIdxSimple(int track_idx) {
 
 	int off_ok = -1;
 	for (uint off=0; off < order_sz; off++) {
-		if (track_order_simple_[next_chunk_idx_+off % order_sz] == track_idx) {
+		if (track_order_simple_[(next_chunk_idx_+off) % order_sz] == track_idx) {
 			if (off_ok < 0) off_ok = off;
 			else {logg(W, "correctChunkIdxSimple(", track_idx, "): next chunk is ambiguous\n"); break;};
 		}
