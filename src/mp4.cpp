@@ -1682,6 +1682,7 @@ Mp4::Chunk Mp4::getChunkPrediction(off_t offset, bool only_perfect_fit) {
 	if (predictChunkViaOrder(offset, c)) {
 		if (c && chunkStartLooksInvalid(offset, c)) {
 			dbgg("Ignoring predictChunkViaOrder, chunkStartLooksInvalid fails", c);
+			ignored_chunk_order_ = true;
 			return Mp4::Chunk();
 		}
 		return c;
