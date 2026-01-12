@@ -144,7 +144,7 @@ public:
 
 	// Note: An backtrack algo across multiple (e.g. track_order.size()) matches would be better than this, since it would work even if currentChunkFinished + we wouldn't have to check upfront
 	int findSizeWithContinuation(off_t off, std::vector<int> sizes) {
-		if (!track_order_.size() || currentChunkFinished(1)) {
+		if (!track_order_.size() || amInFreeSequence() || currentChunkFinished(1)) {
 			return sizes.back();
 		}
 		auto& t = tracks_[last_track_idx_];
