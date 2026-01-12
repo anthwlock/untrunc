@@ -91,6 +91,10 @@ public:
 	void analyze(bool gen_off_map=false);
 	void repair(const std::string& filename);
 
+	// RSV file recovery
+	bool detectRsvStructure(FileRead& file_read);
+	void repairRsv(const std::string& filename);
+
 	bool wouldMatch(const WouldMatchCfg& cfg);
 	bool wouldMatch2(const uchar* start);
 	bool wouldMatchDyn(off_t offset, int last_idx);
