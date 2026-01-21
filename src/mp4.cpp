@@ -2532,7 +2532,7 @@ void Mp4::repairRsv(const string& filename) {
 		// Find first rtmd block end (count rtmd packets)
 		int first_rtmd_count = 0;
 		off_t detect_pos = 0;
-		while (detect_pos + 12 < detect_read && first_rtmd_count < 20) {
+		while (detect_pos + 12 < detect_read && first_rtmd_count < 100) {
 			if (memcmp(detect_buf.data() + detect_pos, rtmd_pattern_prefix, 4) == 0 &&
 			    memcmp(detect_buf.data() + detect_pos + 8, rtmd_pattern_sony_tag, 4) == 0) {
 				first_rtmd_count++;
@@ -2601,7 +2601,7 @@ void Mp4::repairRsv(const string& filename) {
 		// Check both prefix (bytes 0-3) and MXF marker (bytes 8-11) to avoid false positives
 		int rtmd_count = 0;
 		uchar rtmd_header[12];
-		while (pos + rtmd_count * rtmd_packet_size < file_size && rtmd_count < 20) {
+		while (pos + rtmd_count * rtmd_packet_size < file_size && rtmd_count < 100) {
 			file_read.seek(pos + rtmd_count * rtmd_packet_size);
 			file_read.readChar((char*)rtmd_header, 12);
 			// Check prefix (001c0100) AND marker at offset 8 (f0010010)
