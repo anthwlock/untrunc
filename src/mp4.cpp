@@ -2499,7 +2499,7 @@ void Mp4::repairRsv(const string& filename) {
 	
 	// Auto-detect RSV structure parameters from the file itself
 	{
-		vector<uchar> detect_buf(8 * 1024 * 1024);  // 8MB buffer for detection
+		vector<uchar> detect_buf(16 * 1024 * 1024);  // 16MB buffer for detection (GOPs can be 11MB+)
 		file_read.seek(0);
 		size_t detect_read = min((off_t)detect_buf.size(), file_size);
 		file_read.readChar((char*)detect_buf.data(), detect_read);
