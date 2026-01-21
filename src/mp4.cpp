@@ -2381,15 +2381,18 @@ void Mp4::repair(const string& filename) {
 }
 
 // RSV file detection - check for rtmd pattern at offset 0
+// Uses both prefix (bytes 0-3) AND Sony tag (bytes 8-11) for robust detection.
+// Bytes 4-7 are variable camera metadata and should NOT be used for identification.
 bool Mp4::detectRsvStructure(FileRead& file_read) {
-	// RSV files start with rtmd pattern: 00 1c 01 00 23 03 28 e1
-	const uchar rsv_header[] = {0x00, 0x1c, 0x01, 0x00, 0x23, 0x03, 0x28, 0xe1};
+	const uchar rtmd_prefix[] = {0x00, 0x1c, 0x01, 0x00};  // bytes 0-3 (constant)
+	const uchar sony_tag[] = {0xf0, 0x01, 0x00, 0x10};    // bytes 8-11 (constant)
 	
 	file_read.seek(0);
-	uchar buf[8];
-	file_read.readChar((char*)buf, 8);
+	uchar buf[12];
+	file_read.readChar((char*)buf, 12);
 	
-	bool is_rsv = memcmp(buf, rsv_header, 8) == 0;
+	bool is_rsv = memcmp(buf, rtmd_prefix, 4) == 0 && 
+	              memcmp(buf + 8, sony_tag, 4) == 0;
 	if (is_rsv) {
 		logg(I, "detected RSV file structure (Sony recording-in-progress)\n");
 	}
