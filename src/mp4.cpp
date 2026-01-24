@@ -570,6 +570,7 @@ string Mp4::getOutputSuffix() {
 	if (g_use_chunk_stats) output_suffix += "-dyn";
 	if (g_dont_exclude) output_suffix += "-k";
 	if (g_stretch_video) output_suffix += "-sv";
+	if (g_rsv_mode) output_suffix += "-rsv";
 	return output_suffix;
 }
 
@@ -2245,8 +2246,8 @@ void Mp4::repair(const string& filename) {
 		return;
 	}
 	
-	// Auto-detect RSV structure
-	{
+	// Auto-detect RSV structure (unless disabled with -no-rsv)
+	if (!g_no_rsv_mode) {
 		FileRead file_read(filename);
 		if (detectRsvStructure(file_read)) {
 			logg(I, "auto-detected RSV file, switching to RSV mode\n");

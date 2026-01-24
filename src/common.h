@@ -37,7 +37,8 @@ extern bool g_interactive, g_muted, g_ignore_unknown, g_stretch_video,
     g_off_as_hex,
     g_fast_assert,
     g_ignore_out_of_bound_chunks, g_skip_existing, g_no_ctts, g_is_gui,
-    g_rsv_mode;
+    g_rsv_mode,
+    g_no_rsv_mode;
 extern int64_t g_range_start, g_range_end;
 extern std::string g_dst_path;
 
