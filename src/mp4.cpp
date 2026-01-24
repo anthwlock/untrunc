@@ -2445,14 +2445,24 @@ void Mp4::repairRsv(const string& filename) {
 		video_track_idx = getTrackIdx2("hvc1");
 		is_hevc = true;
 	}
-	int audio_track_idx = getTrackIdx2("twos");
-	if (audio_track_idx < 0) audio_track_idx = getTrackIdx2("sowt");
+	// Find all audio tracks (some cameras have multiple mono tracks)
+	vector<int> audio_track_indices;
+	string audio_codec_name;
+	for (uint i = 0; i < tracks_.size(); i++) {
+		const string& codec = tracks_[i].codec_.name_;
+		if (codec == "twos" || codec == "sowt" || codec == "ipcm") {
+			audio_track_indices.push_back(i);
+			if (audio_codec_name.empty()) audio_codec_name = codec;
+		}
+	}
+	int audio_track_idx = audio_track_indices.empty() ? -1 : audio_track_indices[0];
+	int num_audio_tracks = audio_track_indices.size();
 	
 	if (video_track_idx < 0) {
 		logg(ET, "no video track (avc1/hvc1) found in reference file\n");
 		return;
 	}
-	logg(I, "video track: ", video_track_idx, " (", (is_hevc ? "HEVC" : "H.264"), "), audio track: ", audio_track_idx, "\n");
+	logg(I, "video track: ", video_track_idx, " (", (is_hevc ? "HEVC" : "H.264"), "), audio tracks: ", num_audio_tracks, "\n");
 	
 	// Select AUD pattern based on codec
 	const uchar* aud_pattern = is_hevc ? aud_pattern_hevc : aud_pattern_h264;
@@ -2481,7 +2491,7 @@ void Mp4::repairRsv(const string& filename) {
 			audio_sample_size = audio_track.constant_size_;
 		}
 		audio_sample_rate = audio_track.timescale_;  // For audio, timescale is sample rate
-		logg(V, "audio sample size: ", audio_sample_size, ", sample rate: ", audio_sample_rate, "\n");
+		logg(V, "audio sample size: ", audio_sample_size, ", sample rate: ", audio_sample_rate, ", tracks: ", num_audio_tracks, "\n");
 	}
 	
 	// NOW clear tracks to prepare for RSV parsing
@@ -2500,7 +2510,7 @@ void Mp4::repairRsv(const string& filename) {
 	
 	// Auto-detect RSV structure parameters from the file itself
 	{
-		vector<uchar> detect_buf(16 * 1024 * 1024);  // 16MB buffer for detection (GOPs can be 11MB+)
+		vector<uchar> detect_buf(128 * 1024 * 1024);  // 128MB buffer for detection (GOPs can be 25MB+ at high bitrates)
 		file_read.seek(0);
 		size_t detect_read = min((off_t)detect_buf.size(), file_size);
 		file_read.readChar((char*)detect_buf.data(), detect_read);
@@ -2583,9 +2593,11 @@ void Mp4::repairRsv(const string& filename) {
 	double fps = (double)video_timescale / video_duration_per_sample;
 	double gop_duration_sec = (double)frames_per_gop / fps;
 	int audio_samples_per_chunk = (int)(gop_duration_sec * audio_sample_rate);
-	int audio_chunk_size = audio_samples_per_chunk * audio_sample_size;
+	int audio_chunk_size_per_track = audio_samples_per_chunk * audio_sample_size;
+	// Total audio size in RSV is for all tracks combined
+	int total_audio_chunk_size = audio_chunk_size_per_track * max(1, num_audio_tracks);
 	
-	logg(I, "derived parameters: fps=", fps, ", GOP duration=", gop_duration_sec, "s, audio chunk=", audio_chunk_size, " bytes\n");
+	logg(I, "derived parameters: fps=", fps, ", GOP duration=", gop_duration_sec, "s, audio chunk=", total_audio_chunk_size, " bytes (", num_audio_tracks, " tracks)\n");
 	
 	// Process file GOP by GOP
 	off_t pos = 0;
@@ -2594,7 +2606,7 @@ void Mp4::repairRsv(const string& filename) {
 	int total_audio_chunks = 0;
 	
 	// Buffer for reading
-	const size_t buf_size = 16 * 1024 * 1024;  // 16MB buffer
+	const size_t buf_size = 128 * 1024 * 1024;  // 128MB buffer (GOPs can be 25MB+ at high bitrates)
 	vector<uchar> buffer(buf_size);
 	
 	while (pos < file_size) {
@@ -2635,20 +2647,22 @@ void Mp4::repairRsv(const string& filename) {
 		vector<uint> frame_sizes;
 		
 		// Fast AUD pattern search using memchr
-		// AUD pattern: 00 00 00 02 09
+		// H.264 AUD: 00 00 00 02 09
+		// HEVC AUD:  00 00 00 03 46
 		const uchar* buf_ptr = buffer.data();
 		const uchar* buf_end = buf_ptr + to_read - 5;
 		const uchar* p = buf_ptr;
+		const int aud_pattern_len = 5;
 		
 		while (p < buf_end) {
 			// Use memchr to quickly find potential start (first 0x00)
 			p = (const uchar*)memchr(p, 0x00, buf_end - p);
 			if (!p) break;
 			
-			// Verify full pattern: 00 00 00 02 09
-			if (p + 4 < buf_end && p[1] == 0x00 && p[2] == 0x00 && p[3] == 0x02 && p[4] == 0x09) {
+			// Check against the codec-appropriate AUD pattern
+			if (p + aud_pattern_len <= buf_end && memcmp(p, aud_pattern, aud_pattern_len) == 0) {
 				frame_offsets.push_back(video_start + (p - buf_ptr));
-				p += 5;  // Skip past pattern
+				p += aud_pattern_len;
 			} else {
 				p++;
 			}
@@ -2678,8 +2692,8 @@ void Mp4::repairRsv(const string& filename) {
 			p++;
 		}
 		
-		// Audio is 92160 bytes before next rtmd
-		off_t audio_boundary = next_rtmd_start - audio_chunk_size;
+		// Audio region (all tracks combined) is before next rtmd
+		off_t audio_boundary = next_rtmd_start - total_audio_chunk_size;
 		
 		// Filter out any frame offsets that are past the audio boundary
 		while (!frame_offsets.empty() && frame_offsets.back() >= audio_boundary) {
@@ -2745,30 +2759,34 @@ void Mp4::repairRsv(const string& filename) {
 		
 		logg(V, "GOP ", gop_count, ": ", frames_in_gop, " video frames, audio at ", audio_start, "\n");
 		
-		// Process audio chunk if audio track exists
-		if (audio_track_idx >= 0 && audio_start + audio_chunk_size <= file_size) {
-			Track& audio_track = tracks_[audio_track_idx];
-			
+		// Process audio chunk(s) if audio track(s) exist
+		if (audio_track_idx >= 0 && audio_start + total_audio_chunk_size <= file_size) {
 			// Each audio chunk contains multiple PCM samples
-			// 92160 bytes / 4 bytes per sample = 23040 samples
-			int samples_in_chunk = audio_chunk_size / audio_sample_size;
-			audio_track.num_samples_ += samples_in_chunk;
+			int samples_in_chunk = audio_chunk_size_per_track / audio_sample_size;
 			
-			// Add chunk
-			Track::Chunk audio_chunk;
-			audio_chunk.off_ = audio_start;
-			audio_chunk.size_ = audio_chunk_size;
-			audio_chunk.n_samples_ = samples_in_chunk;
-			audio_track.chunks_.push_back(audio_chunk);
+			// Process each audio track (for multi-track setups like 4 mono channels)
+			for (int t = 0; t < num_audio_tracks; t++) {
+				Track& audio_track = tracks_[audio_track_indices[t]];
+				audio_track.num_samples_ += samples_in_chunk;
+				
+				// Add chunk - each track gets its portion of the audio data
+				// Audio data in RSV appears to be sequential per track
+				Track::Chunk audio_chunk;
+				audio_chunk.off_ = audio_start + t * audio_chunk_size_per_track;
+				audio_chunk.size_ = audio_chunk_size_per_track;
+				audio_chunk.n_samples_ = samples_in_chunk;
+				audio_track.chunks_.push_back(audio_chunk);
+				
+				pkt_idx_ += samples_in_chunk;
+			}
 			
 			total_audio_chunks++;
-			pkt_idx_ += samples_in_chunk;
 			
-			// Next GOP starts after audio
-			pos = audio_start + audio_chunk_size;
+			// Next GOP starts after all audio tracks
+			pos = audio_start + total_audio_chunk_size;
 		} else {
-			// No audio or end of file
-			pos = audio_start;
+			// No audio - still need to advance to next GOP
+			pos = next_rtmd_start;
 		}
 		
 		gop_count++;

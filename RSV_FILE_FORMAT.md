@@ -33,17 +33,27 @@ Each GOP contains three sections in order:
 └─────────────────┴──────────────────────┴───────────────────-┘
 ```
 
-**Typical values** (for 12-frame GOP at 25fps):
+**Observed variations**:
+
+| Setting | Typical | Observed Range |
+|---------|---------|----------------|
+| rtmd packet size | 19,456 bytes | 11,264 - 29,696 bytes |
+| rtmd packets per GOP | 12 | 12 - 48 |
+| Frames per GOP | 12 | 12 - 48 |
+| Frame rate | 25 fps | 23.98, 25, 50 fps |
+| GOP data size | ~6 MB | 6 - 27 MB |
+
+**Example** (12-frame GOP at 25fps):
 - rtmd block: ~233,472 bytes (12 packets × 19,456 bytes)
 - Video frames: ~5-6 MB (12 frames, variable size)
-- Audio chunk: ~92,160 bytes (calculated from GOP duration)
+- Audio chunk: ~92,160 bytes (stereo 16-bit) or ~276,480 bytes (4-channel 24-bit)
 
 ## rtmd Block (Timed Metadata)
 
 ### Structure
 - **Total size**: Variable (depends on packet count and packet size)
-- **Packet count**: Usually 12 packets per GOP (can vary, observed 9-20)
-- **Packet size**: Typically 19,456 bytes each (auto-detected from file)
+- **Packet count**: Typically matches frames per GOP (observed: 12, 24, 48)
+- **Packet size**: Auto-detected from file (observed: 11,264, 19,456, 29,696 bytes)
 
 ### Packet Header Format
 
@@ -155,34 +165,74 @@ The implementation auto-detects `frames_per_gop` by counting AUD patterns in the
 
 ## Audio Essence (PCM)
 
-### Format
-- **Codec**: PCM signed 16-bit big-endian (twos/pcm_s16be)
-- **Sample rate**: 48,000 Hz
-- **Channels**: 2 (stereo)
-- **Bits per sample**: 16
+### Supported Formats
+
+| Format | Codec | Bits | Channels | Bytes/Sample |
+|--------|-------|------|----------|--------------|
+| Stereo 16-bit | twos/sowt | 16 | 2 | 4 |
+| Multi-track 24-bit | ipcm | 24 | 4×1 (mono) | 3 per track |
+
+### Common Configurations
+
+**Stereo 16-bit (twos/sowt)** - Most common:
+- Sample rate: 48,000 Hz
+- Channels: 2 (stereo)
+- Bits per sample: 16
+- Bytes per sample: 4
+
+**Multi-track 24-bit (ipcm)** - Professional cameras:
+- Sample rate: 48,000 Hz
+- Tracks: 4 separate mono tracks
+- Bits per sample: 24
+- Bytes per sample per track: 3
+- Total audio per GOP: 4 × per-track size
 
 ### Chunk Structure
-- **Chunk size**: Fixed per file (calculated once from first GOP's frame count)
-- **Samples per chunk**: Calculated as `GOP_duration × sample_rate`
-- **Bytes per sample**: Typically 4 (2 bytes × 2 channels for stereo 16-bit)
-- **Duration per chunk**: Matches GOP duration (assumes constant GOP size)
+- **Chunk size**: Calculated from GOP duration and audio format
+- **Samples per chunk**: `GOP_duration × sample_rate`
+- **Total audio size**: `samples × bytes_per_sample × num_tracks`
 
 ### Calculation
-Audio chunk size is calculated **once** based on the first GOP's frame count:
+
+Audio chunk size is calculated based on GOP duration:
 ```
 GOP_duration_sec = frames_per_gop / fps
 samples_per_chunk = GOP_duration_sec × audio_sample_rate
-chunk_size = samples_per_chunk × bytes_per_sample
+chunk_size_per_track = samples_per_chunk × bytes_per_sample
+total_audio_size = chunk_size_per_track × num_audio_tracks
 ```
 
-**Example** (12 frames at 25fps, 48kHz stereo 16-bit):
+**Example 1** (12 frames at 25fps, 48kHz stereo 16-bit):
 ```
 GOP_duration = 12 frames ÷ 25 fps = 0.480 seconds
 samples_per_chunk = 0.480s × 48000 Hz = 23,040 samples
 chunk_size = 23,040 × 4 bytes = 92,160 bytes
 ```
 
-**Important**: The implementation calculates `audio_chunk_size` from the first GOP's `frames_per_gop` and uses this fixed size for all GOPs. It **assumes** GOP sizes are constant throughout the file. If GOP sizes varied, this would cause incorrect audio chunk size calculation. The code counts frames per GOP individually but does not recalculate audio chunk size per GOP.
+**Example 2** (12 frames at 25fps, 48kHz 4-track 24-bit):
+```
+GOP_duration = 12 frames ÷ 25 fps = 0.480 seconds
+samples_per_chunk = 0.480s × 48000 Hz = 23,040 samples
+chunk_size_per_track = 23,040 × 3 bytes = 69,120 bytes
+total_audio_size = 69,120 × 4 tracks = 276,480 bytes
+```
+
+**Example 3** (48 frames at 50fps, 48kHz stereo 16-bit):
+```
+GOP_duration = 48 frames ÷ 50 fps = 0.960 seconds
+samples_per_chunk = 0.960s × 48000 Hz = 46,080 samples
+chunk_size = 46,080 × 4 bytes = 184,320 bytes
+```
+
+### Multi-Track Audio Layout
+
+For cameras with multiple mono audio tracks (e.g., 4-channel ipcm), the audio data in each GOP is stored **sequentially** by track:
+
+```
+[Track 1 audio][Track 2 audio][Track 3 audio][Track 4 audio]
+```
+
+Each track contains the same number of samples for the GOP duration.
 
 ## Comparison with MP4
 
@@ -265,22 +315,25 @@ To recover an RSV file using untrunc:
 
 ## Known Cameras
 
-This format has been observed in:
-- Sony FX3
-- Other Sony cameras using XAVC codec
+This format has been tested with:
+- Sony FX3 (ILME-FX3)
+- Sony FX30 (ILME-FX30)
+- Sony A7S III (ILCE-7SM3)
 
 ## Typical File Characteristics
 
-| Property | Typical Value |
-|----------|---------------|
-| Video codec | H.264 High Profile or H.265/HEVC |
-| Resolution | 3840×2160 (4K) |
-| Frame rate | 25 fps (variable) |
-| GOP size | Auto-detected from first GOP (typically 12), assumed constant |
-| Audio codec | PCM S16BE (twos/sowt) |
-| Audio rate | 48000 Hz (variable) |
-| Bitrate | ~100 Mbps |
-| rtmd packet size | 19,456 bytes (auto-detected) |
+| Property | Typical Value | Observed Range |
+|----------|---------------|----------------|
+| Video codec | H.264/AVC or H.265/HEVC | avc1, hvc1 |
+| Resolution | 3840×2160 (4K) | - |
+| Frame rate | 25 fps | 23.98, 25, 50 fps |
+| Frames per GOP | 12 | 12, 24, 48 |
+| Audio codec | PCM 16-bit (twos/sowt) | twos, sowt, ipcm (24-bit) |
+| Audio channels | 2 (stereo) | 2 stereo or 4×1 mono |
+| Audio rate | 48000 Hz | - |
+| Bitrate | ~100 Mbps | 100-250 Mbps |
+| rtmd packet size | 19,456 bytes | 11,264 - 29,696 bytes |
+| GOP data size | ~6 MB | 6 - 27 MB |
 
 ## References
 
@@ -295,10 +348,17 @@ This format has been observed in:
 The untrunc implementation includes several auto-detection features:
 
 1. **RSV File Detection**: Automatically detects RSV files by checking for rtmd pattern at offset 0
-2. **rtmd Packet Size**: Auto-detects packet size by measuring distance between first two rtmd patterns
-3. **Frames per GOP**: Auto-detects by counting AUD patterns in the first GOP
-4. **Audio Chunk Size**: Calculated once from the first GOP's frame count and reused for all GOPs (assumes GOP sizes are constant throughout the file)
-5. **Codec Support**: Supports both H.264/AVC (`avc1`) and H.265/HEVC (`hvc1`) codecs
+2. **rtmd Packet Size**: Auto-detects packet size by measuring distance between first two rtmd patterns (handles 11K-30K byte packets)
+3. **Frames per GOP**: Auto-detects by counting AUD patterns in the first GOP (handles 12-48 frames)
+4. **Audio Track Discovery**: Finds all audio tracks (twos, sowt, ipcm) and calculates total audio size
+5. **Multi-Track Audio**: Supports cameras with multiple mono tracks (e.g., 4×24-bit ipcm)
+6. **Codec Support**: Supports both H.264/AVC (`avc1`) and H.265/HEVC (`hvc1`) codecs
+
+### Buffer Requirements
+
+The implementation uses a 128MB buffer for GOP parsing to handle high-bitrate recordings:
+- 25fps H.264 4K: ~6 MB per GOP
+- 50fps HEVC 4K: ~25 MB per GOP
 
 ### Command-Line Usage
 
@@ -308,11 +368,23 @@ untrunc reference.mp4 corrupt.RSV
 
 # Force RSV mode
 untrunc -rsv reference.mp4 corrupt.RSV
+
+# For truncated reference files, use -dcc to skip chunk validation
+untrunc -dcc -rsv reference.mp4 corrupt.RSV
 ```
 
 The `-rsv` flag forces RSV recovery mode even if auto-detection fails.
 
+### Tested Configurations
+
+| Configuration | Video | Audio | Status |
+|---------------|-------|-------|--------|
+| H.264 25fps + stereo 16-bit | avc1 | twos | ✓ |
+| H.264 25fps + 4×mono 24-bit | avc1 | ipcm | ✓ |
+| HEVC 50fps + stereo 16-bit | hvc1 | twos | ✓ |
+| HEVC 23.98fps + stereo 16-bit | hvc1 | twos | ✓ |
+
 ---
 
-*This documentation was created during the development of RSV recovery support for untrunc. Last updated: November 2025*
+*This documentation was created during the development of RSV recovery support for untrunc. Last updated: January 2026*
 
