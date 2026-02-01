@@ -33,6 +33,7 @@ extern "C" {
 #include "mp4.h"
 #include "atom.h"
 #include "file.h"
+#include "rsv.h"
 
 using namespace std;
 
@@ -153,6 +154,7 @@ void Mp4::parseOk(const string& filename, bool accept_unhealthy) {
 		logg(V, "detected 'XAVC', deactivating 'g_strict_nal_frame_check'\n");
 		g_strict_nal_frame_check = false;
 		g_ignore_forbidden_nal_bit = false;
+		g_allow_large_sample = true;
 	}
 
 	has_moov_ = root_atom_->atomByName("moov", true);
@@ -1253,19 +1255,26 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 		return mdatFromRange(file_read, mdat);
 
 	if (!isPointingAtAtom(file_read)) {
-		logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");
-		auto moov = root_atom_->atomByNameSafe("moov");
-//		if (ftyp_ == "XAVC") {
-		if (orig_mdat_start_ < moov->start_) {
-			logg(I, "using orig_mdat_start_ (=", orig_mdat_start_, ")\n");
-			mdat.start_ = orig_mdat_start_;
-			mdat.name_ = "mdat";
-		}
-		else if (!g_search_mdat) {
-			logg(I, "assuming start_offset=0. \n",
-			     "      use '-sm' to search for 'mdat' atom instead (via brute-force)\n");
+		if (isPointingAtRtmdHeader(file_read)) {
+			logg(I, "found rtmd-header at start of file, rsv file?\n");
 			mdat.start_ = -8;
 			mdat.name_ = "mdat";
+		}
+		else {
+			logg(W, "no mp4-structure found in: '", file_read.filename_, "'\n");
+			auto moov = root_atom_->atomByNameSafe("moov");
+	//		if (ftyp_ == "XAVC") {
+			if (orig_mdat_start_ < moov->start_) {
+				logg(I, "using orig_mdat_start_ (=", orig_mdat_start_, ")\n");
+				mdat.start_ = orig_mdat_start_;
+				mdat.name_ = "mdat";
+			}
+			else if (!g_search_mdat) {
+				logg(I, "assuming start_offset=0. \n",
+					"      use '-sm' to search for 'mdat' atom instead (via brute-force)\n");
+				mdat.start_ = -8;
+				mdat.name_ = "mdat";
+			}
 		}
 	}
 
@@ -1660,7 +1669,7 @@ bool Mp4::chunkStartLooksInvalid(off_t offset, const Mp4::Chunk& c) {
 	}
 	else {
 		dbgg("getNextTrackViaDynPatterns does not agree", offset, c, t.predictable_start_cnt_);
-		if (t.predictable_start_cnt_ > 5) {
+		if (t.predictable_start_cnt_ > 5 && nearEnd(offset)) {
 			return true;
 		}
 		else {

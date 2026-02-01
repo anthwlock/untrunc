@@ -74,7 +74,7 @@ LenResult getLengths(Codec* self, const uchar* start, uint maxlength) {
 			break;
 		}
 
-		if (self->ss_stats_->wouldExceed("hvc1", length, nal_info.length_, self->was_keyframe_)) {
+		if (self->ss_stats_->wouldExceed("hvc1", length, nal_info.length_, g_allow_large_sample ? 1 : self->was_keyframe_)) {
 			return r;
 		}
 		if (self->ss_stats_->isBigEnough(length, self->was_keyframe_)) {

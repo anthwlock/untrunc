@@ -64,6 +64,7 @@ bool isPointingAtAtom(FileRead& file) {
 	return file.atEnd() || isValidAtomName(file.getPtr(8)+4);
 }
 
+
 void Atom::parse(FileRead& file) {
 	parseHeader(file);
 

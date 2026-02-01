@@ -46,6 +46,7 @@ bool g_dont_exclude = false;
 bool g_dump_repaired = false;
 bool g_search_mdat = false;
 bool g_strict_nal_frame_check = true;
+bool g_allow_large_sample = false;
 bool g_ignore_forbidden_nal_bit = false;
 bool g_dont_omit = false;
 bool g_noise_buffer_active = false;

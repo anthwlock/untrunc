@@ -58,7 +58,7 @@ struct SSTats {
 		z_score_min = (avg - min) / dev;
 
 		double z_score;
-		if ((z_score_max > 2.5 && rel_dev > 0.025) || (z_score_max > 1 && n < 35)) {
+		if ((z_score_max > 2.5 && rel_dev > 0.025) || (z_score_max > 2 && n < 35)) {
 			upper_bound = avg + 7*(max - min);
 			dbgg("fallback to save upper_bound", upper_bound);
 		} else {
