@@ -180,6 +180,7 @@ uiControl* Gui::settingsTab() {
 	auto chk_stretch = uiNewCheckbox("stretch video to match audio (-sv)");
 	auto chk_keep_unknown = uiNewCheckbox("keep unknown sequences (-k)");
 	auto chk_use_dyn = uiNewCheckbox("use dynamic stats (-dyn)");
+	auto chk_rsv_ben = uiNewCheckbox("RSV recovery mode (-rsv-ben)");
 
 	auto h_box_max_partsize = newHorizontalBox();
 	auto label_max_partsize = uiNewLabel("      max partsize (-mp)");
@@ -192,6 +193,7 @@ uiControl* Gui::settingsTab() {
 	uiBoxAppend(v_box_repair, uiControl(chk_stretch), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_keep_unknown), 0);
 	uiBoxAppend(v_box_repair, uiControl(chk_use_dyn), 0);
+	uiBoxAppend(v_box_repair, uiControl(chk_rsv_ben), 0);
 	uiBoxAppend(v_box_repair, uiControl(h_box_max_partsize), 0);
 	uiGroupSetChild(group_repair, uiControl(v_box_repair));
 	uiBoxAppend(v_box, uiControl(group_repair), 0);
@@ -238,6 +240,13 @@ uiControl* Gui::settingsTab() {
 	uiCheckboxOnToggled(chk_use_dyn, [](uiCheckbox* chk_box, void* data){
 		auto v = uiCheckboxChecked(chk_box);
 		g_use_chunk_stats = v;
+
+	}, nullptr);
+
+	uiCheckboxSetChecked(chk_rsv_ben, g_rsv_ben_mode);
+	uiCheckboxOnToggled(chk_rsv_ben, [](uiCheckbox* chk_box, void* data){
+		auto v = uiCheckboxChecked(chk_box);
+		g_rsv_ben_mode = v;
 
 	}, nullptr);
 

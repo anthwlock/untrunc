@@ -90,6 +90,7 @@ public:
 	void dumpSamples();
 	void analyze(bool gen_off_map=false);
 	void repair(const std::string& filename);
+	void repairRsvBen(const std::string& filename);
 
 	bool wouldMatch(const WouldMatchCfg& cfg);
 	bool wouldMatch2(const uchar* start);

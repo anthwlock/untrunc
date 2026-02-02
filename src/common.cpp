@@ -54,6 +54,7 @@ bool g_ignore_out_of_bound_chunks = false;
 bool g_skip_existing = false;
 bool g_ignore_keyframe_mismatch = false;
 bool g_skip_nal_filler_data = false;
+bool g_rsv_ben_mode = false;
 bool g_off_as_hex = true;
 bool g_fast_assert = false;
 bool g_no_ctts = false;

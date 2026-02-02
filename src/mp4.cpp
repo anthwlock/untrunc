@@ -572,6 +572,7 @@ string Mp4::getOutputSuffix() {
 	if (g_use_chunk_stats) output_suffix += "-dyn";
 	if (g_dont_exclude) output_suffix += "-k";
 	if (g_stretch_video) output_suffix += "-sv";
+	if (g_rsv_ben_mode) output_suffix += "-rsvBen";
 	return output_suffix;
 }
 
@@ -1256,7 +1257,7 @@ BufferedAtom* Mp4::findMdat(FileRead& file_read) {
 
 	if (!isPointingAtAtom(file_read)) {
 		if (isPointingAtRtmdHeader(file_read)) {
-			logg(I, "found rtmd-header at start of file, rsv file?\n");
+			logg(I, "found rtmd-header at start of file, probably a .RSV file. Try '-rsv-ben' too\n");
 			mdat.start_ = -8;
 			mdat.name_ = "mdat";
 		}
@@ -2245,6 +2246,16 @@ bool Mp4::setDuplicateInfo() {
 
 void Mp4::repair(const string& filename) {
 	if (chkBadFFmpegVersion()) {
+		return;
+	}
+
+	// Check for RSV Ben mode
+	if (g_rsv_ben_mode) {
+		FileRead file_read(filename);
+		if (!isPointingAtRtmdHeader(file_read)) {
+			logg(W, "'-rsv-ben' specified but file does not start with rtmd header\n");
+		}
+		repairRsvBen(filename);
 		return;
 	}
 

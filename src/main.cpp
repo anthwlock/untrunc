@@ -39,6 +39,7 @@ void usage() {
 	     << "-s  - step through unknown sequences\n"
 	     << "-st <step_size> - used with '-s'\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
+	     << "-rsv-ben - RSV file recovery (Sony recording-in-progress files)\n"
 	     << "-dw - don't write _fixed.mp4\n"
 	     << "-dr - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
@@ -153,6 +154,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "u") unite = true;
 			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
 			else if (a == "dyn") g_use_chunk_stats = true;
+			else if (a == "rsv-ben") g_rsv_ben_mode = true;
 			else if (a == "range") arg_range = kExpectArg;
 			else if (a == "dst") arg_dst = kExpectArg;
 			else if (a == "skip") g_skip_existing = true;
@@ -174,6 +176,16 @@ int main(int argc, char *argv[]) {
 
 	if (!g_ignore_unknown && arg_step > 0)
 		logg(ET, "setting step_size without using '-s'\n");
+
+	// Check -rsv-ben incompatibilities
+	if (g_rsv_ben_mode) {
+		if (g_ignore_unknown)
+			logg(ET, "'-rsv-ben' is not compatible with '-s'\n");
+		if (g_dont_exclude)
+			logg(ET, "'-rsv-ben' is not compatible with '-k'\n");
+		if (g_use_chunk_stats)
+			logg(ET, "'-rsv-ben' is not compatible with '-dyn'\n");
+	}
 
 	bool skip_info = find_atoms;
 	if (!skip_info) {
