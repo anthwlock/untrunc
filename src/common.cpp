@@ -325,8 +325,16 @@ int64_t gcd(int64_t a, int64_t b) {
 }
 
 mt19937& getRandomGenerator() {
-	static std::random_device rd;
-	static std::mt19937 gen(rd());
+	static std::mt19937 gen = []() {
+		const char* seed_env = std::getenv("UNTRUNC_SEED");
+		if (seed_env) {
+			auto seed = std::stoul(seed_env);
+			logg(I, "using fixed random seed: ", seed, "\n");
+			return std::mt19937(seed);
+		}
+		std::random_device rd;
+		return std::mt19937(rd());
+	}();
 	return gen;
 }
 
