@@ -56,8 +56,7 @@ uint MutualPattern::intersectLen(const uchar* other) {
 	auto data = data_.data();
 
 	for (uint i=first_mutual_; i < mutual_till_; i++) {
-		if (!is_mutual[i]) continue;
-		if (data[i] == other[i]) sum++;
+		sum += is_mutual[i] & (data[i] == other[i]);
 	}
 	return sum;
 }
@@ -65,8 +64,7 @@ uint MutualPattern::intersectLen(const uchar* other) {
 uint MutualPattern::intersectLenHalf(const uchar* other) {
 	uint start_idx = data_.size() / 2, sum = 0;
 	for (uint i=start_idx; i < mutual_till_; i++) {
-		if (!is_mutual_[i]) continue;
-		if (data_[i] == other[i-start_idx]) sum++;
+		sum += is_mutual_[i] & (data_[i] == other[i-start_idx]);
 	}
 	return sum;
 }
