@@ -280,8 +280,8 @@ uiControl* Gui::settingsTab() {
 	defineFileForAnalyze(); \
 	Mp4 mp4; \
 	try { \
-		mp4.parseOk(file_ok); \
 		g_mp4 = &mp4; \
+		mp4.parseOk(file_ok); \
 	} \
 	CATCH_THEM(return);
 
