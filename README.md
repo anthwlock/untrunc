@@ -25,7 +25,19 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 
 ## Building
 
-Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).\
+Windows and macOS users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).
+
+### Supported Architectures (Releases)
+
+| Platform | CPU | File |
+|---|---|---|
+| Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-linux-amd64` |
+| Linux 64-bit (ARM) | aarch64 | `untrunc-linux-arm64` |
+| Linux 32-bit (ARM) | armv7 | `untrunc-linux-armv7` |
+| Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
+| macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
+| macOS (Apple Silicon) | arm64 | `untrunc-macos-arm64` |
+
 In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
 
 #### With system libraries
@@ -92,6 +104,21 @@ docker run --rm -v ~/Videos/:/mnt untrunc /mnt/ok.mp4 /mnt/broken.mp4
 If you have `snap`, you can use `sudo snap install --edge untrunc-anthwlock`.
 
 [![untrunc-anthwlock](https://snapcraft.io//untrunc-anthwlock/badge.svg)](https://snapcraft.io/untrunc-anthwlock)
+
+## Arch Linux (AUR)
+
+AUR binary package: [untrunc-anthwlock-bin](https://aur.archlinux.org/packages/untrunc-anthwlock-bin)
+
+```bash
+# With an AUR helper (recommended)
+paru -S untrunc-anthwlock-bin
+yay -S untrunc-anthwlock-bin
+
+# Manually
+git clone https://aur.archlinux.org/untrunc-anthwlock-bin.git
+cd untrunc-anthwlock-bin
+makepkg -si
+```
 
 ## Using
 
