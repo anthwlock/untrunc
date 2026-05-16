@@ -26,7 +26,7 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 ## Building
 
 Windows users can download the latest version [here](https://github.com/anthwlock/untrunc/releases/latest).\
-In certain cases a specific version of ffmpeg is needed. Untrunc works great with ffmpeg 3.3.9.
+It should build with most versions of ffmpeg, but it is most thoroughly tested against 3.3.9, so if you are having issues, try building with 3.3.9 first (see ["With local libraries"](#with-local-libraries) below).
 
 #### With system libraries
 
@@ -114,6 +114,8 @@ That's it you're done!
 
 #### Reporting issues
 Use the `-v` parameter for a more detailed output. Both the healthy and corrupt file might be needed to help you.
+
+If you are having an issues after building `untrunc` with a recent version of ffmpeg, try building it against 3.3.9 first, and include whether that fixes the issue or not in your report. Updates to ffmpeg's internal libraries in recent versions may break `untrunc` in ways that haven't been fixed yet.
 
 #### Donation
 If this software helped you please consider donating [here](https://www.paypal.me/anthwlock)!\
