@@ -1,78 +1,61 @@
-# Proposal: reference-driven MXF repair
+# Reference-driven MXF repair
 
-## Motivation
-
-Untrunc currently repairs ISO Base Media File Format files by borrowing structure from a
-known-good recording. MXF uses SMPTE KLV partition packs rather than MP4 atoms, but the same
-operator workflow is useful for interrupted camera and broadcast recordings:
+## Workflow
 
     untrunc -mxf reference.mxf damaged.mxf
+    untrunc -mxf -dst repaired.mxf reference.mxf damaged.mxf
 
-The reference must come from the same recorder profile and use the same Operational Pattern,
-essence container labels, track layout, edit rate, and descriptor configuration.
+MXF uses SMPTE KLV partition packs rather than MP4 atoms. The repair path therefore has its
+own streaming parser and does not route MXF data through the MP4 Atom classes.
 
-## Safe initial scope
+The reference must come from the same recorder profile. The implementation verifies the
+Operational Pattern, BodySID, IndexSID, stream count, codec identifiers, raster dimensions,
+sample formats, sample rates, time bases, and codec configuration before producing output.
 
-The first implementation should target partitioned OP-1a files whose essence body remains
-present but whose header metadata, footer partition, index table, or Random Index Pack is
-missing or truncated.
+## Reconstruction
 
-1. Scan both files for SMPTE partition-pack Universal Labels and parse BER lengths.
-2. Compare the Preface OperationalPattern, EssenceContainers set, Material/Source Package
-   track layout, File Descriptors, edit rates, BodySID, and IndexSID. Refuse repair on any
-   incompatibility unless a future explicit force option is supplied.
-3. Copy structural header metadata from the reference, but never copy reference essence.
-4. Walk recoverable KLV essence in the damaged body and derive actual edit-unit boundaries.
-5. Rebuild IndexTableSegment entries from the damaged essence. Do not reuse reference
-   stream offsets or durations.
-6. Rewrite ThisPartition, PreviousPartition, FooterPartition, HeaderByteCount,
-   IndexByteCount, BodyOffset, and KAG-aligned fill.
-7. Generate a closed-complete footer partition and a new Random Index Pack.
-8. Write damaged.mxf_fixed.mxf atomically and report preserved essence/edit-unit counts.
+1. Scan both files with fixed-size windows and 64-bit offsets. File size is not capped and
+   recording contents are never loaded wholesale into memory.
+2. Locate and bounds-check Header, Body, and Footer Partition Pack KLVs plus any existing
+   Random Index Pack.
+3. Copy only reference header metadata; reference essence is never copied.
+4. Stream damaged-file body and footer data into a structural intermediate.
+5. Rewrite ThisPartition, PreviousPartition, and FooterPartition references after the header
+   size change and discard a stale RIP.
+6. Open the reconstructed intermediate through libavformat and compare its complete stream
+   profile against the known-good reference.
+7. Demux every recoverable damaged-file packet and remux it through the FFmpeg MXF or
+   MXF OP-Atom muxer. This rebuilds edit-unit indexing, durations, header/footer metadata,
+   KAG layout, partition offsets, and the RIP from actual recovered packets.
+8. Remove the structural intermediate. A failed validation or remux also removes partial
+   output rather than leaving a file that appears repaired.
 
-## Refusal and validation rules
+The final remux delegates codec and wrapping support to the FFmpeg version linked into
+untrunc, so new MXF codecs supported by libavformat do not require parallel packet parsers
+inside untrunc.
 
-Repair should fail without modifying the input when:
+## Refusal rules
 
-- no valid Header or Body Partition Pack can be found;
-- reference and damaged Operational Patterns differ;
-- essence container labels, track count, descriptors, edit rates, BodySID, or IndexSID differ;
-- encrypted essence or an unsupported clip-wrapped/container mapping is encountered;
-- a BER length, KLV extent, or partition offset exceeds the file;
-- the damaged essence cannot be segmented without guessing.
+Repair fails without modifying either input when:
 
-The implementation should stream files and keep only metadata/index state in memory so
-multi-hundred-gigabyte broadcast MXF files remain practical.
+- no bounded Header or Body Partition Pack can be found;
+- BER lengths or KLV extents exceed the source file;
+- reference and damaged Operational Patterns, SIDs, or stream profiles differ;
+- libavformat cannot demux the recovered essence;
+- the selected MXF muxer cannot represent one of the recovered streams;
+- no media packets can be recovered;
+- writing or finalizing the new MXF fails.
 
-## Suggested architecture
-
-Add an MXF-specific module instead of extending the MP4 Atom classes:
-
-- MxfKlvReader: bounded UL/BER/KLV parsing and resynchronization;
-- MxfPartitionMap: Header/Body/Footer/RIP discovery and offset validation;
-- MxfReferenceProfile: compatibility fingerprint derived from metadata sets;
-- MxfEssenceScanner: codec/container-specific edit-unit discovery;
-- MxfWriter: KAG alignment, partition rewriting, index construction, and RIP output.
-
-Start with frame-wrapped MPEG-2/XDCAM OP-1a, then add AVC-Intra and DNxHD/DNxHR fixtures.
-Clip-wrapped formats should remain explicitly unsupported until their duration/index rules
-are implemented.
+There is intentionally no force option that bypasses reference compatibility.
 
 ## Tests
 
-Use tiny generated or synthetic fixtures and assert:
+The regression suite generates real OP-1a MPEG-2 video plus PCM audio fixtures and verifies:
 
-- reference metadata is present in the repaired file;
-- damaged-file essence is byte-identical and reference essence never leaks into output;
-- partition chains and RIP offsets point inside the output and are monotonically valid;
-- truncated Header, Footer, IndexTableSegment, and RIP cases repair independently;
-- incompatible Operational Pattern, descriptor, edit-rate, and SID fixtures are rejected;
-- malformed BER lengths and forged huge offsets are rejected without excessive allocation;
-- ffprobe, mediainfo, and an MXF conformance checker can read the repaired duration,
-  streams, timecode, and edit-unit count.
-
-## Review strategy
-
-Land the bounded KLV reader and partition-map tests first. Add the compatibility fingerprint
-second, and add one essence scanner plus writer in a third change. This keeps parser security,
-format compatibility, and media reconstruction independently reviewable.
+- a destroyed header is replaced from the reference;
+- damaged-file video and audio packets are recovered and reindexed;
+- the result is readable by ffprobe with the expected codecs and packet count;
+- the reference recording is not substituted for damaged essence;
+- temporary structural files are removed;
+- Operational Pattern mismatches are rejected;
+- same-OP files with incompatible raster descriptors are rejected.

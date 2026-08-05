@@ -1,38 +1,53 @@
 #!/bin/sh
 set -eu
+FFMPEG=${FFMPEG:-ffmpeg}
+FFPROBE=${FFPROBE:-ffprobe}
 UNTRUNC=${UNTRUNC:-./untrunc}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT HUP INT TERM
+
+make_mxf() {
+ "$FFMPEG" -v error -y -f lavfi -i "$1=size=$4:rate=25"   -f lavfi -i sine=frequency="$2":sample_rate=48000 -t 2   -c:v mpeg2video -pix_fmt yuv422p -g 12 -b:v 2M   -c:a pcm_s16le -ar 48000 -f mxf "$3"
+}
+make_mxf testsrc 440 "$work/reference.mxf" 160x90
+make_mxf testsrc 440 "$work/wrong-raster-reference.mxf" 320x180
+make_mxf testsrc2 880 "$work/complete-damaged.mxf" 160x90
+
 python3 - "$work" <<'PY'
-import pathlib,struct,sys
-root=pathlib.Path(sys.argv[1]); prefix=bytes.fromhex("060e2b34020501010d01020101")
-op=bytes.fromhex("060e2b34040101010d01020101010900"); rip=bytes.fromhex("060e2b34020501010d01020101110100")
-def ber(n): return b"\x83"+n.to_bytes(3,"big")
-def part(kind,this,marker=b"",pattern=op):
- v=struct.pack(">HHIQQQQQIQI16s",1,3,1,this,0,0,len(marker),0,0,0,1,pattern)+marker
- return prefix+bytes((kind,4,0))+ber(len(v))+v
-gh=part(2,0,b"KNOWN-GOOD-HEADER"); gb=part(3,len(gh),b"REFERENCE-ESSENCE")
-(root/"good.mxf").write_bytes(gh+gb)
-bh=part(2,0,b"BROKEN-HEADER"); bb=part(3,len(bh),b"DAMAGED-FILE-ESSENCE")
-(root/"damaged.mxf").write_bytes(bh+bb+rip+ber(16)+struct.pack(">IQI",1,len(bh),36))
-badop=bytes.fromhex("060e2b34040101010d01020101010a00")
-(root/"incompatible.mxf").write_bytes(bh+part(3,len(bh),b"ESSENCE",badop))
-PY
-"$UNTRUNC" -mxf -dst "$work/fixed.mxf" "$work/good.mxf" "$work/damaged.mxf"
-grep -a -q "KNOWN-GOOD-HEADER" "$work/fixed.mxf"
-grep -a -q "DAMAGED-FILE-ESSENCE" "$work/fixed.mxf"
-! grep -a -q "REFERENCE-ESSENCE" "$work/fixed.mxf"
-python3 - "$work/fixed.mxf" <<'PY'
 import pathlib,sys
-d=pathlib.Path(sys.argv[1]).read_bytes()
-rip=bytes.fromhex("060e2b34020501010d01020101110100")
-body=bytes.fromhex("060e2b34020501010d01020101030400")
-assert d.count(rip)==1
-off=d.index(body); value=off+20
-assert int.from_bytes(d[value+8:value+16],"big")==off
-assert int.from_bytes(d[value+16:value+24],"big")==0
+p=pathlib.Path(sys.argv[1])
+d=bytearray((p/"complete-damaged.mxf").read_bytes())
+body=bytes.fromhex("060e2b34020501010d0102010103")
+off=d.index(body)
+assert off>0
+damaged=bytearray(d)
+damaged[:off]=b"\0"*off
+(p/"damaged.mxf").write_bytes(damaged)
+incompatible=bytearray(damaged)
+value=off+16
+first=incompatible[value]
+ber=1 if first<128 else 1+(first&0x7f)
+incompatible[value+ber+64+15]^=1
+(p/"incompatible.mxf").write_bytes(incompatible)
 PY
-if "$UNTRUNC" -mxf -dst "$work/no.mxf" "$work/good.mxf" "$work/incompatible.mxf"; then
+
+"$UNTRUNC" -mxf -dst "$work/fixed.mxf" "$work/reference.mxf" "$work/damaged.mxf"
+video=$("$FFPROBE" -v error -select_streams v:0 -show_entries stream=codec_name  -of default=noprint_wrappers=1:nokey=1 "$work/fixed.mxf")
+audio=$("$FFPROBE" -v error -select_streams a:0 -show_entries stream=codec_name  -of default=noprint_wrappers=1:nokey=1 "$work/fixed.mxf")
+packets=$("$FFPROBE" -v error -count_packets -show_entries stream=nb_read_packets  -of csv=p=0 "$work/fixed.mxf" | awk -F, '{for(i=1;i<=NF;i++)s+=$i} END{print s+0}')
+test "$video" = mpeg2video
+test "$audio" = pcm_s16le
+test "$packets" -gt 50
+cmp "$work/fixed.mxf" "$work/reference.mxf" >/dev/null && {
+ echo "repair copied the reference recording instead of damaged essence" >&2; exit 1;
+}
+test ! -e "$work/fixed.mxf.untrunc-structure.tmp"
+
+if "$UNTRUNC" -mxf -dst "$work/no.mxf" "$work/reference.mxf" "$work/incompatible.mxf"; then
  echo "incompatible Operational Pattern was accepted" >&2; exit 1
 fi
 test ! -e "$work/no.mxf"
+if "$UNTRUNC" -mxf -dst "$work/wrong-profile.mxf" "$work/wrong-raster-reference.mxf" "$work/damaged.mxf"; then
+ echo "incompatible stream profile was accepted" >&2; exit 1
+fi
+test ! -e "$work/wrong-profile.mxf"

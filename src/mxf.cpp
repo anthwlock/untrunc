@@ -3,161 +3,245 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
 
+extern "C" {
+#include <libavformat/avformat.h>
+#include <libavutil/avutil.h>
+#include <libavutil/dict.h>
+}
+
 using namespace std;
 
 namespace {
-constexpr array<uint8_t, 13> kPartitionPrefix = {
-    0x06,0x0e,0x2b,0x34,0x02,0x05,0x01,0x01,0x0d,0x01,0x02,0x01,0x01
-};
-constexpr array<uint8_t, 16> kRipKey = {
-    0x06,0x0e,0x2b,0x34,0x02,0x05,0x01,0x01,0x0d,0x01,0x02,0x01,0x01,0x11,0x01,0x00
-};
-constexpr uint64_t kMaxPrototypeBytes = uint64_t(2) << 30;
+constexpr array<uint8_t,13> kPartitionPrefix={
+ 0x06,0x0e,0x2b,0x34,0x02,0x05,0x01,0x01,0x0d,0x01,0x02,0x01,0x01};
+constexpr array<uint8_t,16> kRipKey={
+ 0x06,0x0e,0x2b,0x34,0x02,0x05,0x01,0x01,0x0d,0x01,0x02,0x01,0x01,0x11,0x01,0x00};
+constexpr size_t kWindow=4*1024*1024;
 
 struct Partition {
-    uint64_t offset;
-    uint8_t kind;
-    size_t value_offset;
-    uint64_t value_length;
-    uint32_t index_sid;
-    uint32_t body_sid;
+ uint64_t offset=0,value_offset=0,value_length=0;
+ uint8_t kind=0;
+ uint32_t index_sid=0,body_sid=0;
+ array<uint8_t,16> operational_pattern{};
 };
 
-uint32_t readBe32(const vector<uint8_t>& d, size_t p) {
-    if (p + 4 > d.size()) throw runtime_error("truncated MXF partition pack");
-    uint32_t v = 0;
-    for (size_t i=0;i<4;++i) v=(v<<8)|d[p+i];
-    return v;
+uint32_t be32(const uint8_t* p) {
+ return (uint32_t(p[0])<<24)|(uint32_t(p[1])<<16)|(uint32_t(p[2])<<8)|p[3];
 }
-void writeBe32(vector<uint8_t>& d, size_t p, uint32_t v) {
-    if (p + 4 > d.size()) throw runtime_error("truncated MXF output");
-    for (int i=3;i>=0;--i) { d[p+i]=uint8_t(v); v>>=8; }
+void put32(ostream& out,uint32_t v) {
+ uint8_t b[4]={uint8_t(v>>24),uint8_t(v>>16),uint8_t(v>>8),uint8_t(v)};
+ out.write(reinterpret_cast<char*>(b),4);
 }
-void writeBe64(vector<uint8_t>& d, size_t p, uint64_t v) {
-    if (p + 8 > d.size()) throw runtime_error("truncated MXF output");
-    for (int i=7;i>=0;--i) { d[p+i]=uint8_t(v); v>>=8; }
+void put64(ostream& out,uint64_t v) {
+ uint8_t b[8];
+ for(int i=7;i>=0;--i){b[i]=uint8_t(v);v>>=8;}
+ out.write(reinterpret_cast<char*>(b),8);
 }
-bool readBer(const vector<uint8_t>& d, size_t p, uint64_t& v, size_t& n) {
-    if (p >= d.size()) return false;
-    uint8_t first=d[p];
-    if (!(first&0x80)) { v=first; n=1; return true; }
-    size_t count=first&0x7f;
-    if (!count || count>8 || p+1+count>d.size()) return false;
-    v=0;
-    for (size_t i=0;i<count;++i) v=(v<<8)|d[p+1+i];
-    n=1+count;
-    return true;
+void patch64(fstream& out,uint64_t off,uint64_t v) {
+ out.seekp(static_cast<streamoff>(off));
+ put64(out,v);
+ if(!out) throw runtime_error("could not patch MXF partition");
 }
-vector<uint8_t> readAll(const string& path) {
-    ifstream f(path,ios::binary|ios::ate);
-    if (!f) throw runtime_error("could not open MXF file: "+path);
-    auto end=f.tellg();
-    if (end<0 || uint64_t(end)>kMaxPrototypeBytes)
-        throw runtime_error("MXF prototype currently supports files up to 2 GiB");
-    vector<uint8_t> d(static_cast<size_t>(end));
-    f.seekg(0);
-    if (!d.empty() && !f.read(reinterpret_cast<char*>(d.data()),d.size()))
-        throw runtime_error("could not read MXF file: "+path);
-    return d;
+uint64_t fileSize(const string& path) {
+ ifstream f(path,ios::binary|ios::ate);
+ if(!f) throw runtime_error("could not open MXF file: "+path);
+ auto n=f.tellg();
+ if(n<0) throw runtime_error("could not size MXF file: "+path);
+ return static_cast<uint64_t>(n);
 }
-vector<Partition> partitions(const vector<uint8_t>& d) {
-    vector<Partition> out;
-    for (size_t p=0;p+17<=d.size();++p) {
-        if (!equal(kPartitionPrefix.begin(),kPartitionPrefix.end(),d.begin()+p)) continue;
-        uint8_t kind=d[p+13];
-        if (kind<2 || kind>4) continue;
-        uint64_t len=0; size_t ber=0;
-        if (!readBer(d,p+16,len,ber) || len<80) continue;
-        size_t value=p+16+ber;
-        if (len>d.size()-value) continue;
-        out.push_back({p,kind,value,len,readBe32(d,value+48),readBe32(d,value+60)});
-        p=value+size_t(len)-1;
-    }
-    return out;
+bool readAt(ifstream& f,uint64_t off,uint8_t* p,size_t n) {
+ f.clear(); f.seekg(static_cast<streamoff>(off));
+ return bool(f.read(reinterpret_cast<char*>(p),static_cast<streamsize>(n)));
 }
-const Partition& firstKind(const vector<Partition>& ps,uint8_t kind,const char* what) {
-    for (const auto& p:ps) if (p.kind==kind) return p;
-    throw runtime_error(string("MXF has no valid ")+what+" partition");
+bool readBer(ifstream& f,uint64_t off,uint64_t& value,size_t& bytes) {
+ uint8_t first;
+ if(!readAt(f,off,&first,1)) return false;
+ if(!(first&0x80)){value=first;bytes=1;return true;}
+ size_t count=first&0x7f;
+ if(!count||count>8)return false;
+ uint8_t b[8];
+ if(!readAt(f,off+1,b,count))return false;
+ value=0;
+ for(size_t i=0;i<count;++i)value=(value<<8)|b[i];
+ bytes=1+count;return true;
 }
-bool sameOperationalPattern(const vector<uint8_t>& a,const Partition& pa,
-                            const vector<uint8_t>& b,const Partition& pb) {
-    return equal(a.begin()+pa.value_offset+64,a.begin()+pa.value_offset+80,
-                 b.begin()+pb.value_offset+64);
+bool parsePartition(ifstream& f,uint64_t size,uint64_t off,Partition& p) {
+ uint8_t key[16];
+ if(!readAt(f,off,key,16)||!equal(kPartitionPrefix.begin(),kPartitionPrefix.end(),key))
+  return false;
+ if(key[13]<2||key[13]>4)return false;
+ uint64_t len;size_t ber;
+ if(!readBer(f,off+16,len,ber)||len<80||off+16+ber>size||len>size-(off+16+ber))
+  return false;
+ uint8_t head[80];
+ uint64_t value=off+16+ber;
+ if(!readAt(f,value,head,sizeof(head)))return false;
+ p.offset=off;p.kind=key[13];p.value_offset=value;p.value_length=len;
+ p.index_sid=be32(head+48);p.body_sid=be32(head+60);
+ copy(head+64,head+80,p.operational_pattern.begin());
+ return true;
 }
-size_t ripOffset(const vector<uint8_t>& d) {
-    if (d.size()<20) return d.size();
-    size_t begin=d.size()>65536?d.size()-65536:0;
-    for (size_t p=d.size()-16;p>=begin;--p) {
-        if (equal(kRipKey.begin(),kRipKey.end(),d.begin()+p)) return p;
-        if (p==0) break;
-    }
-    return d.size();
+struct Scan {
+ uint64_t size=0,rip=0;
+ vector<Partition> parts;
+};
+Scan scan(const string& path) {
+ ifstream f(path,ios::binary);
+ if(!f)throw runtime_error("could not open MXF file: "+path);
+ Scan s;s.size=fileSize(path);s.rip=s.size;
+ vector<uint8_t> buf(kWindow+15);
+ uint64_t base=0;size_t carry=0;
+ while(base<s.size){
+  uint64_t want=min<uint64_t>(kWindow,s.size-base);
+  f.clear();f.seekg(static_cast<streamoff>(base));
+  f.read(reinterpret_cast<char*>(buf.data()+carry),static_cast<streamsize>(want));
+  size_t got=carry+static_cast<size_t>(f.gcount());
+  uint64_t start=base-carry;
+  for(size_t i=0;i+16<=got;++i){
+   uint64_t absolute=start+i;
+   if(equal(kRipKey.begin(),kRipKey.end(),buf.begin()+i))s.rip=min(s.rip,absolute);
+   if(equal(kPartitionPrefix.begin(),kPartitionPrefix.end(),buf.begin()+i)){
+    Partition p;
+    if(parsePartition(f,s.size,absolute,p)&&
+       (s.parts.empty()||s.parts.back().offset!=p.offset))s.parts.push_back(p);
+   }
+  }
+  carry=min<size_t>(15,got);
+  if(carry)copy(buf.begin()+got-carry,buf.begin()+got,buf.begin());
+  base+=want;
+ }
+ return s;
 }
-void append32(vector<uint8_t>& d,uint32_t v) {
-    size_t p=d.size(); d.resize(p+4); writeBe32(d,p,v);
+const Partition& first(const vector<Partition>& ps,uint8_t kind,const char* label){
+ for(const auto& p:ps)if(p.kind==kind)return p;
+ throw runtime_error(string("MXF has no valid ")+label+" partition");
 }
-void append64(vector<uint8_t>& d,uint64_t v) {
-    size_t p=d.size(); d.resize(p+8); writeBe64(d,p,v);
+void copyRange(ifstream& in,ostream& out,uint64_t begin,uint64_t end){
+ vector<char> b(kWindow);in.clear();in.seekg(static_cast<streamoff>(begin));
+ while(begin<end){
+  size_t n=static_cast<size_t>(min<uint64_t>(b.size(),end-begin));
+  if(!in.read(b.data(),static_cast<streamsize>(n)))throw runtime_error("truncated MXF while copying");
+  out.write(b.data(),static_cast<streamsize>(n));
+  if(!out)throw runtime_error("could not write MXF intermediate");
+  begin+=n;
+ }
 }
-void appendRip(vector<uint8_t>& out,const vector<Partition>& ps,int64_t delta) {
-    vector<pair<uint32_t,uint64_t>> entries;
-    entries.push_back({0,0});
-    for (const auto& p:ps)
-        entries.push_back({p.body_sid,uint64_t(int64_t(p.offset)+delta)});
-    uint32_t value_len=uint32_t(entries.size()*12+4);
-    uint32_t total=16+4+value_len;
-    out.insert(out.end(),kRipKey.begin(),kRipKey.end());
-    out.push_back(0x83);
-    out.push_back(uint8_t(value_len>>16)); out.push_back(uint8_t(value_len>>8)); out.push_back(uint8_t(value_len));
-    for (const auto& e:entries) { append32(out,e.first); append64(out,e.second); }
-    append32(out,total);
+string avError(int code){
+ char b[AV_ERROR_MAX_STRING_SIZE];av_strerror(code,b,sizeof(b));return b;
+}
+void validateProfiles(const string& reference,const string& reconstructed){
+ AVFormatContext* a=nullptr;AVFormatContext* b=nullptr;
+ auto openInfo=[](const string& path,AVFormatContext** ctx){
+  int r=avformat_open_input(ctx,path.c_str(),nullptr,nullptr);
+  if(r>=0)r=avformat_find_stream_info(*ctx,nullptr);
+  return r;
+ };
+ int r=openInfo(reference,&a);
+ if(r<0)throw runtime_error("could not inspect reference MXF profile: "+avError(r));
+ r=openInfo(reconstructed,&b);
+ if(r<0){avformat_close_input(&a);throw runtime_error("could not inspect reconstructed MXF profile: "+avError(r));}
+ string mismatch;
+ if(a->nb_streams!=b->nb_streams)mismatch="stream count";
+ for(unsigned i=0;mismatch.empty()&&i<a->nb_streams;++i){
+  const AVStream* x=a->streams[i];const AVStream* y=b->streams[i];
+  const AVCodecParameters* p=x->codecpar;const AVCodecParameters* q=y->codecpar;
+  if(p->codec_type!=q->codec_type||p->codec_id!=q->codec_id)mismatch="codec";
+  else if(p->width!=q->width||p->height!=q->height)mismatch="video dimensions";
+  else if(p->sample_rate!=q->sample_rate)mismatch="audio sample rate";
+  else if(p->format!=q->format&&p->format>=0&&q->format>=0)mismatch="media sample format";
+  else if(av_cmp_q(x->time_base,y->time_base))mismatch="stream time base";
+  else if(p->extradata_size&&q->extradata_size&&
+          (p->extradata_size!=q->extradata_size||
+           !equal(p->extradata,p->extradata+p->extradata_size,q->extradata)))
+   mismatch="codec configuration";
+ }
+ avformat_close_input(&a);avformat_close_input(&b);
+ if(!mismatch.empty())throw runtime_error("reference and damaged MXF profiles differ: "+mismatch);
+}
+void remux(const string& input,const string& output,const char* muxer){
+ AVFormatContext* in=nullptr;AVFormatContext* out=nullptr;AVPacket pkt;
+ int r=avformat_open_input(&in,input.c_str(),nullptr,nullptr);
+ if(r<0)throw runtime_error("reconstructed MXF could not be opened: "+avError(r));
+ auto closeIn=[&](){if(in)avformat_close_input(&in);};
+ r=avformat_find_stream_info(in,nullptr);
+ if(r<0){closeIn();throw runtime_error("could not read reconstructed MXF streams: "+avError(r));}
+ r=avformat_alloc_output_context2(&out,nullptr,muxer,output.c_str());
+ if(r<0||!out){closeIn();throw runtime_error("FFmpeg MXF muxer is unavailable");}
+ av_dict_copy(&out->metadata,in->metadata,0);
+ for(unsigned i=0;i<in->nb_streams;++i){
+  AVStream* src=in->streams[i];AVStream* dst=avformat_new_stream(out,nullptr);
+  if(!dst){avformat_free_context(out);closeIn();throw runtime_error("could not allocate MXF stream");}
+  r=avcodec_parameters_copy(dst->codecpar,src->codecpar);
+  if(r<0){avformat_free_context(out);closeIn();throw runtime_error("could not copy MXF stream parameters");}
+  dst->codecpar->codec_tag=0;dst->time_base=src->time_base;
+  av_dict_copy(&dst->metadata,src->metadata,0);
+ }
+ if(!(out->oformat->flags&AVFMT_NOFILE)){
+  r=avio_open(&out->pb,output.c_str(),AVIO_FLAG_WRITE);
+  if(r<0){avformat_free_context(out);closeIn();throw runtime_error("could not create repaired MXF: "+avError(r));}
+ }
+ r=avformat_write_header(out,nullptr);
+ if(r<0){if(out->pb)avio_closep(&out->pb);avformat_free_context(out);closeIn();throw runtime_error("could not write MXF header: "+avError(r));}
+ int64_t packets=0;
+ while((r=av_read_frame(in,&pkt))>=0){
+  AVStream* src=in->streams[pkt.stream_index];AVStream* dst=out->streams[pkt.stream_index];
+  av_packet_rescale_ts(&pkt,src->time_base,dst->time_base);pkt.pos=-1;
+  r=av_interleaved_write_frame(out,&pkt);av_packet_unref(&pkt);
+  if(r<0)break;
+  ++packets;
+ }
+ if(r!=AVERROR_EOF&&r<0){avio_closep(&out->pb);avformat_free_context(out);closeIn();throw runtime_error("failed while rebuilding MXF edit units: "+avError(r));}
+ r=av_write_trailer(out);
+ if(out->pb)avio_closep(&out->pb);
+ avformat_free_context(out);closeIn();
+ if(r<0||!packets)throw runtime_error(!packets?"no recoverable MXF edit units":"could not finalize repaired MXF: "+avError(r));
+ cout<<"Reindexed "<<packets<<" recovered MXF packet(s)"<<endl;
 }
 }
 
-void MxfRepair::repair(const string& reference,const string& damaged,const string& destination) {
-    auto good=readAll(reference), bad=readAll(damaged);
-    auto gp=partitions(good), bp=partitions(bad);
-    const auto& gh=firstKind(gp,2,"header");
-    const auto& gb=firstKind(gp,3,"body");
-    const auto& db=firstKind(bp,3,"body");
-    if (!sameOperationalPattern(good,gh,bad,db))
-        throw runtime_error("reference and damaged MXF Operational Patterns differ");
-    if (gb.body_sid!=db.body_sid || gb.index_sid!=db.index_sid)
-        throw runtime_error("reference and damaged MXF BodySID/IndexSID differ");
-
-    size_t good_body=size_t(gb.offset), bad_body=size_t(db.offset), bad_end=ripOffset(bad);
-    if (bad_end<bad_body) throw runtime_error("damaged MXF Random Index Pack precedes body");
-    vector<uint8_t> out;
-    out.reserve(good_body+bad_end-bad_body+4096);
-    out.insert(out.end(),good.begin(),good.begin()+good_body);
-    out.insert(out.end(),bad.begin()+bad_body,bad.begin()+bad_end);
-
-    int64_t delta=int64_t(good_body)-int64_t(bad_body);
-    vector<Partition> copied;
-    for (const auto& p:bp) if (p.offset>=bad_body && p.offset<bad_end) copied.push_back(p);
-    uint64_t footer=0;
-    for (const auto& p:copied) if (p.kind==4) footer=uint64_t(int64_t(p.offset)+delta);
-    writeBe64(out,gh.value_offset+24,footer);
-    uint64_t previous=0;
-    for (auto p:copied) {
-        p.value_offset=size_t(int64_t(p.value_offset)+delta);
-        uint64_t here=uint64_t(int64_t(p.offset)+delta);
-        writeBe64(out,p.value_offset+8,here);
-        writeBe64(out,p.value_offset+16,previous);
-        writeBe64(out,p.value_offset+24,footer);
-        previous=here;
-    }
-    appendRip(out,copied,delta);
-
-    string target=destination.empty()?damaged+"_fixed.mxf":destination;
-    ofstream f(target,ios::binary|ios::trunc);
-    if (!f || (!out.empty() && !f.write(reinterpret_cast<const char*>(out.data()),out.size())))
-        throw runtime_error("could not write repaired MXF: "+target);
-    cout<<"Recovered MXF using compatible reference metadata: "<<target<<std::endl;
-    cout<<"Preserved "<<copied.size()<<" body/footer partition(s) and rebuilt the RIP\n";
+void MxfRepair::repair(const string& reference,const string& damaged,const string& destination){
+ Scan gs=scan(reference),ds=scan(damaged);
+ const auto& gh=first(gs.parts,2,"reference header");
+ const auto& gb=first(gs.parts,3,"reference body");
+ const auto& db=first(ds.parts,3,"damaged body");
+ if(gh.operational_pattern!=db.operational_pattern)
+  throw runtime_error("reference and damaged MXF Operational Patterns differ");
+ if(gb.body_sid!=db.body_sid||gb.index_sid!=db.index_sid)
+  throw runtime_error("reference and damaged MXF BodySID/IndexSID differ");
+ uint64_t bad_end=ds.rip;
+ if(bad_end<db.offset)throw runtime_error("damaged MXF RIP precedes its body");
+ string target=destination.empty()?damaged+"_fixed.mxf":destination;
+ string intermediate=target+".untrunc-structure.tmp";
+ {
+  ifstream good(reference,ios::binary),bad(damaged,ios::binary);
+  fstream out(intermediate,ios::binary|ios::in|ios::out|ios::trunc);
+  if(!good||!bad||!out)throw runtime_error("could not create MXF repair intermediate");
+  copyRange(good,out,0,gb.offset);
+  copyRange(bad,out,db.offset,bad_end);
+  int64_t delta=int64_t(gb.offset)-int64_t(db.offset);
+  uint64_t footer=0;
+  vector<Partition> copied;
+  for(const auto& p:ds.parts)if(p.offset>=db.offset&&p.offset<bad_end){
+   copied.push_back(p);if(p.kind==4)footer=uint64_t(int64_t(p.offset)+delta);
+  }
+  patch64(out,gh.value_offset+24,footer);
+  uint64_t previous=0;
+  for(const auto& p:copied){
+   uint64_t here=uint64_t(int64_t(p.offset)+delta);
+   uint64_t value=uint64_t(int64_t(p.value_offset)+delta);
+   patch64(out,value+8,here);patch64(out,value+16,previous);patch64(out,value+24,footer);
+   previous=here;
+  }
+ }
+ const char* muxer=gh.operational_pattern[13]==0x0d?"mxf_opatom":"mxf";
+ try{validateProfiles(reference,intermediate);remux(intermediate,target,muxer);}
+ catch(...){remove(intermediate.c_str());remove(target.c_str());throw;}
+ remove(intermediate.c_str());
+ cout<<"Recovered MXF using compatible reference metadata: "<<target<<endl;
 }
