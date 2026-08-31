@@ -316,6 +316,7 @@ public:
 	int dump_idx_ = 0;
 	bool chunkReachedSampleLimit();
 	int has_duplicates_ = false;
+	int skipped_empty_chunks_ = 0;
 private:
 	// from healthy file
 	std::vector<int> orig_sizes_;
