@@ -815,7 +815,10 @@ void Track::genChunkSizes() {
 
 void Track::pushBackLastChunk() {
 	if (!current_chunk_.n_samples_ && is_dummy_) return;  // dummyIsSkippable -> chkOffset -> pushBackLastChunk
-	assert(current_chunk_.n_samples_);
+	if (!current_chunk_.n_samples_) {
+		skipped_empty_chunks_++;
+		return;
+	}
 
 	if (is_dummy_ && current_chunk_.size_)
 		g_mp4->addUnknownSequence(current_chunk_.off_, current_chunk_.size_);

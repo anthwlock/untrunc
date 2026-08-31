@@ -524,7 +524,10 @@ void Mp4::saveVideo(const string& filename) {
 	for (auto it=tracks_.begin(); it != tracks_.end();) {
 		if (!it->getNumSamples()) {
 			moov->prune(it->trak_);
-			logg(I, "pruned empty '", it->codec_.name_, "' track\n");
+			if (it->skipped_empty_chunks_)
+				logg(W, "pruned empty '", it->codec_.name_, "' track (", it->skipped_empty_chunks_, " empty chunks skipped)\n");
+			else
+				logg(I, "pruned empty '", it->codec_.name_, "' track\n");
 			it = tracks_.erase(it);
 		}
 		else it++;
