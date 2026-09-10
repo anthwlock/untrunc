@@ -240,6 +240,8 @@ protected:
 #ifdef _WIN32
 void argv_as_utf8(int argc, char* argv[]);
 FILE* _my_open(const char* path, const wchar_t* mode);
+std::string to_utf8(const wchar_t* utf16);
+std::wstring to_utf16(const char* utf8);
 #define my_open(path, mode) _my_open(path, L ## mode)
 #else
 #define argv_as_utf8(...);
