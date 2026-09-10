@@ -40,6 +40,8 @@ using namespace std;
 uint64_t Mp4::step_ = 1;
 
 Mp4::~Mp4() {
+	if (context_) avformat_close_input(&context_);
+	delete current_file_;
 	delete root_atom_;
 }
 
