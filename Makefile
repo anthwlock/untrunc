@@ -185,7 +185,7 @@ $(EXE): print_info $(OBJ)
 	$(CXX) $(filter-out $<,$^) $(LDFLAGS) -o $@
 
 $(EXE)-gui: print_info $(filter-out $(DIR)/src/main.o, $(OBJ)) $(OBJ_GUI)
-	$(CXX) $(filter-out $<,$^) $(LDFLAGS) -o $@
+	$(CXX) $(filter-out $<,$^) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $@
 
 $(DIR)/%/win_resources.o: %/win_resources.rc
 	windres.EXE $< $@

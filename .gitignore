@@ -3,6 +3,8 @@
 .build_*
 untrunc
 untrunc-*
+!assets/**
+!*.png
 ffmpeg-*
 libav-*
 build

@@ -1,0 +1,461 @@
+name: Build Untrunc (Multi-Arch)
+
+on:
+  push:
+    tags: [ "v*" ]
+
+jobs:
+  get-ffmpeg-version:
+    name: Get Latest FFmpeg Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Get latest FFmpeg release
+        id: get-version
+        run: |
+          VERSION=$(curl -s https://ffmpeg.org/releases/ | grep -oP 'ffmpeg-\K[0-9]+\.[0-9]+(\.[0-9]+)?' | sort -V | tail -1)
+          echo "Latest FFmpeg version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  build-linux:
+    name: Linux (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    needs: get-ffmpeg-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            image: debian:12-slim
+          - arch: arm64
+            platform: linux/arm64
+            image: debian:12-slim
+          - arch: armv7
+            platform: linux/arm/v7
+            image: debian:12-slim
+          - arch: i386
+            platform: linux/386
+            image: i386/debian:12-slim
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Cache compiled FFmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-built-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
+
+      - name: Build FFmpeg inside Docker
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make wget nasm xz-utils && \
+              wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+                https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+                 ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak && \
+              cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }} && \
+              ./configure --disable-doc --disable-programs \
+                --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+                --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+                --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma && \
+              make -j\$(nproc) && \
+              chown -R \$(stat -c '%u:%g' /workspace) /workspace/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+            "
+
+      - name: Build untrunc inside Docker
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make && \
+              make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1 && \
+              mv untrunc untrunc-linux-${{ matrix.arch }}
+            "
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-linux-${{ matrix.arch }}
+          path: untrunc-linux-${{ matrix.arch }}
+
+  build-macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    needs: get-ffmpeg-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x86_64
+          - os: macos-14
+            arch: arm64
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Cache compiled FFmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-built-macos-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
+
+      - name: Install build tools
+        run: brew install nasm wget
+
+      - name: Build FFmpeg
+        if: steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+            https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+             ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak
+          cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          ./configure --disable-doc --disable-programs \
+            --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+            --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+            --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma \
+            --disable-audiotoolbox --disable-videotoolbox
+          make -j$(sysctl -n hw.logicalcpu)
+
+      - name: Build untrunc
+        run: |
+          make FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} IS_RELEASE=1
+          mv untrunc untrunc-macos-${{ matrix.arch }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-macos-${{ matrix.arch }}
+          path: untrunc-macos-${{ matrix.arch }}
+
+  # ---------------------------------------------------------------------------
+  # Windows builds intentionally use the OLD prebuilt FFmpeg 3.3.4 (not latest).
+  # Why:
+  # 1. No newer prebuilts exist in this format: ffmpeg.zeranoe.com shut down in
+  #    2020, so 3.x/4.x dev+shared zips are the last ones available. They are
+  #    mirrored in our own `win-deps-v1` release so CI doesn't depend on
+  #    web.archive.org.
+  # 2. Stability: untrunc reaches into FFmpeg internals (see src/ff_internal.h,
+  #    the FFCodec struct). That internal layout broke/changed in newer FFmpeg
+  #    releases (upstream PRs #283/#285). 3.3.4 predates the breakage, so the
+  #    Windows GUI+CLI build just works without version-specific patches.
+  # 3. Speed/simplicity: downloading prebuilts takes seconds; compiling FFmpeg
+  #    from source on windows-latest (MSYS2) is slow and fragile. Untrunc only
+  #    needs libavformat demuxers/decoders for atom parsing (new codecs are
+  #    handled by its own src/avc1 + src/hvc1 parsers), so old FFmpeg is enough.
+  #    libui is likewise pinned to alpha4.1, matching this toolchain.
+  # ---------------------------------------------------------------------------
+  build-windows:
+    name: Windows (${{ matrix.arch }})
+    runs-on: windows-latest
+    env:
+      FF_VER: "3.3.4"
+      LIBUI_VER: "alpha4.1"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - job: "32"
+            untr_dest: untrunc-windows-x32
+            msystem: MINGW32
+            arch: win32
+            arch_ui: "386"
+            sha_ffmpeg_dev: d5d48e0c24e4579230eb1a45e3589d27aceafd5391b044f3e6a24aa5d59c69eb
+            sha_ffmpeg_shared: 40bb6ba68d8d1f586a8a69f4bda47f7b8bae1598dfcc6b90123be63e66fd7400
+            sha_libui: e3d2e9a1862fa603d5d7b9d3ccb0692ba79f861bbe70030da32329d23e6fdbef
+          - job: "64"
+            untr_dest: untrunc-windows-x64
+            msystem: MINGW64
+            arch: win64
+            arch_ui: amd64
+            sha_ffmpeg_dev: 9226dfe7f386d339f529bc2ba1be1022a44c829aeeadd2d905593d176c696feb
+            sha_ffmpeg_shared: 4b2890ecf26130d2f11e5d9e25ccd008cbe8cbff633504729de24bf50f1e2c57
+            sha_libui: f0d262959fd96ea5caeef188b56680f7f638e7b3d8a68575ff58e4000ae75109
+
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 / MinGW
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: false
+          install: git zip unzip curl
+          pacboy: gcc:p make:p ntldd:p
+
+      - name: Download external artifacts
+        run: |
+          # Mirrored in our own release (win-deps-v1) so CI doesn't depend on web.archive.org.
+          # Originals: ffmpeg.zeranoe.com via web.archive.org, libui from andlabs/libui alpha4.1.
+          deps_base="https://github.com/fr0stb1rd/untrunc/releases/download/win-deps-v1"
+
+          curl -fsSL "${deps_base}/ffmpeg-${FF_VER}-${{ matrix.arch }}-dev.zip"                   -o ffmpeg-dev.zip
+          curl -fsSL "${deps_base}/ffmpeg-${FF_VER}-${{ matrix.arch }}-shared.zip"                -o ffmpeg-shared.zip
+          curl -fsSL "${deps_base}/libui-${LIBUI_VER}-windows-${{ matrix.arch_ui }}-mingw-static.zip" -o libui-static.zip
+
+      - name: Verify checksums (fail-fast)
+        run: |
+          cat > SHA256SUMS <<EOF
+          ${{ matrix.sha_ffmpeg_dev }}  ffmpeg-dev.zip
+          ${{ matrix.sha_ffmpeg_shared }}  ffmpeg-shared.zip
+          ${{ matrix.sha_libui }}  libui-static.zip
+          EOF
+          sha256sum -c SHA256SUMS
+
+      - name: Unpack into the MinGW sysroot
+        run: |
+          sysroot="$MINGW_PREFIX"
+
+          unzip -q ffmpeg-dev.zip
+          cp -r ffmpeg-${FF_VER}-${{ matrix.arch }}-dev/include/* "${sysroot}/include/"
+          cp -r ffmpeg-${FF_VER}-${{ matrix.arch }}-dev/lib/*     "${sysroot}/lib/"
+
+          unzip -q ffmpeg-shared.zip
+          cp -r ffmpeg-${FF_VER}-${{ matrix.arch }}-shared/bin/*  "${sysroot}/bin/"
+
+          unzip -q -d libui-static libui-static.zip
+          find libui-static -name '*.h' -exec cp {} "${sysroot}/include/" \;
+          find libui-static -name '*.a' -exec cp {} "${sysroot}/lib/" \;
+
+      - name: Build
+        run: |
+          mingw32-make IS_RELEASE=1
+          mingw32-make untrunc-gui LIBUI_STATIC=1 IS_RELEASE=1
+
+      - name: Bundle DLLs, strip and zip
+        run: |
+          dest="${{ matrix.untr_dest }}"
+          mkdir -p "$dest"
+
+          ntldd -R untrunc-gui.exe | awk '{print $1}' | sort -u | while read -r name; do
+            src="$MINGW_PREFIX/bin/$name"
+            [ -f "$src" ] || continue
+            cp -v "$src" "$dest/$(basename "$name" | tr '[:lower:]' '[:upper:]')"
+          done
+
+          strip untrunc.exe     -o "$dest/untrunc.exe"
+          strip untrunc-gui.exe -o "$dest/untrunc-gui.exe"
+          zip -r "${dest}.zip" "$dest"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.untr_dest }}
+          path: ${{ matrix.untr_dest }}.zip
+
+  build-linux-gui:
+    name: Linux GUI (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    needs: get-ffmpeg-version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            platform: linux/amd64
+            image: debian:12-slim
+            native: true
+            libui_asset: libui-ng-ubuntu-x64-static-release.zip
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            image: debian:12-slim
+            native: true
+            libui_asset: libui-ng-ubuntu-arm64-static-release.zip
+          - arch: armv7
+            runner: ubuntu-latest
+            platform: linux/arm/v7
+            image: debian:12-slim
+            native: false
+            libui_asset: libui-ng-ubuntu-armv7-static-release.zip
+          - arch: i386
+            runner: ubuntu-latest
+            platform: linux/386
+            image: i386/debian:12-slim
+            native: false
+            libui_asset: libui-ng-ubuntu-i386-static-release.zip
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        if: matrix.native == false
+        uses: docker/setup-qemu-action@v3
+
+      - name: Get latest libui-ng release tag
+        id: libui-tag
+        run: |
+          TAG=$(curl -s https://api.github.com/repos/fr0stb1rd/libui-ng/releases/latest \
+            | grep '"tag_name"' | head -1 | cut -d '"' -f4)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download libui-ng static zip
+        run: |
+          curl -sL \
+            "https://github.com/fr0stb1rd/libui-ng/releases/download/${{ steps.libui-tag.outputs.tag }}/${{ matrix.libui_asset }}" \
+            -o libui-ng.zip
+
+      - name: Cache compiled FFmpeg
+        id: cache-ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          key: ffmpeg-built-linux-${{ matrix.arch }}-${{ needs.get-ffmpeg-version.outputs.version }}
+
+      # ── amd64 / arm64: native runner + fr0stb1rd/libui-ng prebuilt zip ───────
+
+      - name: Install deps + libui-ng static (native)
+        if: matrix.native == true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y g++ make nasm wget libgtk-3-dev pkg-config unzip
+          sudo unzip -q libui-ng.zip -d /usr/local
+
+      - name: Build FFmpeg (native)
+        if: matrix.native == true && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+            https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz
+          mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+             ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak
+          cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+          ./configure --disable-doc --disable-programs \
+            --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+            --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+            --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma
+          make -j$(nproc)
+
+      - name: Build untrunc-gui (native)
+        if: matrix.native == true
+        run: |
+          GTK3_LIBS=$(pkg-config --libs gtk+-3.0)
+          make untrunc-gui \
+            FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} \
+            IS_RELEASE=1 \
+            LIBUI_STATIC=1 \
+            "EXTRA_LDFLAGS=${GTK3_LIBS}"
+          mv untrunc-gui untrunc-gui-linux-${{ matrix.arch }}
+
+      # ── armv7 / i386: Docker (+QEMU) + fr0stb1rd/libui-ng prebuilt zip ──────
+
+      - name: Build FFmpeg inside Docker (QEMU)
+        if: matrix.native == false && steps.cache-ffmpeg.outputs.cache-hit != 'true'
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make wget nasm xz-utils && \
+              wget -q -O /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz \
+                https://www.ffmpeg.org/releases/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              tar xf /tmp/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}.tar.xz && \
+              mv ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION \
+                 ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}/VERSION.bak && \
+              cd ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }} && \
+              ./configure --disable-doc --disable-programs \
+                --disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+                --disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
+                --disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma && \
+              make -j\$(nproc) && \
+              chown -R \$(stat -c '%u:%g' /workspace) /workspace/ffmpeg-${{ needs.get-ffmpeg-version.outputs.version }}
+            "
+
+      - name: Install libui-ng zip + build untrunc-gui inside Docker (QEMU)
+        if: matrix.native == false
+        run: |
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/workspace \
+            -w /workspace \
+            ${{ matrix.image }} /bin/bash -c "
+              apt-get update && \
+              apt-get install -y g++ make unzip pkg-config libgtk-3-dev && \
+              unzip -q libui-ng.zip -d /usr/local && \
+              GTK3_LIBS=\$(pkg-config --libs gtk+-3.0) && \
+              make untrunc-gui \
+                FF_VER=${{ needs.get-ffmpeg-version.outputs.version }} \
+                IS_RELEASE=1 \
+                LIBUI_STATIC=1 \
+                \"EXTRA_LDFLAGS=\${GTK3_LIBS}\" && \
+              mv untrunc-gui untrunc-gui-linux-${{ matrix.arch }} && \
+              chown \$(stat -c '%u:%g' /workspace) /workspace/untrunc-gui-linux-${{ matrix.arch }}
+            "
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: untrunc-gui-linux-${{ matrix.arch }}
+          path: untrunc-gui-linux-${{ matrix.arch }}
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [get-ffmpeg-version, build-linux, build-macos, build-windows, build-linux-gui]
+    permissions:
+      contents: write
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body: |
+            ## Untrunc Release
+
+            Automated builds for **Linux**, **macOS** and **Windows**, compiled with **FFmpeg ${{ needs.get-ffmpeg-version.outputs.version }}** (bundled — no ffmpeg installation needed).
+            Windows builds use prebuilt FFmpeg 3.3.4 + libui GUI and ship as `untrunc-windows-x32.zip` / `untrunc-windows-x64.zip`.
+
+            ### Which file to choose?
+
+            | Platform | CPU | File |
+            |---|---|---|
+            | Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-linux-amd64` |
+            | Linux 64-bit (ARM, e.g. RPi 4/5) | aarch64 | `untrunc-linux-arm64` |
+            | Linux 32-bit (ARM, e.g. RPi 2/3) | armv7 | `untrunc-linux-armv7` |
+            | Linux 32-bit (Intel/AMD) | i386 | `untrunc-linux-i386` |
+            | macOS (Intel) | x86_64 | `untrunc-macos-x86_64` |
+            | macOS (Apple Silicon M1/M2/M3) | arm64 | `untrunc-macos-arm64` |
+            | Windows 64-bit | x86_64 | `untrunc-windows-x64.zip` |
+            | Windows 32-bit | x86 | `untrunc-windows-x32.zip` |
+
+            ### GUI builds (Linux only, GTK3)
+
+            | Platform | CPU | File |
+            |---|---|---|
+            | Linux 64-bit (Intel/AMD) | x86_64 | `untrunc-gui-linux-amd64` |
+            | Linux 64-bit (ARM, e.g. RPi 4/5) | aarch64 | `untrunc-gui-linux-arm64` |
+            | Linux 32-bit (ARM, e.g. RPi 2/3) | armv7 | `untrunc-gui-linux-armv7` |
+            | Linux 32-bit (Intel/AMD) | i386 | `untrunc-gui-linux-i386` |
+
