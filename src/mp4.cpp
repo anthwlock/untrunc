@@ -2127,6 +2127,7 @@ bool Mp4::tryChunkPrediction(off_t& offset) {
 			addChunk(chunk);
 			pkt_idx_ += chunk.n_samples_;
 		}
+		setLastTrackIdx(chunk.track_idx_);
 
 		assert(chunk.size_ >= 0);
 		offset += chunk.size_;
