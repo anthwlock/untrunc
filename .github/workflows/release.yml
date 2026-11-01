@@ -43,7 +43,9 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
-          update: false
+          # Refresh package metadata and avoid restoring stale package downloads.
+          update: true
+          cache: false
           # install: literal package names (arch-independent, shared MSYS namespace)
           install: git zip unzip curl
           # pacboy: ':p' auto-prefixes with the active MSYSTEM (mingw-w64-i686-* / -x86_64-*)
