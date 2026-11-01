@@ -138,6 +138,7 @@ void Mp4::parseOk(const string& filename, bool accept_unhealthy) {
 			for (int i = 8; i < ftyp->content_.size(); i += 4) {
 				auto brand = ftyp->getString(i, 4);
 				if (brand == "CAEP") {  // e.g. 'Canon R5'
+					has_canon_brand_ = true;
 					logg(V, "detected 'CAEP', deactivating 'g_strict_nal_frame_check'\n");
 					g_strict_nal_frame_check = false;
 					g_ignore_keyframe_mismatch = true;
@@ -2307,6 +2308,12 @@ void Mp4::repair(const string& filename) {
 	duration_ = 0;
 	for(uint i=0; i < tracks_.size(); i++)
 		tracks_[i].clear();
+
+	if (repairCanon()) {
+		for (auto& track : tracks_) track.fixTimes();
+		saveVideo(getPathRepaired(filename_ok_, filename));
+		return;
+	}
 
 	off_t offset = 0;
 

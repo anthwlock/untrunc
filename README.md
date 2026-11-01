@@ -21,6 +21,7 @@ This fork improves the [original](https://github.com/ponchio/untrunc) in the fol
 * compatible with new versions of ffmpeg
 * handles invalid atom lengths
 * supports GoPro and Sony XAVC videos
+* recovers Canon HEVC recordings using embedded `repi` sample indexes
 * many bugs got fixed, actively maintained
 
 ## Building

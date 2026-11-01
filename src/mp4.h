@@ -185,6 +185,8 @@ private:
 
 	const uchar* loadFragment(off_t offset, bool update_cur_maxlen=true);
 	bool broken_is_64_ = false;
+	bool has_canon_brand_ = false;
+	bool repairCanon();
 	int64_t unknown_length_ = 0;
 	std::vector<uint> atoms_skipped_;
 
