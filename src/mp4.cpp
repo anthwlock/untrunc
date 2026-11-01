@@ -31,6 +31,7 @@ extern "C" {
 }
 
 #include "mp4.h"
+#include "hvc1/picture_order.h"
 #include "atom.h"
 #include "file.h"
 #include "rsv.h"
@@ -2378,7 +2379,10 @@ void Mp4::repair(const string& filename) {
 
 	if (g_muted) unmute();
 
-	for (auto& track : tracks_) track.fixTimes();
+	for (auto& track : tracks_) {
+		track.fixTimes();
+		recoverHevcCompositionOffsets(track, *mdat);
+	}
 
 	auto filename_fixed = getPathRepaired(filename_ok_, filename);
 	saveVideo(filename_fixed);

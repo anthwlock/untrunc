@@ -313,6 +313,7 @@ public:
 	void applyExcludedToOffs();
 
 	std::vector<int> orig_comp_offs_;  // from ctts
+	std::vector<int> composition_offsets_;  // recovered offsets, in track timescale
 	int dump_idx_ = 0;
 	bool chunkReachedSampleLimit();
 	int has_duplicates_ = false;

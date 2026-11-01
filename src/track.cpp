@@ -197,6 +197,7 @@ void Track::clear() {
 
 	keyframes_.clear();
 	chunks_.clear();
+	composition_offsets_.clear();
 
 	num_samples_ = 0;
 
@@ -537,7 +538,7 @@ void Track::saveChunkOffsets() {
 }
 
 void Track::saveCompositionOffsets() {  // aka DisplayOffsets
-	if (orig_ctts_.size()) {
+	if (composition_offsets_.empty() && orig_ctts_.size()) {
 		int orig_sz = orig_ctts_.size();
 //		auto r = findOrder(orig_ctts_, true);
 		auto r = findOrder(orig_ctts_);
@@ -545,26 +546,41 @@ void Track::saveCompositionOffsets() {  // aka DisplayOffsets
 		if (!r) logg(V, "ctts values seem unpredictable..\n");
 	}
 
-	if (!orig_ctts_.size() || g_no_ctts) {
+	if ((composition_offsets_.empty() && orig_ctts_.empty()) || g_no_ctts) {
 		if (g_no_ctts) logg(I, "pruning ctts..\n");
 		trak_->prune("ctts");
 		return;
 	}
 
 	vector<pair<int, int>> vp;
-	for (size_t cnt=0; cnt < num_samples_;) {
-		for (auto p : orig_ctts_) {
-			vp.emplace_back(p);
-			cnt += p.first;
-			if (cnt >= num_samples_) break;
+	if (!composition_offsets_.empty()) {
+		assert(composition_offsets_.size() == num_samples_);
+		for (auto offset : composition_offsets_) {
+			if (!vp.empty() && vp.back().second == offset) ++vp.back().first;
+			else vp.emplace_back(1, offset);
+		}
+	}
+	else {
+		for (size_t cnt=0; cnt < num_samples_;) {
+			for (auto p : orig_ctts_) {
+				vp.emplace_back(p);
+				cnt += p.first;
+				if (cnt >= num_samples_) break;
+			}
 		}
 	}
 
-	Atom *ctts = trak_->atomByNameSafe("ctts");
+	Atom *ctts = trak_->atomByName("ctts");
+	if (!ctts) {
+		ctts = new Atom;
+		ctts->name_ = "ctts";
+		trak_->atomByNameSafe("stbl")->children_.push_back(ctts);
+	}
 
 	ctts->content_.resize(4 + //version+flags
 	                      4 + //entries
 	                      8*vp.size());
+	if (!composition_offsets_.empty()) ctts->writeInt(0x01000000, 0); // signed offsets, version 1
 	ctts->seek(4);
 	ctts->writeInt(vp.size());
 	for (auto p : vp) {

@@ -113,7 +113,7 @@ ifeq ($(NJOBS), 0)
 endif
 
 FF_CONFIG_FLAGS := --disable-doc \
-	--disable-everything --enable-decoders --disable-vdpau --enable-demuxers --enable-protocol=file \
+	--disable-everything --enable-decoders --enable-parser=hevc --disable-vdpau --enable-demuxers --enable-protocol=file \
 	--disable-avdevice --disable-swresample --disable-swscale --disable-avfilter \
 	--disable-xlib --disable-vaapi --disable-zlib --disable-bzlib --disable-lzma \
 	--disable-audiotoolbox --disable-videotoolbox
