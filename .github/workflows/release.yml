@@ -46,11 +46,11 @@ jobs:
           # Refresh package metadata and avoid restoring stale package downloads.
           update: true
           cache: false
-          # install: literal package names (arch-independent, shared MSYS namespace)
-          install: git zip unzip curl
+          # Use MSYS make for both architectures; MinGW32 no longer packages make.
+          install: git zip unzip curl make
           # pacboy: ':p' auto-prefixes with the active MSYSTEM (mingw-w64-i686-* / -x86_64-*)
           # ntldd: arch-aware PE dependency lister (ldd mis-resolves 32-bit exes)
-          pacboy: gcc:p make:p ntldd:p
+          pacboy: gcc:p ntldd:p
 
       - name: Download external artifacts
         run: |
@@ -87,8 +87,8 @@ jobs:
 
       - name: Build
         run: |
-          mingw32-make IS_RELEASE=1
-          mingw32-make untrunc-gui LIBUI_STATIC=1 IS_RELEASE=1
+          make IS_RELEASE=1
+          make untrunc-gui LIBUI_STATIC=1 IS_RELEASE=1
 
       - name: Bundle DLLs, strip and zip
         run: |
