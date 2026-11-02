@@ -167,7 +167,7 @@ private:
 	static BufferedAtom* mdatFromRange(FileRead& file_read, BufferedAtom& mdat);
 	static bool findAtom(FileRead& file_read, std::string atom_name, Atom& atom);
 	BufferedAtom* findMdat(FileRead& file_read);
-	AVFormatContext *context_;
+	AVFormatContext *context_ = nullptr;
 
 	void parseHealthy();
 	void parseTracksOk();
