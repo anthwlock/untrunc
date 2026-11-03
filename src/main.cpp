@@ -26,6 +26,7 @@
 #include "mp4.h"
 #include "atom.h"
 #include "common.h"
+#include "mxf.h"
 
 using namespace std;
 
@@ -40,6 +41,7 @@ void usage() {
 	     << "-st <step_size> - used with '-s'\n"
 	     << "-sv - stretches video to match audio duration (beta)\n"
 	     << "-rsv-ben - RSV file recovery (Sony recording-in-progress files)\n"
+	     << "-mxf - repair MXF metadata using a compatible known-good reference\n"
 	     << "-dw - don't write _fixed.mp4\n"
 	     << "-dr - dump repaired tracks, implies '-dw'\n"
 	     << "-k  - keep unknown sequences\n"
@@ -105,6 +107,7 @@ int main(int argc, char *argv[]) {
 	bool listm = false;
 	bool shorten = false;
 	bool force_shorten = false;
+	bool recover_mxf = false;
 	off_t arg_offset = -1;
 	int arg_step = -1;
 	int arg_range = -1;
@@ -155,6 +158,7 @@ int main(int argc, char *argv[]) {
 			else if (a == "dcc") g_ignore_out_of_bound_chunks = true;
 			else if (a == "dyn") g_use_chunk_stats = true;
 			else if (a == "rsv-ben") g_rsv_ben_mode = true;
+			else if (a == "mxf") recover_mxf = true;
 			else if (a == "range") arg_range = kExpectArg;
 			else if (a == "dst") arg_dst = kExpectArg;
 			else if (a == "skip") g_skip_existing = true;
@@ -202,6 +206,7 @@ int main(int argc, char *argv[]) {
 		if (unite) {chkC(); Mp4::unite(ok, corrupt); return 0;}
 		if (shorten) {Mp4::shorten(ok, corrupt.size() ? stoi(corrupt) : 500, force_shorten); return 0;}
 		if (listm) {Mp4::listm(ok); return 0;}
+		if (recover_mxf) { chkC(); MxfRepair::repair(ok, corrupt, g_dst_path); return 0; }
 
 		Mp4 mp4;
 		g_mp4 = &mp4;  // singleton is overkill, this is good enough
@@ -228,6 +233,7 @@ int main(int argc, char *argv[]) {
 	}
 	catch (const char* e) {return cerr << e << '\n', 1;}
 	catch (string e) {return cerr << e << '\n', 1;}
+	catch (const exception& e) {return cerr << e.what() << '\n', 1;}
 
 	chkHiddenWarnings();
 	return 0;
