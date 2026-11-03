@@ -3,6 +3,10 @@
 #include <string.h>  // memset
 #include <thread>
 
+#ifdef _WIN32
+#include "file-drop.h"
+#endif
+
 extern "C" {
 #include "libavutil/log.h"
 }
@@ -53,6 +57,9 @@ void Gui::init() {
 	uiTimer(100, Gui::writeOutput, NULL);
 
 	uiWindowOnClosing(window_, Gui::onClosing, NULL);
+#ifdef _WIN32
+	FileDrop::enable(window_);
+#endif
 }
 
 void Gui::run() {
@@ -115,6 +122,10 @@ uiEntry* Gui::addFileOpen(uiBox* parent_box, const char* text) {
 	uiBoxAppend(h_box, uiControl(button), 0);
 	uiBoxAppend(h_box, uiControl(entry), 1);
 	uiBoxAppend(parent_box, uiControl(h_box), 1);
+#ifdef _WIN32
+	FileDrop::registerPicker(uiControl(button), entry);
+	FileDrop::registerPicker(uiControl(entry), entry);
+#endif
 	return entry;
 }
 
