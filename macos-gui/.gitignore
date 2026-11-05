@@ -1,0 +1,16 @@
+# Swift build artifacts
+.build/
+*.o
+*.d
+
+# Generated app bundle
+Untrunc.app/
+
+# DMG installer
+*.dmg
+
+# Pre-built CLI binary (compiled locally, not committed)
+Sources/UntruncGUI/untrunc
+
+# macOS
+.DS_Store
