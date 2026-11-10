@@ -381,7 +381,7 @@ void Track::parseSampleToChunk(){
 		int n_samples = stsc->readInt();
 		off += 4;
 
-		for (int i=start_idx; i < end_idx; i++) {
+		for (int i = std::max(1, start_idx); i < std::min(end_idx, (int)chunks_.size() + 1); i++) {
 			chunks_[i-1].n_samples_ = n_samples;
 		}
 	}
